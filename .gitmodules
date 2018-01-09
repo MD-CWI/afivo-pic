@@ -4,3 +4,6 @@
 [submodule "afivo"]
 	path = src/afivo
 	url = https://gitlab.com/MD-CWI-NL/afivo.git
+[submodule "config_fortran"]
+	path = src/config_fortran
+	url = https://github.com/jannisteunissen/config_fortran
