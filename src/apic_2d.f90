@@ -13,7 +13,7 @@ program apic_2d
   integer(int8)          :: t_start, t_current, count_rate
   real(dp)               :: dt, sum_elec, sum_pos_ion
   real(dp)               :: wc_time, inv_count_rate, time_last_print
-  integer                :: it
+  integer                :: it, id, n_part_id
   character(len=ST_slen) :: fname
   logical                :: write_out
   type(CFG_t)            :: cfg  ! The configuration for the simulation
@@ -121,10 +121,7 @@ program apic_2d
      call PC_verlet_correct_accel(pc, dt)
 
      if (modulo(it, 10) == 0) then
-        print *, "befor", pc%get_num_sim_part()
-        call pc%merge_and_split((/.true., .true., .true./), 1e-12_dp, &
-             .true., weight_func, 1.0e10_dp, PC_merge_part_rxv, PC_split_part)
-        print *, "after", pc%get_num_sim_part(), pc%get_num_real_part()
+        call adapt_weights(tree, pc)
      end if
 
      if (write_out) then
@@ -139,6 +136,68 @@ program apic_2d
   end do
 
 contains
+
+  subroutine adapt_weights(tree, pc)
+    type(a2_t), intent(in)    :: tree
+    type(PC_t), intent(inout) :: pc
+    integer, allocatable      :: id_ipart(:)
+
+    call sort_by_id(tree, pc, id_ipart)
+
+    ! print *, "befor", pc%get_num_sim_part(), pc%get_num_real_part()
+    !$omp parallel do private(id, n_part_id) schedule(dynamic)
+    do id = 1, tree%highest_id
+       n_part_id = id_ipart(id+1) - id_ipart(id)
+       if (n_part_id > 0) then
+          call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
+               (/.true., .true., .false./), 1e-12_dp, &
+               .true., weight_func, 1.0e10_dp, PC_merge_part_rxv, PC_split_part)
+       end if
+    end do
+    !$omp end parallel do
+
+    call pc%clean_up()
+    ! print *, "after", pc%get_num_sim_part(), pc%get_num_real_part()
+  end subroutine adapt_weights
+
+  subroutine sort_by_id(tree, pc, id_ipart)
+    type(a2_t), intent(in)              :: tree
+    type(PC_t), intent(inout)           :: pc
+    integer, intent(inout), allocatable :: id_ipart(:)
+
+    integer                      :: n, n_part, id, new_ix
+    integer, allocatable         :: id_count(:)
+    integer, allocatable         :: id_ix(:)
+    type(PC_part_t), allocatable :: p_copy(:)
+
+    if (allocated(id_ipart)) deallocate(id_ipart)
+    allocate(id_ipart(tree%highest_id+1))
+    allocate(id_ix(tree%highest_id+1))
+    allocate(id_count(tree%highest_id))
+    allocate(p_copy(pc%n_part))
+
+    id_count(:) = 0
+
+    do n = 1, pc%n_part
+       id           = pc%particles(n)%id
+       id_count(id) = id_count(id) + 1
+       p_copy(n)    = pc%particles(n)
+    end do
+
+    id_ix(1) = 1
+    do id = 2, tree%highest_id+1
+       id_ix(id) = id_ix(id-1) + id_count(id-1)
+    end do
+
+    id_ipart(:) = id_ix(:)
+
+    do n = 1, pc%n_part
+       id                   = p_copy(n)%id
+       new_ix               = id_ix(id)
+       id_ix(id)            = id_ix(id) + 1
+       pc%particles(new_ix) = p_copy(n)
+    end do
+  end subroutine sort_by_id
 
   !> Initialize the AMR tree
   subroutine init_tree(tree)
@@ -290,6 +349,7 @@ contains
     integer               :: n, i, n_part, n_events
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: weights(:)
+    integer, allocatable  :: id_guess(:)
 
     n_part = pc%get_num_sim_part()
     n_events = events%n_stored
@@ -297,11 +357,13 @@ contains
 
     allocate(coords(2, n))
     allocate(weights(n))
+    allocate(id_guess(n))
 
     !$omp parallel do
     do n = 1, n_part
        coords(:, n) = pc%particles(n)%x(1:2)
        weights(n) = pc%particles(n)%w
+       id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
 
@@ -310,14 +372,16 @@ contains
        call a2_tree_clear_cc(tree, i_pos_ion)
 
        call a2_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, 1)
+            weights(1:n_part), n_part, 1, id_guess(1:n_part))
        call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, 1)
+            weights(1:n_part), n_part, 1, id_guess(1:n_part))
     else
        call a2_tree_clear_cc(tree, i_electron)
        call a2_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, 1)
+            weights(1:n_part), n_part, 1, id_guess(1:n_part))
     end if
+
+    pc%particles(1:n_part)%id = id_guess(1:n_part)
 
     i = 0
     do n = 1, n_events
@@ -325,11 +389,14 @@ contains
           i = i + 1
           coords(:, i) = events%list(n)%part%x(1:2)
           weights(i) = events%list(n)%part%w
+          id_guess(i) = events%list(n)%part%id
        end if
     end do
 
-    call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
-         weights(1:i), i, 1)
+    if (i > 0) then
+       call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
+            weights(1:i), i, 1, id_guess(1:i))
+    end if
 
     events%n_stored = 0
 
@@ -385,7 +452,7 @@ contains
     type(a2_loc_t)              :: loc
     integer                     :: id, ix(2)
 
-    loc = a2_get_loc(tree, my_part%x(1:2))
+    loc = a2_get_loc(tree, my_part%x(1:2), my_part%id)
     id = loc%id
     ix = loc%ix
 
@@ -393,6 +460,11 @@ contains
     weight = n_elec / PM_part_per_cell
     weight = max(1.0_dp, min(PM_max_weight, weight))
   end function weight_func
+
+  real(dp) function id_as_real(my_part)
+    type(PC_part_t), intent(in) :: my_part
+    id_as_real = my_part%id
+  end function id_as_real
 
   subroutine print_status()
     write(*, "(F7.2,A,I0,A,E10.3,A,E10.3,A,E10.3,A,E10.3,A,E10.3)") &
