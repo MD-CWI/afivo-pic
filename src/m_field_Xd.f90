@@ -143,7 +143,7 @@ contains
     call a$D_loop_box(tree, field_from_potential)
 
     ! Set the field norm also in ghost cells
-    call a$D_gc_tree(tree, [i_Ex, i_Ey], a$D_gc_interp, a$D_bc_neumann_zero)
+    call a$D_gc_tree(tree, [i_Ex, i_Ey, i_E], a$D_gc_interp, a$D_bc_neumann_zero)
   end subroutine field_compute
 
   !> Compute the electric field at a given time
@@ -341,6 +341,8 @@ contains
          (box%cc(0:nc-1, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, i_phi))
     box%cc(1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr * &
          (box%cc(1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 2:nc+1, i_phi))
+    box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
+         box%cc(1:nc, 1:nc, i_Ey)**2)
 
     ! box%cc(1:nc, 1:nc, i_electric_fld) = 0.5_dp * sqrt(&
     !      (box%fc(1:nc, 1:nc, 1, electric_fld) + &

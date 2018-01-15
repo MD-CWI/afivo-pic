@@ -22,7 +22,15 @@ module m_init_cond_$Dd
   ! This will contain the initial conditions
   type(initcnd_t), protected, public :: init_conds
 
+  integer               :: num_particle_seeds
+  integer, allocatable  :: seed_counts(:)
+  real(dp), allocatable :: seed_weights(:)
+  real(dp), allocatable :: seed_sigmas(:)
+  real(dp), allocatable :: seed_pos(:, :)
+  real(dp)              :: background_density = 0.0_dp
+
   public :: init_cond_initialize
+  public :: init_cond_particles
   public :: init_cond_set_box
 
 contains
@@ -49,9 +57,8 @@ contains
          "Type of seed: neutral (0), ions (1) or electrons (-1)", .true.)
     call CFG_add(cfg, "seed_width", [0.25d-3], &
          "Seed width (m)", .true.)
-    call CFG_add(cfg, "seed_falloff", ['smoothstep'], &
-         "Fall-off type for seed (sigmoid, gaussian, smoothstep, step, laser), "&
-         &"default=smoothstep", .true.)
+    call CFG_add(cfg, "seed_falloff", ['gaussian'], &
+         "Fall-off type for seed (gaussian, step), default=gaussian", .true.)
 
     call CFG_get_size(cfg, "seed_density", n_cond)
     ic%n_cond = n_cond
@@ -94,7 +101,68 @@ contains
 
     init_conds = ic
 
+    call CFG_add_get(cfg, "pseed%background_density", background_density, &
+         "Background density of electrons")
+    call CFG_add(cfg, "pseed%counts", [100], &
+         "Number of particles per seed", .true.)
+    call CFG_get_size(cfg, "pseed%counts", n_cond)
+    num_particle_seeds = n_cond
+
+    allocate(seed_weights(n_cond))
+    seed_weights = 1.0_dp
+    allocate(seed_counts(n_cond))
+    seed_counts = 100
+    allocate(seed_sigmas(n_cond))
+    seed_sigmas = 1e-4_dp
+    allocate(seed_pos(2, n_cond))
+    deallocate(tmp_vec)
+    allocate(tmp_vec(2 * n_cond))
+    tmp_vec = 0.5_dp
+
+    call CFG_get(cfg, "pseed%counts", seed_counts)
+    call CFG_add_get(cfg, "pseed%weights", seed_weights, &
+         "Weight of electrons for the Gaussian seeds", .true.)
+    call CFG_add_get(cfg, "pseed%sigmas", seed_sigmas, &
+         "Width of the Gaussian seeds", .true.)
+    call CFG_add_get(cfg, "pseed%pos", tmp_vec, &
+         "Relative location of the Gaussian seeds", .true.)
+    seed_pos = reshape(tmp_vec * ST_domain_len, [2, n_cond])
+
   end subroutine init_cond_initialize
+
+  subroutine init_cond_particles(tree, pc)
+    use m_particle_core
+    type(a2_t), intent(inout) :: tree
+    type(PC_t), intent(inout) :: pc
+    integer                   :: n, i, n_background
+    real(dp)                  :: x(3), v(3), a(3), w, t_left
+    real(dp)                  :: pos(3)
+    type(PC_part_t)           :: part
+
+    part%v      = 0.0_dp
+    part%a      = 0.0_dp
+    part%t_left = 0.0_dp
+
+    ! n_background = background_density * ST_domain_len**2
+    ! do i = 1, 
+
+    ! end do
+
+    do n = 1, num_particle_seeds
+       pos(1:2)  = tree%r_base + seed_pos(1:2, n)
+       pos(3)    = 0.0_dp
+       part%x(3) = pos(3)
+       part%w    = seed_weights(n)
+
+       do i = 1, seed_counts(n)
+          part%x(1:2) = pos(1:2) + ST_rng%two_normals() * seed_sigmas(n)
+
+          if (outside_check(part) <= 0) then
+             call pc%add_part(part)
+          end if
+       end do
+    end do
+  end subroutine init_cond_particles
 
   !> Sets the initial condition
   subroutine init_cond_set_box(box)

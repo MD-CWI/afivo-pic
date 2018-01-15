@@ -5,7 +5,8 @@ VPATH	:= config_fortran
 
 include afivo/makerules.make
 
-OBJS := apic_2d.o m_streamer.o m_field_2d.o m_config.o m_init_cond_2d.o m_geometry.o
+OBJS := apic_2d.o m_streamer.o m_field_2d.o m_config.o m_init_cond_2d.o	\
+m_geometry.o m_transport_data.o
 PROGS := ../apic_2d
 
 .PHONY: all clean afivo/src/libafivo.a particle_core/src/libparticle_core.a
@@ -45,5 +46,5 @@ $(PROGS): afivo/src/libafivo.a particle_core/src/libparticle_core.a
 $(PROGS): $(OBJS)
 
 apic_2d.o: m_streamer.mod m_field_2d.mod m_init_cond_2d.mod
-m_streamer.o: m_config.mod
+m_streamer.o: m_config.mod m_transport_data.mod
 m_init_cond_2d.o: m_geometry.mod

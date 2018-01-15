@@ -24,9 +24,16 @@ module m_streamer
   integer, protected :: i_phi      = -1 ! Electrical potential
   integer, protected :: i_Ex       = -1 ! Electric field (x)
   integer, protected :: i_Ey       = -1 ! Electric field (x)
+  integer, protected :: i_E        = -1  ! Electric field (x)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
 
   integer, parameter :: name_len = 12
+
+  ! Table with transport data vs electric field
+  type(lookup_table_t), protected :: ST_td_tbl
+
+  ! Index of alpha transport data
+  integer, parameter :: i_td_alpha = 1
 
   ! Names of the cell-centered variables
   character(len=name_len), allocatable :: ST_cc_names(:)
@@ -70,8 +77,11 @@ module m_streamer
   ! Refine if alpha*dx is larger than this value
   real(dp), protected :: ST_refine_adx = 1.0_dp
 
-  ! For refinement, use alpha(f * E)/f, where f is this factor
-  real(dp), protected :: ST_refine_adx_fac = 1.0_dp
+  ! Refine if dx^2 * rhs is larger than this value (Volts)
+  real(dp), protected :: ST_refine_cphi = 1.0_dp
+
+  ! Only refine if electron density is above this value
+  real(dp), protected :: ST_refine_elec_dens = 1.0e13_dp
 
   ! Only derefine if grid spacing if smaller than this value
   real(dp), protected :: ST_derefine_dx = 1e-4_dp
@@ -121,14 +131,18 @@ module m_streamer
   ! Pressure of the gas in bar
   real(dp), protected :: ST_gas_pressure = 1.0_dp
 
+  ! Name of the gas mixture
+  character(len=ST_slen) :: ST_gas_name = "AIR"
+
   ! Fraction of O2
   real(dp), protected :: ST_gas_frac_O2 = 0.2_dp
 
   ! Number of V-cycles to perform per time step
   integer, protected :: ST_multigrid_num_vcycles = 2
 
-  real(dp) :: ST_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.5_dp]
-  real(dp) :: ST_init_seed_sigma    = 1.0e-5_dp
+  ! Position of initial electron seed
+  real(dp) :: ST_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.9_dp]
+  real(dp) :: ST_init_seed_sigma    = 1.0e-3_dp
   integer  :: ST_init_num_particles = 10000
 
 contains
@@ -193,6 +207,7 @@ contains
     i_phi = ST_add_cc_variable("phi", .true.)
     i_Ex = ST_add_cc_variable("Ex", .true.)
     i_Ey = ST_add_cc_variable("Ey", .true.)
+    i_E = ST_add_cc_variable("E", .true.)
     i_rhs = ST_add_cc_variable("rhs", .true.)
 
     call CFG_add_get(cfg, "cylindrical", ST_cylindrical, &
@@ -209,9 +224,11 @@ contains
          "The number of grid cells per coordinate in a box")
     call CFG_add_get(cfg, "domain_len", ST_domain_len, &
          "The length of the domain (m)")
-    call CFG_add_get(cfg, "gas_pressure", ST_gas_pressure, &
+    call CFG_add_get(cfg, "gas%pressure", ST_gas_pressure, &
          "The gas pressure (bar), used for photoionization")
-    call CFG_add_get(cfg, "gas_frac_O2", ST_gas_frac_O2, &
+    call CFG_add_get(cfg, "gas%name", ST_gas_name, &
+         "The name of the gas mixture used")
+    call CFG_add_get(cfg, "gas%frac_O2", ST_gas_frac_O2, &
          "Fraction of O2, used for photoionization")
 
     call CFG_add_get(cfg, "multigrid_num_vcycles", ST_multigrid_num_vcycles, &
@@ -224,51 +241,53 @@ contains
     call CFG_add_get(cfg, "dt_min", ST_dt_min, &
          "The minimum timestep (s)")
 
-    call CFG_add_get(cfg, "refine_buffer_width", ST_refine_buffer_width, &
+    call CFG_add_get(cfg, "refine%buffer_width", ST_refine_buffer_width, &
          "The refinement buffer width in cells (around flagged cells)")
-    call CFG_add_get(cfg, "refine_per_steps", ST_refine_per_steps, &
+    call CFG_add_get(cfg, "refine%per_steps", ST_refine_per_steps, &
          "The number of steps after which the mesh is updated")
-    call CFG_add_get(cfg, "refine_min_dx", ST_refine_min_dx, &
+    call CFG_add_get(cfg, "refine%min_dx", ST_refine_min_dx, &
          "The grid spacing will always be larger than this value")
-    call CFG_add_get(cfg, "refine_max_dx", ST_refine_max_dx, &
+    call CFG_add_get(cfg, "refine%max_dx", ST_refine_max_dx, &
          "The grid spacing will always be smaller than this value")
 
     if (ST_refine_min_dx > ST_refine_max_dx) &
          error stop "Cannot have refine_min_dx < refine_max_dx"
 
-    call CFG_add_get(cfg, "refine_adx", ST_refine_adx, &
+    call CFG_add_get(cfg, "refine%adx", ST_refine_adx, &
          "Refine if alpha*dx is larger than this value")
-    call CFG_add_get(cfg, "refine_adx_fac", ST_refine_adx_fac, &
-         "For refinement, use alpha(f * E)/f, where f is this factor")
+    call CFG_add_get(cfg, "refine%cphi", ST_refine_cphi, &
+         "Refine if the curvature in phi is larger than this value")
+    call CFG_add_get(cfg, "refine%elec_dens", ST_refine_elec_dens, &
+         "Only refine if electron density is above this value")
     call CFG_add_get(cfg, "derefine_dx", ST_derefine_dx, &
          "Only derefine if grid spacing if smaller than this value")
-    call CFG_add_get(cfg, "refine_init_time", ST_refine_init_time, &
+    call CFG_add_get(cfg, "refine%init_time", ST_refine_init_time, &
          "Refine around initial conditions up to this time")
-    call CFG_add_get(cfg, "refine_init_fac", ST_refine_init_fac, &
+    call CFG_add_get(cfg, "refine%init_fac", ST_refine_init_fac, &
          "Refine until dx is smaller than this factor times the seed width")
 
-    call CFG_add(cfg, "refine_regions_dr", [1.0e99_dp], &
+    call CFG_add(cfg, "refine%regions_dr", [1.0e99_dp], &
          "Refine regions up to this grid spacing", .true.)
-    call CFG_add(cfg, "refine_regions_tstop", [-1.0e99_dp], &
+    call CFG_add(cfg, "refine%regions_tstop", [-1.0e99_dp], &
          "Refine regions up to this simulation time", .true.)
     vec = 0.0_dp
-    call CFG_add(cfg, "refine_regions_rmin", vec, &
+    call CFG_add(cfg, "refine%regions_rmin", vec, &
          "Minimum coordinate of the refinement regions", .true.)
-    call CFG_add(cfg, "refine_regions_rmax", vec, &
+    call CFG_add(cfg, "refine%regions_rmax", vec, &
          "Maximum coordinate of the refinement regions", .true.)
 
-    call CFG_get_size(cfg, "refine_regions_dr", n)
+    call CFG_get_size(cfg, "refine%regions_dr", n)
     allocate(ST_refine_regions_dr(n))
     allocate(ST_refine_regions_tstop(n))
     allocate(ST_refine_regions_rmin(ndim, n))
     allocate(ST_refine_regions_rmax(ndim, n))
     allocate(dbuffer(ndim * n))
 
-    call CFG_get(cfg, "refine_regions_dr", ST_refine_regions_dr)
-    call CFG_get(cfg, "refine_regions_tstop", ST_refine_regions_tstop)
-    call CFG_get(cfg, "refine_regions_rmin", dbuffer)
+    call CFG_get(cfg, "refine%regions_dr", ST_refine_regions_dr)
+    call CFG_get(cfg, "refine%regions_tstop", ST_refine_regions_tstop)
+    call CFG_get(cfg, "refine%regions_rmin", dbuffer)
     ST_refine_regions_rmin = reshape(dbuffer, [ndim, n])
-    call CFG_get(cfg, "refine_regions_rmax", dbuffer)
+    call CFG_get(cfg, "refine%regions_rmax", dbuffer)
     ST_refine_regions_rmax = reshape(dbuffer, [ndim, n])
 
     call CFG_add_get(cfg, "rng_seed", rng_int4_seed, &
@@ -284,6 +303,8 @@ contains
     n_threads = af_get_max_threads()
     call ST_prng%init_parallel(n_threads, ST_rng)
 
+    call ST_load_transport_data(cfg)
+
   end subroutine ST_initialize
 
   !> Get a random seed based on the current time
@@ -296,5 +317,49 @@ contains
        seed(i) = ishftc(time, i*8)
     end do
   end function get_random_seed
+
+  !> Initialize the transport coefficients
+  subroutine ST_load_transport_data(cfg)
+    use m_transport_data
+    use m_config
+
+    type(CFG_t), intent(inout) :: cfg
+
+    character(len=ST_slen)     :: td_file = "input/transport_data.txt"
+    integer                    :: table_size       = 500
+    real(dp)                   :: max_electric_fld = 3e7_dp
+    real(dp), allocatable      :: x_data(:), y_data(:)
+    character(len=ST_slen)     :: data_name
+
+    call CFG_add_get(cfg, "transport_data_file", td_file, &
+         "Input file with transport data")
+    call CFG_add_get(cfg, "lookup_table_size", table_size, &
+         "The transport data table size in the fluid model")
+    call CFG_add_get(cfg, "lookup_table_max_efield", max_electric_fld, &
+         "The maximum electric field in the fluid model coefficients")
+
+    ! Create a lookup table for the model coefficients
+    ST_td_tbl = LT_create(0.0_dp, max_electric_fld, table_size, 1)
+
+    ! Fill table with data
+    data_name = "efield[V/m]_vs_alpha[1/m]"
+    call CFG_add_get(cfg, "td_alpha_name", data_name, &
+         "The name of the eff. ionization coeff.")
+    call TD_get_from_file(td_file, ST_gas_name, &
+         trim(data_name), x_data, y_data)
+    call LT_set_col(ST_td_tbl, i_td_alpha, x_data, y_data)
+
+  end subroutine ST_load_transport_data
+
+  pure integer function outside_check(my_part)
+    use m_particle_core
+    type(PC_part_t), intent(in) :: my_part
+
+    if (any(my_part%x(1:2) < 0.0_dp .or. my_part%x(1:2) > ST_domain_len)) then
+       outside_check = 1
+    else
+       outside_check = 0
+    end if
+  end function outside_check
 
 end module m_streamer

@@ -24,7 +24,7 @@ program apic_2d
   type(ref_info_t)       :: ref_info
 
   real(dp), parameter :: PM_part_per_cell = 100
-  real(dp), parameter :: PM_max_weight    = 1000000
+  real(dp), parameter :: PM_max_weight    = 1e20_dp
 
   integer :: output_cnt = 0 ! Number of output files written
 
@@ -33,6 +33,8 @@ program apic_2d
 
   call field_initialize(cfg, mg)
   call init_cond_initialize(cfg, 2)
+
+  call init_particle(cfg, pc)
 
   fname = trim(ST_output_dir) // "/" // trim(ST_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
@@ -60,10 +62,8 @@ program apic_2d
   output_cnt      = 0         ! Number of output files written
   ST_time         = 0         ! Simulation time (all times are in s)
 
-  call init_particle(cfg, pc)
-
   ! Set up the initial conditions
-  call create_initial_particles(tree, pc)
+  call init_cond_particles(tree, pc)
 
   do
      call particles_to_density(tree, pc, events, .true.)
@@ -133,6 +133,17 @@ program apic_2d
         call a2_write_silo(tree, fname, output_cnt, ST_time, &
              vars_for_output, dir=ST_output_dir)
      end if
+
+     if (mod(it, ST_refine_per_steps) == 0) then
+        call a2_adjust_refinement(tree, refine_routine, ref_info, &
+             ST_refine_buffer_width, .true.)
+
+        if (ref_info%n_add > 0) then
+           ! Compute the field on the new mesh
+           call particles_to_density(tree, pc, events, .false.)
+           call field_compute(tree, mg, .true.)
+        end if
+     end if
   end do
 
 contains
@@ -151,13 +162,15 @@ contains
        if (n_part_id > 0) then
           call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
                (/.true., .true., .false./), 1e-12_dp, &
-               .true., weight_func, 1.0e10_dp, PC_merge_part_rxv, PC_split_part)
+               .true., get_desired_weight, 1.0e10_dp, &
+               PC_merge_part_rxv, PC_split_part)
        end if
     end do
     !$omp end parallel do
 
     call pc%clean_up()
     ! print *, "after", pc%get_num_sim_part(), pc%get_num_real_part()
+    ! print *, "after", pc%get_num_real_part()/pc%get_num_sim_part()
   end subroutine adapt_weights
 
   subroutine sort_by_id(tree, pc, id_ipart)
@@ -245,13 +258,13 @@ contains
     type(CS_t), allocatable        :: cross_secs(:)
 
     ! Gas parameters
-    call CFG_add(cfg, "gas_temperature", 300.0_dp, &
+    call CFG_add(cfg, "gas%temperature", 300.0_dp, &
          "The gas temperature (Kelvin)")
-    call CFG_add(cfg, "gas_components", (/"N2"/), &
+    call CFG_add(cfg, "gas%components", (/"N2"/), &
          "The names of the gases used in the simulation", .true.)
-    call CFG_add(cfg, "gas_file", "input/cs_example.txt", &
+    call CFG_add(cfg, "gas%file", "input/cs_example.txt", &
          "The file in which to find cross section data")
-    call CFG_add(cfg, "gas_fractions", (/1.0_dp /), &
+    call CFG_add(cfg, "gas%fractions", (/1.0_dp /), &
          & "The partial pressure of the gases (as if they were ideal gases)", .true.)
 
     ! Particle model related parameters
@@ -266,18 +279,18 @@ contains
     call CFG_add(cfg, "boris_dt_factor", 0.1_dp, &
          "The maximum time step in terms of the cylotron frequency")
 
-    call CFG_get_size(cfg, "gas_components", n_gas_comp)
-    call CFG_get_size(cfg, "gas_fractions", n_gas_frac)
+    call CFG_get_size(cfg, "gas%components", n_gas_comp)
+    call CFG_get_size(cfg, "gas%fractions", n_gas_frac)
     if (n_gas_comp /= n_gas_frac) &
-         error stop "gas_components and gas_component_fracs have unequal size"
+         error stop "gas%components and gas%fractions have unequal size"
     allocate(gas_names(n_gas_comp))
     allocate(gas_fracs(n_gas_comp))
 
-    call CFG_get(cfg, "gas_components", gas_names)
-    call CFG_get(cfg, "gas_fractions", gas_fracs)
-    call CFG_get(cfg, "gas_temperature", temperature)
+    call CFG_get(cfg, "gas%components", gas_names)
+    call CFG_get(cfg, "gas%fractions", gas_fracs)
+    call CFG_get(cfg, "gas%temperature", temperature)
 
-    call CFG_get(cfg, "gas_file", cs_file)
+    call CFG_get(cfg, "gas%file", cs_file)
     call CFG_get(cfg, "particle%max_energy_ev", max_ev)
     call CFG_get(cfg, "particle%max_number", max_num_part)
 
@@ -299,6 +312,7 @@ contains
          tbl_size, max_ev, max_num_part, get_random_seed())
 
     pc%accel_function => get_accel
+    pc%outside_check => outside_check
 
     where (pc%colls(:)%type == CS_ionize_t)
        pc%coll_is_event(:) = .true.
@@ -315,29 +329,6 @@ contains
     accel(1:2) = accel(1:2) * UC_elec_q_over_m
     accel(3) = 0.0_dp
   end function get_accel
-
-  subroutine create_initial_particles(tree, pc)
-    type(a2_t), intent(inout) :: tree
-    type(PC_t), intent(inout) :: pc
-    integer                   :: n
-    real(dp)                  :: x(3), v(3), a(3), w, t_left
-    real(dp)                  :: pos(3)
-
-    pos(1:2) = tree%r_base + ST_init_seed_pos(1:2) * tree%n_cell * tree%dr_base
-    pos(3) = 0
-
-    v = 0.0_dp
-    a = 0.0_dp
-    w = 1000.0_dp
-    t_left = 0.0_dp
-
-    do n = 1, ST_init_num_particles
-       x(1:2) = ST_rng%two_normals()
-       x(3)   = 0.0_dp
-       x      = pos + x * ST_init_seed_sigma
-       call pc%create_part(x, v, a, w, t_left)
-    end do
-  end subroutine create_initial_particles
 
   subroutine particles_to_density(tree, pc, events, init_cond)
     use m_cross_sec
@@ -411,17 +402,34 @@ contains
     integer, intent(out)     :: &
          cell_flags(box%n_cell, box%n_cell)
     integer                  :: i, j, n, nc
-    real(dp) :: dx
+    real(dp)                 :: dx, dx2, fld, alpha, adx, cphi, elec_dens
     real(dp)                 :: dist, rmin(2), rmax(2)
 
     nc = box%n_cell
     dx = box%dr
+    dx2 = dx**2
 
-    if (dx > 1e-5_dp) then
-       cell_flags = af_do_ref
-    else
-       cell_flags = af_keep_ref
-    end if
+    do j = 1, nc; do i = 1, nc
+       fld   = box%cc(i, j, i_E)
+       alpha = LT_get_col(ST_td_tbl, i_td_alpha, fld)
+       adx   = box%dr * alpha
+
+       ! The refinement is also based on the intensity of the source term.
+       ! Here we estimate the curvature of phi (given by dx**2 *
+       ! Laplacian(phi))
+       cphi = dx2 * abs(box%cc(i, j, i_rhs))
+
+       elec_dens = box%cc(i, j, i_electron)
+
+       if (adx > ST_refine_adx .and. elec_dens > ST_refine_elec_dens) then
+          cell_flags(i, j) = af_do_ref
+       else if (adx < 0.125_dp * ST_refine_adx .or. &
+            elec_dens < 0.125_dp * ST_refine_elec_dens) then
+          cell_flags(i, j) = af_rm_ref
+       else
+          cell_flags(i, j) = af_keep_ref
+       end if
+    end do; end do
 
     ! Check fixed refinements
     rmin = box%r_min
@@ -446,7 +454,7 @@ contains
 
   end subroutine refine_routine
 
-  function weight_func(my_part) result(weight)
+  function get_desired_weight(my_part) result(weight)
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: weight, n_elec
     type(a2_loc_t)              :: loc
@@ -459,7 +467,8 @@ contains
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * tree%boxes(id)%dr**2
     weight = n_elec / PM_part_per_cell
     weight = max(1.0_dp, min(PM_max_weight, weight))
-  end function weight_func
+    ! print *, n_elec, weight, my_part%w
+  end function get_desired_weight
 
   real(dp) function id_as_real(my_part)
     type(PC_part_t), intent(in) :: my_part
