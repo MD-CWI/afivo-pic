@@ -41,43 +41,42 @@ contains
     integer, intent(in)        :: n_dim
 
     integer                    :: n_cond, varsize
-    real(dp)                   :: dlen
     real(dp), allocatable      :: tmp_vec(:)
     type(initcnd_t)            :: ic
 
     call CFG_add(cfg, "background_density", 0.0_dp, &
          "The background ion and electron density (1/m3)")
-    call CFG_add(cfg, "seed_density", [1.0e15_dp], &
+    call CFG_add(cfg, "seed%density", [1.0e15_dp], &
          "Initial density of the seed (1/m3)", .true.)
-    call CFG_add(cfg, "seed_rel_r0", [DTIMES(0.5_dp)], &
+    call CFG_add(cfg, "seed%rel_r0", [DTIMES(0.5_dp)], &
          "The relative start position of the initial seed", .true.)
-    call CFG_add(cfg, "seed_rel_r1", [DTIMES(0.5_dp)], &
+    call CFG_add(cfg, "seed%rel_r1", [DTIMES(0.5_dp)], &
          "The relative end position of the initial seed", .true.)
-    call CFG_add(cfg, "seed_charge_type", [0], &
+    call CFG_add(cfg, "seed%charge_type", [0], &
          "Type of seed: neutral (0), ions (1) or electrons (-1)", .true.)
-    call CFG_add(cfg, "seed_width", [0.25d-3], &
+    call CFG_add(cfg, "seed%width", [0.25d-3], &
          "Seed width (m)", .true.)
-    call CFG_add(cfg, "seed_falloff", ['gaussian'], &
+    call CFG_add(cfg, "seed%falloff", ['gaussian'], &
          "Fall-off type for seed (gaussian, step), default=gaussian", .true.)
 
-    call CFG_get_size(cfg, "seed_density", n_cond)
+    call CFG_get_size(cfg, "seed%density", n_cond)
     ic%n_cond = n_cond
 
-    call CFG_get_size(cfg, "seed_rel_r0", varsize)
+    call CFG_get_size(cfg, "seed%rel_r0", varsize)
     if (varsize /= n_dim * n_cond) &
-         stop "seed_rel_r0 variable has incompatible size"
+         stop "seed%rel_r0 variable has incompatible size"
 
-    call CFG_get_size(cfg, "seed_rel_r1", varsize)
+    call CFG_get_size(cfg, "seed%rel_r1", varsize)
     if (varsize /= n_dim * n_cond) &
-         stop "seed_rel_r1 variable has incompatible size"
+         stop "seed%rel_r1 variable has incompatible size"
 
-    call CFG_get_size(cfg, "seed_charge_type", varsize)
+    call CFG_get_size(cfg, "seed%charge_type", varsize)
     if (varsize /= n_cond) &
-         stop "seed_charge_type variable has incompatible size"
+         stop "seed%charge_type variable has incompatible size"
 
-    call CFG_get_size(cfg, "seed_width", varsize)
+    call CFG_get_size(cfg, "seed%width", varsize)
     if (varsize /= n_cond) &
-         stop "seed_width variable has incompatible size"
+         stop "seed%width variable has incompatible size"
 
     allocate(ic%seed_density(n_cond))
     allocate(ic%seed_charge_type(n_cond))
@@ -87,17 +86,16 @@ contains
     allocate(ic%seed_falloff(n_cond))
 
     allocate(tmp_vec(n_dim * n_cond))
-    call CFG_get(cfg, "seed_rel_r0", tmp_vec)
-    call CFG_get(cfg, "domain_len", dlen)
-    ic%seed_r0 = dlen * reshape(tmp_vec, [n_dim, n_cond])
-    call CFG_get(cfg, "seed_rel_r1", tmp_vec)
-    ic%seed_r1 = dlen * reshape(tmp_vec, [n_dim, n_cond])
+    call CFG_get(cfg, "seed%rel_r0", tmp_vec)
+    ic%seed_r0 = ST_domain_len * reshape(tmp_vec, [n_dim, n_cond])
+    call CFG_get(cfg, "seed%rel_r1", tmp_vec)
+    ic%seed_r1 = ST_domain_len * reshape(tmp_vec, [n_dim, n_cond])
 
     call CFG_get(cfg, "background_density", ic%background_density)
-    call CFG_get(cfg, "seed_density", ic%seed_density)
-    call CFG_get(cfg, "seed_charge_type", ic%seed_charge_type)
-    call CFG_get(cfg, "seed_width", ic%seed_width)
-    call CFG_get(cfg, "seed_falloff", ic%seed_falloff)
+    call CFG_get(cfg, "seed%density", ic%seed_density)
+    call CFG_get(cfg, "seed%charge_type", ic%seed_charge_type)
+    call CFG_get(cfg, "seed%width", ic%seed_width)
+    call CFG_get(cfg, "seed%falloff", ic%seed_falloff)
 
     init_conds = ic
 

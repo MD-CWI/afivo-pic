@@ -66,6 +66,8 @@ program apic_2d
   call init_cond_particles(tree, pc)
 
   do
+     call a2_tree_clear_cc(tree, i_pos_ion)
+     call a2_loop_box(tree, init_cond_set_box)
      call particles_to_density(tree, pc, events, .true.)
      call field_compute(tree, mg, .false.)
      call a2_adjust_refinement(tree, refine_routine, ref_info, &
@@ -360,8 +362,6 @@ contains
 
     if (init_cond) then
        call a2_tree_clear_cc(tree, i_electron)
-       call a2_tree_clear_cc(tree, i_pos_ion)
-
        call a2_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
        call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
