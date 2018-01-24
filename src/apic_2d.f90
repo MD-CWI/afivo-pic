@@ -6,6 +6,7 @@ program apic_2d
   use m_field_2d
   use m_init_cond_2d
   use m_particle_core
+  use m_photoi_2d
 
   implicit none
 
@@ -35,6 +36,8 @@ program apic_2d
   call init_cond_initialize(cfg, 2)
 
   call init_particle(cfg, pc)
+
+  call pi_initialize(cfg)
 
   fname = trim(ST_output_dir) // "/" // trim(ST_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
@@ -322,24 +325,36 @@ contains
 
   end subroutine init_particle
 
+  function get_accel_pos(x) result(accel)
+    use m_units_constants
+    real(dp), intent(in) :: x(2)
+    real(dp)             :: accel(3)
+
+    accel(1:2) = a2_interp1(tree, x, [i_Ex, i_Ey], 2)
+    accel(1:2) = accel(1:2) * UC_elec_q_over_m
+    accel(3) = 0.0_dp
+  end function get_accel_pos
+
   function get_accel(my_part) result(accel)
     use m_units_constants
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: accel(3)
 
-    accel(1:2) = a2_interp1(tree, my_part%x(1:2), [i_Ex, i_Ey], 2)
+    accel(1:2) = a2_interp1(tree, my_part%x(1:2), [i_Ex, i_Ey], 2, my_part%id)
     accel(1:2) = accel(1:2) * UC_elec_q_over_m
     accel(3) = 0.0_dp
   end function get_accel
 
   subroutine particles_to_density(tree, pc, events, init_cond)
     use m_cross_sec
+    use m_photoi_2d
     type(a2_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     type(PC_events_t), intent(inout) :: events
     logical, intent(in)              :: init_cond
 
-    integer               :: n, i, n_part, n_events
+    integer               :: n, i, n_part, n_events, n_photons, id
+    real(dp)              :: x(3), v(3), a(3)
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: weights(:)
     integer, allocatable  :: id_guess(:)
@@ -389,6 +404,22 @@ contains
             weights(1:i), i, 1, id_guess(1:i))
     end if
 
+    if (photoi_enabled) then
+       call get_photoionization(events, coords, weights, n_photons)
+       call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
+            weights(1:n_photons), n_photons, 1)
+       print *, "n_photons", n_photons
+       do n = 1, n_photons
+          x(1:2) = coords(:, n)
+          x(3)   = 0
+          v      = 0
+          a      = get_accel_pos(x(1:2))
+          id     = a2_get_id_at(tree, x(1:2))
+
+          call pc%create_part(x, v, a, weights(n), 0.0_dp, id=id)
+       end do
+    end if
+
     events%n_stored = 0
 
   end subroutine particles_to_density
@@ -403,7 +434,7 @@ contains
          cell_flags(box%n_cell, box%n_cell)
     integer                  :: i, j, n, nc
     real(dp)                 :: dx, dx2, fld, alpha, adx, cphi, elec_dens
-    real(dp)                 :: dist, rmin(2), rmax(2)
+    real(dp)                 :: rmin(2), rmax(2)
 
     nc = box%n_cell
     dx = box%dr

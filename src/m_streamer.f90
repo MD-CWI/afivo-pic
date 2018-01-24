@@ -331,7 +331,7 @@ contains
     real(dp), allocatable      :: x_data(:), y_data(:)
     character(len=ST_slen)     :: data_name
 
-    call CFG_add_get(cfg, "transport_data_file", td_file, &
+    call CFG_add_get(cfg, "gas%transport_data_file", td_file, &
          "Input file with transport data")
     call CFG_add_get(cfg, "lookup_table_size", table_size, &
          "The transport data table size in the fluid model")
@@ -351,15 +351,22 @@ contains
 
   end subroutine ST_load_transport_data
 
+  pure integer function outside_check_pos(x)
+    use m_particle_core
+    real(dp), intent(in) :: x(2)
+
+    if (any(x(1:2) < 0.0_dp .or. x(1:2) > ST_domain_len)) then
+       outside_check_pos = 1
+    else
+       outside_check_pos = 0
+    end if
+  end function outside_check_pos
+
   pure integer function outside_check(my_part)
     use m_particle_core
     type(PC_part_t), intent(in) :: my_part
 
-    if (any(my_part%x(1:2) < 0.0_dp .or. my_part%x(1:2) > ST_domain_len)) then
-       outside_check = 1
-    else
-       outside_check = 0
-    end if
+    outside_check = outside_check_pos(my_part%x(1:2))
   end function outside_check
 
 end module m_streamer
