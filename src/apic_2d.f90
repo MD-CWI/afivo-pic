@@ -24,9 +24,6 @@ program apic_2d
   type(PC_events_t)      :: events
   type(ref_info_t)       :: ref_info
 
-  real(dp), parameter :: PM_part_per_cell = 100
-  real(dp), parameter :: PM_max_weight    = 1e20_dp
-
   integer :: output_cnt = 0 ! Number of output files written
 
   call CFG_update_from_arguments(cfg)
@@ -408,7 +405,7 @@ contains
        call get_photoionization(events, coords, weights, n_photons)
        call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
             weights(1:n_photons), n_photons, 1)
-       print *, "n_photons", n_photons
+       print *, "n_photons", n_photons, dt, n_events
        do n = 1, n_photons
           x(1:2) = coords(:, n)
           x(3)   = 0
@@ -496,8 +493,8 @@ contains
     ix = loc%ix
 
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * tree%boxes(id)%dr**2
-    weight = n_elec / PM_part_per_cell
-    weight = max(1.0_dp, min(PM_max_weight, weight))
+    weight = n_elec / particle_per_cell
+    weight = max(particle_min_weight, min(particle_max_weight, weight))
     ! print *, n_elec, weight, my_part%w
   end function get_desired_weight
 

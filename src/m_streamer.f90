@@ -145,6 +145,10 @@ module m_streamer
   real(dp) :: ST_init_seed_sigma    = 1.0e-3_dp
   integer  :: ST_init_num_particles = 10000
 
+  real(dp), protected :: particle_min_weight = 1.0_dp
+  real(dp), protected :: particle_max_weight = 1.0e20_dp
+  real(dp), protected :: particle_per_cell = 100.0_dp
+
 contains
 
   integer function ST_add_cc_variable(name, include_in_output)
@@ -230,6 +234,13 @@ contains
          "The name of the gas mixture used")
     call CFG_add_get(cfg, "gas%frac_O2", ST_gas_frac_O2, &
          "Fraction of O2, used for photoionization")
+
+    call CFG_add_get(cfg, "particle%per_cell", particle_per_cell, &
+         "Desired number of particles per cell")
+    call CFG_add_get(cfg, "particle%min_weight", particle_min_weight, &
+         "Minimum weight for simulation particles")
+    call CFG_add_get(cfg, "particle%max_weight", particle_max_weight, &
+         "Maximum weight for simulation particles")
 
     call CFG_add_get(cfg, "multigrid_num_vcycles", ST_multigrid_num_vcycles, &
          "Number of V-cycles to perform per time step")
