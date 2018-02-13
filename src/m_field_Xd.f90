@@ -343,31 +343,17 @@ contains
          (box%cc(1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 2:nc+1, i_phi))
     box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
          box%cc(1:nc, 1:nc, i_Ey)**2)
-
-    ! box%cc(1:nc, 1:nc, i_electric_fld) = 0.5_dp * sqrt(&
-    !      (box%fc(1:nc, 1:nc, 1, electric_fld) + &
-    !      box%fc(2:nc+1, 1:nc, 1, electric_fld))**2 + &
-    !      (box%fc(1:nc, 1:nc, 2, electric_fld) + &
-    !      box%fc(1:nc, 2:nc+1, 2, electric_fld))**2)
 #elif $D == 3
-    error stop
-    ! box%fc(1:nc+1, 1:nc, 1:nc, 1, electric_fld) = inv_dr * &
-    !      (box%cc(0:nc, 1:nc, 1:nc, i_phi) - &
-    !      box%cc(1:nc+1, 1:nc, 1:nc, i_phi))
-    ! box%fc(1:nc, 1:nc+1, 1:nc, 2, electric_fld) = inv_dr * &
-    !      (box%cc(1:nc, 0:nc, 1:nc, i_phi) - &
-    !      box%cc(1:nc, 1:nc+1, 1:nc, i_phi))
-    ! box%fc(1:nc, 1:nc, 1:nc+1, 3, electric_fld) = inv_dr * &
-    !      (box%cc(1:nc, 1:nc, 0:nc, i_phi) - &
-    !      box%cc(1:nc, 1:nc, 1:nc+1, i_phi))
-
-    ! box%cc(1:nc, 1:nc, 1:nc, i_electric_fld) = 0.5_dp * sqrt(&
-    !      (box%fc(1:nc, 1:nc, 1:nc, 1, electric_fld) + &
-    !      box%fc(2:nc+1, 1:nc, 1:nc, 1, electric_fld))**2 + &
-    !      (box%fc(1:nc, 1:nc, 1:nc, 2, electric_fld) + &
-    !      box%fc(1:nc, 2:nc+1, 1:nc, 2, electric_fld))**2 + &
-    !      (box%fc(1:nc, 1:nc, 1:nc, 3, electric_fld) + &
-    !      box%fc(1:nc, 1:nc, 2:nc+1, 3, electric_fld))**2)
+    box%cc(1:nc, 1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr * &
+         (box%cc(0:nc-1, 1:nc, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, 1:nc, i_phi))
+    box%cc(1:nc, 1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr * &
+         (box%cc(1:nc, 0:nc-1, 1:nc, i_phi) - box%cc(1:nc, 2:nc+1, 1:nc, i_phi))
+    box%cc(1:nc, 1:nc, 1:nc, i_Ez) = 0.5_dp * inv_dr * &
+         (box%cc(1:nc, 1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 1:nc, 2:nc+1, i_phi))
+    box%cc(1:nc, 1:nc, 1:nc, i_E) = sqrt(&
+         box%cc(1:nc, 1:nc, 1:nc, i_Ex)**2 + &
+         box%cc(1:nc, 1:nc, 1:nc, i_Ey)**2 + &
+         box%cc(1:nc, 1:nc, 1:nc, i_Ez)**2)
 #endif
 
   end subroutine field_from_potential

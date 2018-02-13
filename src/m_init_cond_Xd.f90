@@ -112,9 +112,9 @@ contains
     seed_counts = 100
     allocate(seed_sigmas(n_cond))
     seed_sigmas = 1e-4_dp
-    allocate(seed_pos(2, n_cond))
+    allocate(seed_pos(n_dim, n_cond))
     deallocate(tmp_vec)
-    allocate(tmp_vec(2 * n_cond))
+    allocate(tmp_vec(n_dim * n_cond))
     tmp_vec = 0.5_dp
 
     call CFG_get(cfg, "pseed%counts", seed_counts)
@@ -124,13 +124,13 @@ contains
          "Width of the Gaussian seeds", .true.)
     call CFG_add_get(cfg, "pseed%pos", tmp_vec, &
          "Relative location of the Gaussian seeds", .true.)
-    seed_pos = reshape(tmp_vec * ST_domain_len, [2, n_cond])
+    seed_pos = reshape(tmp_vec * ST_domain_len, [n_dim, n_cond])
 
   end subroutine init_cond_initialize
 
   subroutine init_cond_particles(tree, pc)
     use m_particle_core
-    type(a2_t), intent(inout) :: tree
+    type(a$D_t), intent(inout) :: tree
     type(PC_t), intent(inout) :: pc
     integer                   :: n, i, n_background
     real(dp)                  :: x(3), v(3), a(3), w, t_left
@@ -147,13 +147,23 @@ contains
     ! end do
 
     do n = 1, num_particle_seeds
+#if $D == 2
        pos(1:2)  = tree%r_base + seed_pos(1:2, n)
        pos(3)    = 0.0_dp
        part%x(3) = pos(3)
+#elif $D == 3
+       pos(1:3)  = tree%r_base + seed_pos(1:3, n)
+#endif
        part%w    = seed_weights(n)
 
        do i = 1, seed_counts(n)
+#if $D == 2
           part%x(1:2) = pos(1:2) + ST_rng%two_normals() * seed_sigmas(n)
+#elif $D == 3
+          ! TODO: avoid setting x(2) twice
+          part%x(1:2) = pos(1:2) + ST_rng%two_normals() * seed_sigmas(n)
+          part%x(2:3) = pos(2:3) + ST_rng%two_normals() * seed_sigmas(n)
+#endif
 
           if (outside_check(part) <= 0) then
              call pc%add_part(part)

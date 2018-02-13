@@ -1,12 +1,13 @@
-!> Program to perform 2d discharge simulations in Cartesian and cylindrical coordinates
-program apic_2d
+#include "afivo/src/cpp_macros_$Dd.h"
+!> Program to perform $Dd discharge simulations in Cartesian and cylindrical coordinates
+program apic_$Dd
 
-  use m_a2_all
+  use m_a$D_all
   use m_streamer
-  use m_field_2d
-  use m_init_cond_2d
+  use m_field_$Dd
+  use m_init_cond_$Dd
   use m_particle_core
-  use m_photoi_2d
+  use m_photoi_$Dd
 
   implicit none
 
@@ -18,8 +19,8 @@ program apic_2d
   character(len=ST_slen) :: fname
   logical                :: write_out
   type(CFG_t)            :: cfg  ! The configuration for the simulation
-  type(a2_t)             :: tree ! This contains the full grid information
-  type(mg2_t)            :: mg   ! Multigrid option struct
+  type(a$D_t)             :: tree ! This contains the full grid information
+  type(mg$D_t)            :: mg   ! Multigrid option struct
   type(PC_t)             :: pc
   type(PC_events_t)      :: events
   type(ref_info_t)       :: ref_info
@@ -27,10 +28,10 @@ program apic_2d
   integer :: output_cnt = 0 ! Number of output files written
 
   call CFG_update_from_arguments(cfg)
-  call ST_initialize(cfg, 2)
+  call ST_initialize(cfg, $D)
 
   call field_initialize(cfg, mg)
-  call init_cond_initialize(cfg, 2)
+  call init_cond_initialize(cfg, $D)
 
   call init_particle(cfg, pc)
 
@@ -48,16 +49,16 @@ program apic_2d
   mg%i_rhs = i_rhs
 
   ! This automatically handles cylindrical symmetry
-  mg%box_op => mg2_auto_op
-  mg%box_gsrb => mg2_auto_gsrb
-  mg%box_corr => mg2_auto_corr
+  mg%box_op => mg$D_auto_op
+  mg%box_gsrb => mg$D_auto_gsrb
+  mg%box_corr => mg$D_auto_corr
 
   ! This routine always needs to be called when using multigrid
-  call mg2_init_mg(mg)
+  call mg$D_init_mg(mg)
 
-  call a2_set_cc_methods(tree, i_electron, a2_bc_neumann_zero)
-  call a2_set_cc_methods(tree, i_pos_ion, a2_bc_neumann_zero)
-  call a2_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
+  call a$D_set_cc_methods(tree, i_electron, a$D_bc_neumann_zero)
+  call a$D_set_cc_methods(tree, i_pos_ion, a$D_bc_neumann_zero)
+  call a$D_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
 
   output_cnt      = 0         ! Number of output files written
   ST_time         = 0         ! Simulation time (all times are in s)
@@ -66,11 +67,11 @@ program apic_2d
   call init_cond_particles(tree, pc)
 
   do
-     call a2_tree_clear_cc(tree, i_pos_ion)
-     call a2_loop_box(tree, init_cond_set_box)
+     call a$D_tree_clear_cc(tree, i_pos_ion)
+     call a$D_loop_box(tree, init_cond_set_box)
      call particles_to_density(tree, pc, events, .true.)
      call field_compute(tree, mg, .false.)
-     call a2_adjust_refinement(tree, refine_routine, ref_info, &
+     call a$D_adjust_refinement(tree, refine_routine, ref_info, &
           ST_refine_buffer_width, .true.)
      if (ref_info%n_add == 0) exit
   end do
@@ -78,7 +79,7 @@ program apic_2d
   call pc%set_accel()
 
   print *, "Number of threads", af_get_max_threads()
-  call a2_print_info(tree)
+  call a$D_print_info(tree)
 
   ! Start from small time step
   ST_dt   = ST_dt_min
@@ -90,8 +91,8 @@ program apic_2d
 
   do it = 1, huge(1)-1
      if (ST_time >= ST_end_time) exit
-     ! call a2_tree_sum_cc(tree, i_electron, sum_elec)
-     ! call a2_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
+     ! call a$D_tree_sum_cc(tree, i_electron, sum_elec)
+     ! call a$D_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
 
      call system_clock(t_current)
      wc_time = (t_current - t_start) * inv_count_rate
@@ -128,16 +129,16 @@ program apic_2d
 
      if (write_out) then
         ! Fill ghost cells before writing output
-        call a2_gc_tree(tree, i_electron, a2_gc_interp_lim, a2_bc_neumann_zero)
-        call a2_gc_tree(tree, i_pos_ion, a2_gc_interp_lim, a2_bc_neumann_zero)
+        call a$D_gc_tree(tree, i_electron, a$D_gc_interp_lim, a$D_bc_neumann_zero)
+        call a$D_gc_tree(tree, i_pos_ion, a$D_gc_interp_lim, a$D_bc_neumann_zero)
 
         write(fname, "(A,I6.6)") trim(ST_simulation_name) // "_", output_cnt
-        call a2_write_silo(tree, fname, output_cnt, ST_time, &
+        call a$D_write_silo(tree, fname, output_cnt, ST_time, &
              vars_for_output, dir=ST_output_dir)
      end if
 
      if (mod(it, ST_refine_per_steps) == 0) then
-        call a2_adjust_refinement(tree, refine_routine, ref_info, &
+        call a$D_adjust_refinement(tree, refine_routine, ref_info, &
              ST_refine_buffer_width, .true.)
 
         if (ref_info%n_add > 0) then
@@ -151,7 +152,7 @@ program apic_2d
 contains
 
   subroutine adapt_weights(tree, pc)
-    type(a2_t), intent(in)    :: tree
+    type(a$D_t), intent(in)    :: tree
     type(PC_t), intent(inout) :: pc
     integer, allocatable      :: id_ipart(:)
 
@@ -176,7 +177,7 @@ contains
   end subroutine adapt_weights
 
   subroutine sort_by_id(tree, pc, id_ipart)
-    type(a2_t), intent(in)              :: tree
+    type(a$D_t), intent(in)              :: tree
     type(PC_t), intent(inout)           :: pc
     integer, intent(inout), allocatable :: id_ipart(:)
 
@@ -216,22 +217,22 @@ contains
 
   !> Initialize the AMR tree
   subroutine init_tree(tree)
-    type(a2_t), intent(inout) :: tree
+    type(a$D_t), intent(inout) :: tree
 
     ! Variables used below to initialize tree
     real(dp)                  :: dr
     integer                   :: id
-    integer                   :: ix_list(2, 1) ! Spatial indices of initial boxes
+    integer                   :: ix_list($D, 1) ! Spatial indices of initial boxes
 
     dr = ST_domain_len / ST_box_size
 
     ! Initialize tree
     if (ST_cylindrical) then
-       call a2_init(tree, ST_box_size, n_var_cell, n_var_face, dr, &
+       call a$D_init(tree, ST_box_size, n_var_cell, n_var_face, dr, &
             coarsen_to=2, coord=af_cyl, &
             cc_names=ST_cc_names)
     else
-       call a2_init(tree, ST_box_size, n_var_cell, n_var_face, dr, &
+       call a$D_init(tree, ST_box_size, n_var_cell, n_var_face, dr, &
             coarsen_to=2, cc_names=ST_cc_names)
     end if
 
@@ -240,7 +241,7 @@ contains
     ix_list(:, id) = 1          ! With index 1,1 ...
 
     ! Create the base mesh
-    call a2_set_base(tree, 1, ix_list)
+    call a$D_set_base(tree, 1, ix_list)
 
   end subroutine init_tree
 
@@ -324,12 +325,17 @@ contains
 
   function get_accel_pos(x) result(accel)
     use m_units_constants
-    real(dp), intent(in) :: x(2)
+    real(dp), intent(in) :: x($D)
     real(dp)             :: accel(3)
 
-    accel(1:2) = a2_interp1(tree, x, [i_Ex, i_Ey], 2)
-    accel(1:2) = accel(1:2) * UC_elec_q_over_m
+#if $D == 2
+    accel(1:$D) = a$D_interp1(tree, x, [i_Ex, i_Ey], $D)
+    accel(1:$D) = accel(1:$D) * UC_elec_q_over_m
     accel(3) = 0.0_dp
+#elif $D == 3
+    accel(1:$D) = a$D_interp1(tree, x, [i_Ex, i_Ey, i_Ez], $D)
+    accel(1:$D) = accel(1:$D) * UC_elec_q_over_m
+#endif
   end function get_accel_pos
 
   function get_accel(my_part) result(accel)
@@ -337,15 +343,22 @@ contains
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: accel(3)
 
-    accel(1:2) = a2_interp1(tree, my_part%x(1:2), [i_Ex, i_Ey], 2, my_part%id)
-    accel(1:2) = accel(1:2) * UC_elec_q_over_m
+#if $D == 2
+    accel(1:$D) = a$D_interp1(tree, my_part%x(1:$D), [i_Ex, i_Ey], $D, my_part%id)
     accel(3) = 0.0_dp
+#elif $D == 3
+    accel(1:$D) = a$D_interp1(tree, my_part%x(1:$D), [i_Ex, i_Ey, i_Ez], &
+         $D, my_part%id)
+#endif
+
+    accel(:) = accel(:) * UC_elec_q_over_m
+
   end function get_accel
 
   subroutine particles_to_density(tree, pc, events, init_cond)
     use m_cross_sec
-    use m_photoi_2d
-    type(a2_t), intent(inout)        :: tree
+    use m_photoi_$Dd
+    type(a$D_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     type(PC_events_t), intent(inout) :: events
     logical, intent(in)              :: init_cond
@@ -360,27 +373,27 @@ contains
     n_events = events%n_stored
     n = max(n_part, n_events)
 
-    allocate(coords(2, n))
+    allocate(coords($D, n))
     allocate(weights(n))
     allocate(id_guess(n))
 
     !$omp parallel do
     do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:2)
+       coords(:, n) = pc%particles(n)%x(1:$D)
        weights(n) = pc%particles(n)%w
        id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
 
     if (init_cond) then
-       call a2_tree_clear_cc(tree, i_electron)
-       call a2_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
+       call a$D_tree_clear_cc(tree, i_electron)
+       call a$D_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
-       call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
+       call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
     else
-       call a2_tree_clear_cc(tree, i_electron)
-       call a2_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
+       call a$D_tree_clear_cc(tree, i_electron)
+       call a$D_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
     end if
 
@@ -390,28 +403,28 @@ contains
     do n = 1, n_events
        if (events%list(n)%ctype == CS_ionize_t) then
           i = i + 1
-          coords(:, i) = events%list(n)%part%x(1:2)
+          coords(:, i) = events%list(n)%part%x(1:$D)
           weights(i) = events%list(n)%part%w
           id_guess(i) = events%list(n)%part%id
        end if
     end do
 
     if (i > 0) then
-       call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
+       call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, 1, id_guess(1:i))
     end if
 
     if (photoi_enabled) then
        call get_photoionization(events, coords, weights, n_photons)
-       call a2_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
+       call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
             weights(1:n_photons), n_photons, 1)
        print *, "n_photons", n_photons, dt, n_events
        do n = 1, n_photons
-          x(1:2) = coords(:, n)
+          x(1:$D) = coords(:, n)
           x(3)   = 0
           v      = 0
-          a      = get_accel_pos(x(1:2))
-          id     = a2_get_id_at(tree, x(1:2))
+          a      = get_accel_pos(x(1:$D))
+          id     = a$D_get_id_at(tree, x(1:$D))
 
           call pc%create_part(x, v, a, weights(n), 0.0_dp, id=id)
        end do
@@ -424,40 +437,40 @@ contains
   ! This routine sets the cell refinement flags for box
   subroutine refine_routine(box, cell_flags)
     use m_geometry
-    use m_init_cond_2d
-    type(box2_t), intent(in) :: box
+    use m_init_cond_$Dd
+    type(box$D_t), intent(in) :: box
     ! Refinement flags for the cells of the box
     integer, intent(out)     :: &
-         cell_flags(box%n_cell, box%n_cell)
-    integer                  :: i, j, n, nc
+         cell_flags(DTIMES(box%n_cell))
+    integer                  :: IJK, n, nc
     real(dp)                 :: dx, dx2, fld, alpha, adx, cphi, elec_dens
-    real(dp)                 :: rmin(2), rmax(2)
+    real(dp)                 :: rmin($D), rmax($D)
 
     nc = box%n_cell
     dx = box%dr
     dx2 = dx**2
 
-    do j = 1, nc; do i = 1, nc
-       fld   = box%cc(i, j, i_E)
+    do KJI_DO(1,nc)
+       fld   = box%cc(IJK, i_E)
        alpha = LT_get_col(ST_td_tbl, i_td_alpha, fld)
        adx   = box%dr * alpha
 
        ! The refinement is also based on the intensity of the source term.
        ! Here we estimate the curvature of phi (given by dx**2 *
        ! Laplacian(phi))
-       cphi = dx2 * abs(box%cc(i, j, i_rhs))
+       cphi = dx2 * abs(box%cc(IJK, i_rhs))
 
-       elec_dens = box%cc(i, j, i_electron)
+       elec_dens = box%cc(IJK, i_electron)
 
        if (adx > ST_refine_adx .and. elec_dens > ST_refine_elec_dens) then
-          cell_flags(i, j) = af_do_ref
+          cell_flags(IJK) = af_do_ref
        else if (adx < 0.125_dp * ST_refine_adx .or. &
             elec_dens < 0.125_dp * ST_refine_elec_dens) then
-          cell_flags(i, j) = af_rm_ref
+          cell_flags(IJK) = af_rm_ref
        else
-          cell_flags(i, j) = af_keep_ref
+          cell_flags(IJK) = af_keep_ref
        end if
-    end do; end do
+    end do; CLOSE_DO
 
     ! Check fixed refinements
     rmin = box%r_min
@@ -469,7 +482,7 @@ contains
             rmax >= ST_refine_regions_rmin(:, n) .and. &
             rmin <= ST_refine_regions_rmax(:, n))) then
           ! Mark just the center cell to prevent refining neighbors
-          cell_flags(nc/2, nc/2) = af_do_ref
+          cell_flags(DTIMES(nc/2)) = af_do_ref
        end if
     end do
 
@@ -485,17 +498,23 @@ contains
   function get_desired_weight(my_part) result(weight)
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: weight, n_elec
-    type(a2_loc_t)              :: loc
-    integer                     :: id, ix(2)
+    type(a$D_loc_t)              :: loc
+    integer                     :: id, ix($D)
 
-    loc = a2_get_loc(tree, my_part%x(1:2), my_part%id)
+    loc = a$D_get_loc(tree, my_part%x(1:$D), my_part%id)
     id = loc%id
     ix = loc%ix
 
-    n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * tree%boxes(id)%dr**2
+#if $D == 2
+    n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * &
+         tree%boxes(id)%dr**2
+#elif $D == 3
+    n_elec = tree%boxes(id)%cc(ix(1), ix(2), ix(3), i_electron) * &
+         tree%boxes(id)%dr**2
+#endif
+
     weight = n_elec / particle_per_cell
     weight = max(particle_min_weight, min(particle_max_weight, weight))
-    ! print *, n_elec, weight, my_part%w
   end function get_desired_weight
 
   real(dp) function id_as_real(my_part)
@@ -507,8 +526,8 @@ contains
     write(*, "(F7.2,A,I0,A,E10.3,A,E10.3,A,E10.3,A,E10.3,A,E10.3)") &
          100 * ST_time / ST_end_time, "% it: ", it, &
          " t:", ST_time, " dt:", ST_dt, " wc:", wc_time, &
-         " ncell:", real(a2_num_cells_used(tree), dp), &
+         " ncell:", real(a$D_num_cells_used(tree), dp), &
          " npart:", real(pc%get_num_sim_part(), dp)
   end subroutine print_status
 
-end program apic_2d
+end program apic_$Dd

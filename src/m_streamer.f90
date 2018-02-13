@@ -23,7 +23,8 @@ module m_streamer
   integer, protected :: i_pos_ion  = -1 ! Positive ion density
   integer, protected :: i_phi      = -1 ! Electrical potential
   integer, protected :: i_Ex       = -1 ! Electric field (x)
-  integer, protected :: i_Ey       = -1 ! Electric field (x)
+  integer, protected :: i_Ey       = -1 ! Electric field (y)
+  integer, protected :: i_Ez       = -1 ! Electric field (z)
   integer, protected :: i_E        = -1  ! Electric field (x)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
 
@@ -211,6 +212,9 @@ contains
     i_phi = ST_add_cc_variable("phi", .true.)
     i_Ex = ST_add_cc_variable("Ex", .true.)
     i_Ey = ST_add_cc_variable("Ey", .true.)
+    if (ndim > 2) then
+       i_Ez = ST_add_cc_variable("Ez", .true.)
+    end if
     i_E = ST_add_cc_variable("E", .true.)
     i_rhs = ST_add_cc_variable("rhs", .true.)
 
