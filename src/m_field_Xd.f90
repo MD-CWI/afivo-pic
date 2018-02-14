@@ -1,7 +1,8 @@
 #include "afivo/src/cpp_macros_$Dd.h"
 module m_field_$Dd
   use m_a$D_all
-  use m_streamer
+  use m_globals
+  use m_domain_$Dd
 
   implicit none
   private
@@ -35,6 +36,9 @@ module m_field_$Dd
 
   !> Location from which the field drops off (set below)
   real(dp) :: field_dropoff_pos(2) = 0.0_dp
+
+  ! Number of V-cycles to perform per time step
+  integer, protected :: multigrid_num_vcycles = 2
 
   character(ST_slen) :: field_bc_type = "homogeneous"
 
@@ -74,8 +78,10 @@ contains
          "Potential stays constant up to this radius")
     call CFG_add_get(cfg, "field%dropoff_relwidth", field_dropoff_relwidth, &
          "Relative width over which the potential drops")
+    call CFG_add_get(cfg, "multigrid_num_vcycles", multigrid_num_vcycles, &
+         "Number of V-cycles to perform per time step")
 
-    field_voltage = -ST_domain_len * field_amplitude
+    field_voltage = -domain_len * field_amplitude
 
     select case (field_bc_type)
     case ("homogeneous")
@@ -134,7 +140,7 @@ contains
        call mg$D_fas_fmg(tree, mg, .false., have_guess)
     else
        ! Perform cheaper V-cycles
-       do i = 1, ST_multigrid_num_vcycles
+       do i = 1, multigrid_num_vcycles
           call mg$D_fas_vcycle(tree, mg, .false.)
        end do
     end if
@@ -143,7 +149,12 @@ contains
     call a$D_loop_box(tree, field_from_potential)
 
     ! Set the field norm also in ghost cells
+#if $D == 2
     call a$D_gc_tree(tree, [i_Ex, i_Ey, i_E], a$D_gc_interp, a$D_bc_neumann_zero)
+#elif $D == 3
+    call a$D_gc_tree(tree, [i_Ex, i_Ey, i_Ez, i_E], a$D_gc_interp, a$D_bc_neumann_zero)
+#endif
+
   end subroutine field_compute
 
   !> Compute the electric field at a given time
@@ -167,7 +178,7 @@ contains
   subroutine field_set_voltage(time)
     real(dp), intent(in) :: time
 
-    field_voltage = -ST_domain_len * field_get_amplitude(time)
+    field_voltage = -domain_len * field_get_amplitude(time)
   end subroutine field_set_voltage
 
   !> This fills ghost cells near physical boundaries for the potential
@@ -240,7 +251,7 @@ contains
           rr = a2_r_cc(box, [i, 0])
           rdist = abs(rr(1) - field_dropoff_pos(1))
           rdist = (rdist - field_dropoff_radius) / &
-               (field_dropoff_relwidth * ST_domain_len)
+               (field_dropoff_relwidth * domain_len)
 
           if (rdist < 0) then
              box%cc(i, nc+1, iv) = field_voltage
@@ -258,7 +269,7 @@ contains
              rr = a3_r_cc(box, [i, j, 0])
              rdist = norm2(rr(1:2) - field_dropoff_pos(1:2))
              rdist = (rdist - field_dropoff_radius) / &
-                  (field_dropoff_relwidth * ST_domain_len)
+                  (field_dropoff_relwidth * domain_len)
 
              if (rdist < 0) then
                 box%cc(i, j, nc+1, iv) = field_voltage
@@ -286,7 +297,7 @@ contains
     real(dp)                     :: rr($D), rdist, tmp
 
     nc = box%n_cell
-    tmp = field_dropoff_relwidth * ST_domain_len
+    tmp = field_dropoff_relwidth * domain_len
 
     select case (nb)
 #if $D == 2

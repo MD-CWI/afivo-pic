@@ -3,24 +3,28 @@
 program apic_$Dd
 
   use m_a$D_all
-  use m_streamer
+  use m_globals
   use m_field_$Dd
   use m_init_cond_$Dd
   use m_particle_core
   use m_photoi_$Dd
+  use m_domain_$Dd
+  use m_refine_$Dd
+  use m_time_step_$Dd
 
   implicit none
 
   integer, parameter     :: int8 = selected_int_kind(18)
+  integer, parameter     :: ndim = $D
   integer(int8)          :: t_start, t_current, count_rate
-  real(dp)               :: dt, sum_elec, sum_pos_ion
+  real(dp)               :: dt, fld_err
   real(dp)               :: wc_time, inv_count_rate, time_last_print
   integer                :: it, id, n_part_id
   character(len=ST_slen) :: fname
   logical                :: write_out
   type(CFG_t)            :: cfg  ! The configuration for the simulation
-  type(a$D_t)             :: tree ! This contains the full grid information
-  type(mg$D_t)            :: mg   ! Multigrid option struct
+  type(a$D_t)            :: tree ! This contains the full grid information
+  type(mg$D_t)           :: mg   ! Multigrid option struct
   type(PC_t)             :: pc
   type(PC_events_t)      :: events
   type(ref_info_t)       :: ref_info
@@ -28,10 +32,13 @@ program apic_$Dd
   integer :: output_cnt = 0 ! Number of output files written
 
   call CFG_update_from_arguments(cfg)
-  call ST_initialize(cfg, $D)
+  call domain_init(cfg)
+  call refine_init(cfg, ndim)
+  call time_step_init(cfg)
+  call ST_initialize(cfg, ndim)
 
   call field_initialize(cfg, mg)
-  call init_cond_initialize(cfg, $D)
+  call init_cond_initialize(cfg, ndim)
 
   call init_particle(cfg, pc)
 
@@ -72,7 +79,7 @@ program apic_$Dd
      call particles_to_density(tree, pc, events, .true.)
      call field_compute(tree, mg, .false.)
      call a$D_adjust_refinement(tree, refine_routine, ref_info, &
-          ST_refine_buffer_width, .true.)
+          refine_buffer_width, .true.)
      if (ref_info%n_add == 0) exit
   end do
 
@@ -91,8 +98,6 @@ program apic_$Dd
 
   do it = 1, huge(1)-1
      if (ST_time >= ST_end_time) exit
-     ! call a$D_tree_sum_cc(tree, i_electron, sum_elec)
-     ! call a$D_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
 
      call system_clock(t_current)
      wc_time = (t_current - t_start) * inv_count_rate
@@ -113,6 +118,8 @@ program apic_$Dd
         dt        = ST_dt
      end if
 
+     call PM_fld_error(tree, pc, ST_rng, 1000, fld_err, .true.)
+
      call pc%advance_openmp(dt, events)
 
      ST_time = ST_time + dt
@@ -121,7 +128,12 @@ program apic_$Dd
      ! Compute field with new density
      call field_compute(tree, mg, .true.)
 
-     call PC_verlet_correct_accel(pc, dt)
+     call PM_fld_error(tree, pc, ST_rng, 1000, fld_err, .false.)
+     print *, "fld err", fld_err, ST_dt
+     ST_dt = get_new_dt(ST_dt, fld_err, 10.0e-2_dp)
+
+     ! call PC_verlet_correct_accel(pc, dt)
+     call pc%set_accel()
 
      if (modulo(it, 10) == 0) then
         call adapt_weights(tree, pc)
@@ -129,23 +141,26 @@ program apic_$Dd
 
      if (write_out) then
         ! Fill ghost cells before writing output
-        call a$D_gc_tree(tree, i_electron, a$D_gc_interp_lim, a$D_bc_neumann_zero)
-        call a$D_gc_tree(tree, i_pos_ion, a$D_gc_interp_lim, a$D_bc_neumann_zero)
+        call a$D_gc_tree(tree, i_electron)
+        call a$D_gc_tree(tree, i_pos_ion)
 
         write(fname, "(A,I6.6)") trim(ST_simulation_name) // "_", output_cnt
         call a$D_write_silo(tree, fname, output_cnt, ST_time, &
              vars_for_output, dir=ST_output_dir)
+        call print_info()
      end if
 
-     if (mod(it, ST_refine_per_steps) == 0) then
+     if (mod(it, refine_per_steps) == 0) then
         call a$D_adjust_refinement(tree, refine_routine, ref_info, &
-             ST_refine_buffer_width, .true.)
+             refine_buffer_width, .true.)
 
         if (ref_info%n_add > 0) then
            ! Compute the field on the new mesh
            call particles_to_density(tree, pc, events, .false.)
            call field_compute(tree, mg, .true.)
         end if
+        ! print *, "after"
+        ! call print_info()
      end if
   end do
 
@@ -158,7 +173,6 @@ contains
 
     call sort_by_id(tree, pc, id_ipart)
 
-    ! print *, "befor", pc%get_num_sim_part(), pc%get_num_real_part()
     !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
        n_part_id = id_ipart(id+1) - id_ipart(id)
@@ -172,8 +186,6 @@ contains
     !$omp end parallel do
 
     call pc%clean_up()
-    ! print *, "after", pc%get_num_sim_part(), pc%get_num_real_part()
-    ! print *, "after", pc%get_num_real_part()/pc%get_num_sim_part()
   end subroutine adapt_weights
 
   subroutine sort_by_id(tree, pc, id_ipart)
@@ -181,7 +193,7 @@ contains
     type(PC_t), intent(inout)           :: pc
     integer, intent(inout), allocatable :: id_ipart(:)
 
-    integer                      :: n, n_part, id, new_ix
+    integer                      :: n, id, new_ix
     integer, allocatable         :: id_count(:)
     integer, allocatable         :: id_ix(:)
     type(PC_part_t), allocatable :: p_copy(:)
@@ -224,15 +236,14 @@ contains
     integer                   :: id
     integer                   :: ix_list($D, 1) ! Spatial indices of initial boxes
 
-    dr = ST_domain_len / ST_box_size
+    dr = domain_len / box_size
 
     ! Initialize tree
     if (ST_cylindrical) then
-       call a$D_init(tree, ST_box_size, n_var_cell, n_var_face, dr, &
-            coarsen_to=2, coord=af_cyl, &
-            cc_names=ST_cc_names)
+       call a$D_init(tree, box_size, n_var_cell, n_var_face, dr, &
+            coarsen_to=2, coord=af_cyl, cc_names=ST_cc_names)
     else
-       call a$D_init(tree, ST_box_size, n_var_cell, n_var_face, dr, &
+       call a$D_init(tree, box_size, n_var_cell, n_var_face, dr, &
             coarsen_to=2, cc_names=ST_cc_names)
     end if
 
@@ -317,7 +328,8 @@ contains
     pc%accel_function => get_accel
     pc%outside_check => outside_check
 
-    where (pc%colls(:)%type == CS_ionize_t)
+    where (pc%colls(:)%type == CS_ionize_t .or. &
+         pc%colls(:)%type == CS_attach_t)
        pc%coll_is_event(:) = .true.
     end where
 
@@ -406,6 +418,11 @@ contains
           coords(:, i) = events%list(n)%part%x(1:$D)
           weights(i) = events%list(n)%part%w
           id_guess(i) = events%list(n)%part%id
+       else if (events%list(n)%ctype == CS_attach_t) then
+          i = i + 1
+          coords(:, i) = events%list(n)%part%x(1:$D)
+          weights(i) = -events%list(n)%part%w
+          id_guess(i) = events%list(n)%part%id
        end if
     end do
 
@@ -418,10 +435,12 @@ contains
        call get_photoionization(events, coords, weights, n_photons)
        call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
             weights(1:n_photons), n_photons, 1)
-       print *, "n_photons", n_photons, dt, n_events
+       print *, "n_photons", n_photons, n_events
        do n = 1, n_photons
           x(1:$D) = coords(:, n)
+#if $D == 2
           x(3)   = 0
+#endif
           v      = 0
           a      = get_accel_pos(x(1:$D))
           id     = a$D_get_id_at(tree, x(1:$D))
@@ -434,66 +453,6 @@ contains
 
   end subroutine particles_to_density
 
-  ! This routine sets the cell refinement flags for box
-  subroutine refine_routine(box, cell_flags)
-    use m_geometry
-    use m_init_cond_$Dd
-    type(box$D_t), intent(in) :: box
-    ! Refinement flags for the cells of the box
-    integer, intent(out)     :: &
-         cell_flags(DTIMES(box%n_cell))
-    integer                  :: IJK, n, nc
-    real(dp)                 :: dx, dx2, fld, alpha, adx, cphi, elec_dens
-    real(dp)                 :: rmin($D), rmax($D)
-
-    nc = box%n_cell
-    dx = box%dr
-    dx2 = dx**2
-
-    do KJI_DO(1,nc)
-       fld   = box%cc(IJK, i_E)
-       alpha = LT_get_col(ST_td_tbl, i_td_alpha, fld)
-       adx   = box%dr * alpha
-
-       ! The refinement is also based on the intensity of the source term.
-       ! Here we estimate the curvature of phi (given by dx**2 *
-       ! Laplacian(phi))
-       cphi = dx2 * abs(box%cc(IJK, i_rhs))
-
-       elec_dens = box%cc(IJK, i_electron)
-
-       if (adx > ST_refine_adx .and. elec_dens > ST_refine_elec_dens) then
-          cell_flags(IJK) = af_do_ref
-       else if (adx < 0.125_dp * ST_refine_adx .or. &
-            elec_dens < 0.125_dp * ST_refine_elec_dens) then
-          cell_flags(IJK) = af_rm_ref
-       else
-          cell_flags(IJK) = af_keep_ref
-       end if
-    end do; CLOSE_DO
-
-    ! Check fixed refinements
-    rmin = box%r_min
-    rmax = box%r_min + box%dr * box%n_cell
-
-    do n = 1, size(ST_refine_regions_dr)
-       if (ST_time <= ST_refine_regions_tstop(n) .and. &
-            dx > ST_refine_regions_dr(n) .and. all(&
-            rmax >= ST_refine_regions_rmin(:, n) .and. &
-            rmin <= ST_refine_regions_rmax(:, n))) then
-          ! Mark just the center cell to prevent refining neighbors
-          cell_flags(DTIMES(nc/2)) = af_do_ref
-       end if
-    end do
-
-    ! Make sure we don't have or get a too fine or too coarse grid
-    if (dx > ST_refine_max_dx) then
-       cell_flags = af_do_ref
-    else if (dx < 2 * ST_refine_min_dx) then
-       where(cell_flags == af_do_ref) cell_flags = af_keep_ref
-    end if
-
-  end subroutine refine_routine
 
   function get_desired_weight(my_part) result(weight)
     type(PC_part_t), intent(in) :: my_part
@@ -517,11 +476,6 @@ contains
     weight = max(particle_min_weight, min(particle_max_weight, weight))
   end function get_desired_weight
 
-  real(dp) function id_as_real(my_part)
-    type(PC_part_t), intent(in) :: my_part
-    id_as_real = my_part%id
-  end function id_as_real
-
   subroutine print_status()
     write(*, "(F7.2,A,I0,A,E10.3,A,E10.3,A,E10.3,A,E10.3,A,E10.3)") &
          100 * ST_time / ST_end_time, "% it: ", it, &
@@ -529,5 +483,23 @@ contains
          " ncell:", real(a$D_num_cells_used(tree), dp), &
          " npart:", real(pc%get_num_sim_part(), dp)
   end subroutine print_status
+
+  subroutine print_info()
+    use m_units_constants
+    real(dp) :: max_fld, max_elec, max_pion
+    real(dp) :: sum_elec, sum_pos_ion
+    real(dp) :: mean_en
+    call a$D_tree_max_cc(tree, i_E, max_fld)
+    call a$D_tree_max_cc(tree, i_electron, max_elec)
+    call a$D_tree_max_cc(tree, i_pos_ion, max_pion)
+    call a$D_tree_sum_cc(tree, i_electron, sum_elec)
+    call a$D_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
+    mean_en = pc%get_mean_energy()
+
+    print *, "max field", max_fld
+    print *, "max elec/pion", max_elec, max_pion
+    print *, "sum elec/pion", sum_elec, sum_pos_ion
+    print *, "mean energy", mean_en / UC_elec_volt
+  end subroutine print_info
 
 end program apic_$Dd

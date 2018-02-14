@@ -1,7 +1,8 @@
 #include "afivo/src/cpp_macros_$Dd.h"
 module m_init_cond_$Dd
-  use m_streamer
+  use m_globals
   use m_a$D_all
+  use m_domain_$Dd
 
   implicit none
   private
@@ -46,7 +47,7 @@ contains
 
     call CFG_add(cfg, "background_density", 0.0_dp, &
          "The background ion and electron density (1/m3)")
-    call CFG_add(cfg, "seed%density", [1.0e15_dp], &
+    call CFG_add(cfg, "seed%density", [0.0e15_dp], &
          "Initial density of the seed (1/m3)", .true.)
     call CFG_add(cfg, "seed%rel_r0", [DTIMES(0.5_dp)], &
          "The relative start position of the initial seed", .true.)
@@ -87,9 +88,9 @@ contains
 
     allocate(tmp_vec(n_dim * n_cond))
     call CFG_get(cfg, "seed%rel_r0", tmp_vec)
-    ic%seed_r0 = ST_domain_len * reshape(tmp_vec, [n_dim, n_cond])
+    ic%seed_r0 = domain_len * reshape(tmp_vec, [n_dim, n_cond])
     call CFG_get(cfg, "seed%rel_r1", tmp_vec)
-    ic%seed_r1 = ST_domain_len * reshape(tmp_vec, [n_dim, n_cond])
+    ic%seed_r1 = domain_len * reshape(tmp_vec, [n_dim, n_cond])
 
     call CFG_get(cfg, "background_density", ic%background_density)
     call CFG_get(cfg, "seed%density", ic%seed_density)
@@ -124,7 +125,7 @@ contains
          "Width of the Gaussian seeds", .true.)
     call CFG_add_get(cfg, "pseed%pos", tmp_vec, &
          "Relative location of the Gaussian seeds", .true.)
-    seed_pos = reshape(tmp_vec * ST_domain_len, [n_dim, n_cond])
+    seed_pos = reshape(tmp_vec * domain_len, [n_dim, n_cond])
 
   end subroutine init_cond_initialize
 
@@ -132,8 +133,7 @@ contains
     use m_particle_core
     type(a$D_t), intent(inout) :: tree
     type(PC_t), intent(inout) :: pc
-    integer                   :: n, i, n_background
-    real(dp)                  :: x(3), v(3), a(3), w, t_left
+    integer                   :: n, i
     real(dp)                  :: pos(3)
     type(PC_part_t)           :: part
 
@@ -141,7 +141,7 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    ! n_background = background_density * ST_domain_len**2
+    ! n_background = background_density * domain_len**2
     ! do i = 1, 
 
     ! end do

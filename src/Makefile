@@ -5,11 +5,12 @@ VPATH	:= config_fortran
 
 include afivo/makerules.make
 
-OBJS_XD := m_field_Xd.o m_init_cond_Xd.o m_photoi_Xd.o
-OBJS := m_streamer.o m_config.o m_geometry.o m_transport_data.o
+OBJS_XD := m_field_Xd.o m_init_cond_Xd.o m_photoi_Xd.o m_domain_Xd.o	\
+m_refine_Xd.o m_time_step_Xd.o
+OBJS := m_globals.o m_config.o m_geometry.o m_transport_data.o
 PROGS := ../apic_3d
 
-.PHONY: all clean afivo/src/libafivo.a particle_core/src/libparticle_core.a
+.PHONY: all clean allclean
 
 all: 	$(PROGS)
 
@@ -19,6 +20,10 @@ libstreamer.a: $(OBJS)
 
 clean:
 	$(RM) $(PROGS) *.o *.mod libstreamer.a
+
+allclean: clean
+	$(MAKE) -C afivo clean
+	$(MAKE) -C particle_core clean
 
 %_2d.f90: %_Xd.f90
 	@echo "*** $< has changed, regenerating $@ ***"
@@ -46,8 +51,38 @@ $(PROGS): afivo/src/libafivo.a particle_core/src/libparticle_core.a
 ../apic_2d: $(OBJS) $(OBJS_XD:%_Xd.o=%_2d.o)
 ../apic_3d: $(OBJS) $(OBJS_XD:%_Xd.o=%_3d.o)
 
-apic_2d.o: m_streamer.mod $(OBJS_XD:%_Xd.o=%_2d.mod)
-apic_3d.o: m_streamer.mod $(OBJS_XD:%_Xd.o=%_3d.mod)
-m_streamer.o: m_config.mod m_transport_data.mod
-m_init_cond_2d.o m_init_cond_3d.o: m_geometry.mod
+$(OBJS): afivo/src/libafivo.a particle_core/src/libparticle_core.a
+$(OBJS_XD:%_Xd.o=%_2d.o): afivo/src/libafivo.a particle_core/src/libparticle_core.a
+$(OBJS_XD:%_Xd.o=%_3d.o): afivo/src/libafivo.a particle_core/src/libparticle_core.a
 
+# Put content of list_module_deps.sh below
+apic_3d.o: m_domain_3d.mod
+apic_3d.o: m_field_3d.mod
+apic_3d.o: m_globals.mod
+apic_3d.o: m_init_cond_3d.mod
+apic_3d.o: m_photoi_3d.mod
+apic_3d.o: m_refine_3d.mod
+apic_3d.o: m_time_step_3d.mod
+apic_Xd.o: m_globals.mod
+m_domain_3d.o: m_config.mod
+m_field_2d.o: m_streamer.mod
+m_field_3d.o: m_domain_3d.mod
+m_field_3d.o: m_globals.mod
+m_globals.o: m_config.mod
+m_init_cond_2d.o: m_geometry.mod
+m_init_cond_2d.o: m_streamer.mod
+m_init_cond_3d.o: m_domain_3d.mod
+m_init_cond_3d.o: m_geometry.mod
+m_init_cond_3d.o: m_globals.mod
+m_photoi_2d.o: m_config.mod
+m_photoi_2d.o: m_streamer.mod
+m_photoi_3d.o: m_config.mod
+m_photoi_3d.o: m_domain_3d.mod
+m_photoi_3d.o: m_globals.mod
+m_refine_3d.o: m_config.mod
+m_refine_3d.o: m_geometry.mod
+m_refine_3d.o: m_globals.mod
+m_refine_3d.o: m_init_cond_3d.mod
+m_refine_3d.o: m_transport_data.mod
+m_time_step_3d.o: m_config.mod
+m_time_step_3d.o: m_globals.mod
