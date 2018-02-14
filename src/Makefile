@@ -8,7 +8,7 @@ include afivo/makerules.make
 OBJS_XD := m_field_Xd.o m_init_cond_Xd.o m_photoi_Xd.o m_domain_Xd.o	\
 m_refine_Xd.o m_time_step_Xd.o
 OBJS := m_globals.o m_config.o m_geometry.o m_transport_data.o
-PROGS := ../apic_3d
+PROGS := ../apic_2d ../apic_3d
 
 .PHONY: all clean allclean
 
@@ -63,19 +63,19 @@ apic_3d.o: m_init_cond_3d.mod
 apic_3d.o: m_photoi_3d.mod
 apic_3d.o: m_refine_3d.mod
 apic_3d.o: m_time_step_3d.mod
-apic_Xd.o: m_globals.mod
+m_domain_2d.o: m_config.mod
 m_domain_3d.o: m_config.mod
-m_field_2d.o: m_streamer.mod
+m_field_2d.o: m_domain_2d.mod
+m_field_2d.o: m_globals.mod
 m_field_3d.o: m_domain_3d.mod
 m_field_3d.o: m_globals.mod
 m_globals.o: m_config.mod
+m_init_cond_2d.o: m_domain_2d.mod
 m_init_cond_2d.o: m_geometry.mod
-m_init_cond_2d.o: m_streamer.mod
+m_init_cond_2d.o: m_globals.mod
 m_init_cond_3d.o: m_domain_3d.mod
 m_init_cond_3d.o: m_geometry.mod
 m_init_cond_3d.o: m_globals.mod
-m_photoi_2d.o: m_config.mod
-m_photoi_2d.o: m_streamer.mod
 m_photoi_3d.o: m_config.mod
 m_photoi_3d.o: m_domain_3d.mod
 m_photoi_3d.o: m_globals.mod

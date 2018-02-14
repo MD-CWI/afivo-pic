@@ -4,7 +4,7 @@
 deps="$(grep -e "use m_" *.f90)"
 
 # Remove Xd files
-deps=$(echo "$deps" | sed 's/^m_\S.*\Xd.*$//')
+deps=$(echo "$deps" | sed 's/^\S*_Xd.*$//')
 
 # Remove modules from libraries
 deps=$(echo "$deps" | sed 's/use m_a\$D_.*$//')
