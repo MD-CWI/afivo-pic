@@ -66,6 +66,7 @@ program apic_$Dd
   call a$D_set_cc_methods(tree, i_electron, a$D_bc_neumann_zero)
   call a$D_set_cc_methods(tree, i_pos_ion, a$D_bc_neumann_zero)
   call a$D_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
+  call a$D_set_cc_methods(tree, i_ppc, a$D_bc_neumann_zero)
 
   output_cnt      = 0         ! Number of output files written
   ST_time         = 0         ! Simulation time (all times are in s)
@@ -132,17 +133,14 @@ program apic_$Dd
      print *, "fld err", fld_err, ST_dt
      ST_dt = get_new_dt(ST_dt, fld_err, 10.0e-2_dp)
 
-     ! call PC_verlet_correct_accel(pc, dt)
-     call pc%set_accel()
+     call PC_verlet_correct_accel(pc, dt)
 
      if (modulo(it, 10) == 0) then
         call adapt_weights(tree, pc)
      end if
 
      if (write_out) then
-        ! Fill ghost cells before writing output
-        call a$D_gc_tree(tree, i_electron)
-        call a$D_gc_tree(tree, i_pos_ion)
+        call prepare_output_variables()
 
         write(fname, "(A,I6.6)") trim(ST_simulation_name) // "_", output_cnt
         call a$D_write_silo(tree, fname, output_cnt, ST_time, &
@@ -154,7 +152,8 @@ program apic_$Dd
         call a$D_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width, .true.)
 
-        if (ref_info%n_add > 0) then
+        if (ref_info%n_add + ref_info%n_rm > 0) then
+           call adapt_weights(tree, pc)
            ! Compute the field on the new mesh
            call particles_to_density(tree, pc, events, .false.)
            call field_compute(tree, mg, .true.)
@@ -172,7 +171,7 @@ contains
     integer, allocatable      :: id_ipart(:)
 
     call sort_by_id(tree, pc, id_ipart)
-
+    print *, "before: ", pc%get_num_sim_part()
     !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
        n_part_id = id_ipart(id+1) - id_ipart(id)
@@ -184,6 +183,7 @@ contains
        end if
     end do
     !$omp end parallel do
+    print *, "after:  ", pc%get_num_sim_part()
 
     call pc%clean_up()
   end subroutine adapt_weights
@@ -488,18 +488,52 @@ contains
     use m_units_constants
     real(dp) :: max_fld, max_elec, max_pion
     real(dp) :: sum_elec, sum_pos_ion
-    real(dp) :: mean_en
+    real(dp) :: mean_en, n_elec
+    integer  :: n_part
     call a$D_tree_max_cc(tree, i_E, max_fld)
     call a$D_tree_max_cc(tree, i_electron, max_elec)
     call a$D_tree_max_cc(tree, i_pos_ion, max_pion)
     call a$D_tree_sum_cc(tree, i_electron, sum_elec)
     call a$D_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
     mean_en = pc%get_mean_energy()
+    n_part  = pc%get_num_sim_part()
+    n_elec  = pc%get_num_real_part()
 
     print *, "max field", max_fld
     print *, "max elec/pion", max_elec, max_pion
     print *, "sum elec/pion", sum_elec, sum_pos_ion
     print *, "mean energy", mean_en / UC_elec_volt
+    print *, "n_part, n_elec", n_part, n_elec
+    print *, "mean weight", n_elec/n_part
   end subroutine print_info
+
+  subroutine prepare_output_variables()
+    integer :: n, n_part
+    real(dp), allocatable :: coords(:, :)
+    real(dp), allocatable :: weights(:)
+    integer, allocatable  :: id_guess(:)
+
+    n_part = pc%get_num_sim_part()
+    allocate(coords($D, n_part))
+    allocate(weights(n_part))
+    allocate(id_guess(n_part))
+
+    !$omp parallel do
+    do n = 1, n_part
+       coords(:, n) = pc%particles(n)%x(1:$D)
+       weights(n) = 1.0_dp
+       id_guess(n) = pc%particles(n)%id
+    end do
+    !$omp end parallel do
+
+    call a$D_tree_clear_cc(tree, i_ppc)
+    call a$D_particles_to_grid(tree, i_ppc, coords(:, 1:n_part), &
+         weights(1:n_part), n_part, 0, id_guess(1:n_part), .false.)
+
+    ! Fill ghost cells before writing output
+    call a$D_gc_tree(tree, i_electron)
+    call a$D_gc_tree(tree, i_pos_ion)
+
+  end subroutine prepare_output_variables
 
 end program apic_$Dd

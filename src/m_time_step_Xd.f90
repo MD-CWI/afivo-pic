@@ -67,7 +67,7 @@ contains
           do i = 1, n_samples
              ! Randomly select a particle
              n = floor(rng%unif_01() * pc%n_part) + 1
-             pos_samples(:,i) = pc%particles(n)%x
+             pos_samples(:,i) = pc%particles(n)%x(1:$D)
 #if $D == 2
              fld_samples(:,i) = a$D_interp1(tree, pos_samples(:,i), &
                   [i_Ex, i_Ey], $D)

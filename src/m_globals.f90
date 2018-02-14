@@ -25,8 +25,9 @@ module m_globals
   integer, protected :: i_Ex       = -1 ! Electric field (x)
   integer, protected :: i_Ey       = -1 ! Electric field (y)
   integer, protected :: i_Ez       = -1 ! Electric field (z)
-  integer, protected :: i_E        = -1  ! Electric field (x)
+  integer, protected :: i_E        = -1 ! Electric field (x)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
+  integer, protected :: i_ppc      = -1 ! Particles per cell
 
   integer, parameter :: name_len = 12
 
@@ -146,6 +147,7 @@ contains
     end if
     i_E = ST_add_cc_variable("E", .true.)
     i_rhs = ST_add_cc_variable("rhs", .true.)
+    i_ppc = ST_add_cc_variable("ppc", .true.)
 
     call CFG_add_get(cfg, "cylindrical", ST_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")
