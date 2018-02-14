@@ -1,0 +1,12 @@
+/src/apic_3d.f90
+/src/m_domain_3d.f90
+/src/m_field_2d.f90
+/src/m_field_3d.f90
+/src/m_init_cond_2d.f90
+/src/m_init_cond_3d.f90
+/src/m_photoi_2d.f90
+/src/m_photoi_3d.f90
+/src/m_refine_3d.f90
+/src/m_time_step_3d.f90
+/apic_2d
+/apic_3d
