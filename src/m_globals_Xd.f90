@@ -3,16 +3,19 @@
 !! * Names of the cell-centered variables
 !! * Indices of face-centered variables
 !! * Indices of transport data
-module m_globals
-
+module m_globals_$Dd
+  use m_a$D_all
+  use m_particle_core
   use m_config
   use m_random
-  use m_lookup_table
 
   implicit none
   public
 
-  integer, parameter, private :: dp = kind(0.0d0)
+  type(CFG_t)            :: cfg  ! The configuration for the simulation
+  type(a$D_t)            :: tree ! This contains the full grid information
+  type(mg$D_t)           :: mg   ! Multigrid option struct
+  type(PC_t)             :: pc
 
   ! Default length of strings
   integer, parameter :: ST_slen = 200
@@ -78,9 +81,10 @@ module m_globals
   real(dp) :: ST_init_seed_sigma    = 1.0e-3_dp
   integer  :: ST_init_num_particles = 10000
 
-  real(dp), protected :: particle_min_weight = 1.0_dp
-  real(dp), protected :: particle_max_weight = 1.0e20_dp
-  real(dp), protected :: particle_per_cell = 100.0_dp
+  real(dp) :: min_merge_increase = 1.1_dp
+  real(dp) :: particle_min_weight = 1.0_dp
+  real(dp) :: particle_max_weight = 1.0e20_dp
+  real(dp) :: particle_per_cell = 100.0_dp
 
 contains
 
@@ -166,13 +170,6 @@ contains
     call CFG_add_get(cfg, "gas%frac_O2", ST_gas_frac_O2, &
          "Fraction of O2, used for photoionization")
 
-    call CFG_add_get(cfg, "particle%per_cell", particle_per_cell, &
-         "Desired number of particles per cell")
-    call CFG_add_get(cfg, "particle%min_weight", particle_min_weight, &
-         "Minimum weight for simulation particles")
-    call CFG_add_get(cfg, "particle%max_weight", particle_max_weight, &
-         "Maximum weight for simulation particles")
-
     call CFG_add_get(cfg, "rng_seed", rng_int4_seed, &
          "Seed for random numbers. If all zero, generate from clock.")
 
@@ -199,4 +196,4 @@ contains
     end do
   end function get_random_seed
 
-end module m_globals
+end module m_globals_$Dd

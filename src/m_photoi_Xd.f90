@@ -1,10 +1,9 @@
 module m_photoi_$Dd
-  use m_globals
+  use m_globals_$Dd
 
   implicit none
   private
 
-  integer, parameter    :: dp = kind(0.0d0)
   real(dp)              :: pi_quench_fac
   real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
   real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
@@ -74,6 +73,7 @@ contains
     use m_particle_core
     use m_units_constants
     use m_domain_$Dd
+
     type(PC_events_t), intent(in) :: events
     real(dp), intent(inout)       :: photo_pos(:, :)
     real(dp), intent(inout)       :: photo_w(:)

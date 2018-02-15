@@ -1,6 +1,6 @@
 #include "afivo/src/cpp_macros_$Dd.h"
 module m_init_cond_$Dd
-  use m_globals
+  use m_globals_$Dd
   use m_a$D_all
   use m_domain_$Dd
 

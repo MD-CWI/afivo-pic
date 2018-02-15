@@ -1,7 +1,7 @@
 module m_time_step_$Dd
   use m_a$D_all
   use m_particle_core
-  use m_globals
+  use m_globals_$Dd
 
   implicit none
   public
@@ -104,46 +104,42 @@ contains
 
   end subroutine PM_fld_error
 
-  ! function PM_get_max_dt(pc, rng, n_samples, cfl_num) result(dt_max)
-  !   use m_random
-  !   use m_efield_amr
-  !   use mpi
-  !   use m_mrgrnk
-  !   class(PC_t), intent(in)    :: pc
-  !   type(RNG_t), intent(inout) :: rng
-  !   integer, intent(in)        :: n_samples
-  !   real(dp), intent(in)       :: cfl_num
-  !   real(dp)                   :: dt_max
+  function PM_get_max_dt(pc, rng, n_samples, cfl_num) result(dt_max)
+    use m_random
+    use m_mrgrnk
+    class(PC_t), intent(in)    :: pc
+    type(RNG_t), intent(inout) :: rng
+    integer, intent(in)        :: n_samples
+    real(dp), intent(in)       :: cfl_num
+    real(dp)                   :: dt_max
+    real(dp)                   :: vel_est, min_dr
+    real(dp), allocatable      :: velocities(:)
+    integer, allocatable       :: ix_list(:)
+    integer                    :: n, ix
 
-  !   real(dp)                   :: vel_est, min_dr
-  !   real(dp), allocatable      :: velocities(:)
-  !   integer, allocatable       :: ix_list(:)
-  !   integer                    :: n, ix, ierr
+    allocate(velocities(n_samples))
+    allocate(ix_list(n_samples))
 
-  !   allocate(velocities(n_samples))
-  !   allocate(ix_list(n_samples))
+    if (pc%n_part > 0) then
+       ! Estimate maximum velocity of particles
+       do n = 1, n_samples
+          ix = floor(rng%unif_01() * pc%n_part) + 1
+          velocities(n) = norm2(pc%particles(ix)%v)
+       end do
 
-  !   if (pc%n_part > 0) then
-  !      ! Estimate maximum velocity of particles
-  !      do n = 1, n_samples
-  !         ix = floor(rng%unif_01() * pc%n_part) + 1
-  !         velocities(n) = norm2(pc%particles(ix)%v)
-  !      end do
+       call mrgrnk(velocities, ix_list)
+       velocities = velocities(ix_list)
 
-  !      call mrgrnk(velocities, ix_list)
-  !      velocities = velocities(ix_list)
+       vel_est = velocities(nint(n_samples * 0.9_dp))
 
-  !      vel_est = velocities(nint(n_samples * 0.9_dp))
+       ! Get smallest grid delta
+       min_dr = a$D_min_dr(tree)
+       dt_max = cfl_num * min_dr / vel_est
+    else
+       dt_max = huge(1.0_dp)
+    end if
 
-  !      ! Get smallest grid delta
-  !      min_dr = minval(E_get_smallest_dr())
-
-  !      dt_max = cfl_num * min_dr / vel_est
-  !   else
-  !      dt_max = huge(1.0_dp)
-  !   end if
-
-  ! end function PM_get_max_dt
+  end function PM_get_max_dt
 
   !> Given the old stepsize 'old_dt', the error 'err', the maximum allowed error
   !> 'max_err', and the relative change in number of particles, return a new
