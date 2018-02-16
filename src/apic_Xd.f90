@@ -19,7 +19,7 @@ program apic_$Dd
   integer, parameter     :: int8 = selected_int_kind(18)
   integer, parameter     :: ndim = $D
   integer(int8)          :: t_start, t_current, count_rate
-  real(dp)               :: dt, fld_err
+  real(dp)               :: dt
   real(dp)               :: wc_time, inv_count_rate, time_last_print
   integer                :: it
   integer                :: n_part, n_prev_merge
@@ -28,7 +28,7 @@ program apic_$Dd
   type(PC_events_t)      :: events
   type(ref_info_t)       :: ref_info
   real(dp)               :: n_elec, n_elec_prev
-  real(dp)               :: dt_fld, dt_cfl, dt_growth
+  real(dp)               :: dt_cfl, dt_growth
 
   real(dp) :: t0
   real(dp) :: wtime_start
@@ -77,7 +77,6 @@ program apic_$Dd
   call a$D_set_cc_methods(tree, i_electron, a$D_bc_neumann_zero)
   call a$D_set_cc_methods(tree, i_pos_ion, a$D_bc_neumann_zero)
   call a$D_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
-  call a$D_set_cc_methods(tree, i_ppc, a$D_bc_neumann_zero)
 
   output_cnt      = 0         ! Number of output files written
   ST_time         = 0         ! Simulation time (all times are in s)
@@ -132,8 +131,6 @@ program apic_$Dd
         dt        = ST_dt
      end if
 
-     call PM_fld_error(tree, pc, ST_rng, 1000, fld_err, .true.)
-
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt, events)
      call pc%after_mover(dt)
@@ -160,19 +157,15 @@ program apic_$Dd
 
      call pc%set_accel()
 
-     call PM_fld_error(tree, pc, ST_rng, 1000, fld_err, .false.)
-     ! print *, "fld err", fld_err, ST_dt
-     n_elec = pc%get_num_real_part()
-     dt_fld = get_new_dt(ST_dt, fld_err, 10.0e-2_dp)
-     dt_cfl = PM_get_max_dt(pc, ST_rng, 1000, 0.5_dp)
-     dt_growth = get_new_dt(ST_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
-     print *, dt_fld, dt_cfl, dt_growth
-     ST_dt = min(dt_cfl, dt_growth)
+     n_elec      = pc%get_num_real_part()
+     dt_cfl      = PM_get_max_dt(pc, ST_rng, 1000, 0.5_dp)
+     dt_growth   = get_new_dt(ST_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
+     ST_dt       = min(dt_cfl, dt_growth)
      n_elec_prev = n_elec
 
      if (write_out) then
         t0 = omp_get_wtime()
-        call prepare_output_variables()
+        call set_output_variables()
 
         write(fname, "(A,I6.6)") trim(ST_simulation_name) // "_", output_cnt
         call a$D_write_silo(tree, fname, output_cnt, ST_time, &
@@ -190,7 +183,6 @@ program apic_$Dd
            ! Compute the field on the new mesh
            call particles_to_density_and_events(tree, pc, events, .false.)
            call field_compute(tree, mg, .true.)
-           print *, "changed grid"
            call adapt_weights(tree, pc)
         end if
      end if
@@ -270,33 +262,50 @@ contains
          wtime_merge + wtime_density + wtime_io + wtime_amr) / wtime_run
   end subroutine print_info
 
-  subroutine prepare_output_variables()
+  subroutine set_output_variables()
+    use m_units_constants
     integer :: n, n_part
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: weights(:)
+    real(dp), allocatable :: energy(:)
     integer, allocatable  :: id_guess(:)
+    ! integer, allocatable :: ionize_ix(:)
 
     n_part = pc%get_num_sim_part()
     allocate(coords($D, n_part))
     allocate(weights(n_part))
+    allocate(energy(n_part))
     allocate(id_guess(n_part))
+
+    ! call pc%get_colls_of_type(CS_ionize_t, ionize_ix)
 
     !$omp parallel do
     do n = 1, n_part
        coords(:, n) = pc%particles(n)%x(1:$D)
        weights(n) = 1.0_dp
+       energy(n) = pc%particles(n)%w * &
+            PC_v_to_en(pc%particles(n)%v, UC_elec_mass) / &
+            UC_elec_volt
        id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
 
     call a$D_tree_clear_cc(tree, i_ppc)
+    ! Don't divide by cell volume (last .false. argument)
     call a$D_particles_to_grid(tree, i_ppc, coords(:, 1:n_part), &
-         weights(1:n_part), n_part, 0, id_guess(1:n_part), .false.)
+         weights(1:n_part), n_part, 0, id_guess(1:n_part), &
+         density=.false., fill_gc=.false.)
+
+    call a$D_tree_clear_cc(tree, i_energy)
+    call a$D_particles_to_grid(tree, i_energy, coords(:, 1:n_part), &
+         energy(1:n_part), n_part, 1, id_guess(1:n_part), &
+         fill_gc=.false.)
+    call a$D_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output
     call a$D_gc_tree(tree, i_electron)
     call a$D_gc_tree(tree, i_pos_ion)
 
-  end subroutine prepare_output_variables
+  end subroutine set_output_variables
 
 end program apic_$Dd

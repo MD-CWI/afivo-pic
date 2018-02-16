@@ -11,7 +11,7 @@ module m_refine_$Dd
   integer, protected :: refine_buffer_width = 2
 
   ! The number of steps after which the mesh is updated
-  integer, protected :: refine_per_steps = 2
+  integer, protected :: refine_per_steps = 10
 
   ! The grid spacing will always be larger than this value
   real(dp), protected :: refine_min_dx = 1.0e-6_dp
@@ -23,13 +23,13 @@ module m_refine_$Dd
   real(dp), protected :: refine_adx = 1.0_dp
 
   ! Refine if dx^2 * rhs is larger than this value (Volts)
-  real(dp), protected :: refine_cphi = 1.0_dp
+  real(dp), protected :: refine_cphi = 1.0e50_dp
 
   ! Only refine if electron density is above this value
   real(dp), protected :: refine_elec_dens = 1.0e13_dp
 
   ! Only derefine if grid spacing if smaller than this value
-  real(dp), protected :: derefine_dx = 1e-4_dp
+  real(dp), protected :: derefine_dx = 5e-5_dp
 
   ! Refine around initial conditions up to this time
   real(dp), protected :: refine_init_time = 10e-9_dp
@@ -83,7 +83,7 @@ contains
          "Refine if the curvature in phi is larger than this value")
     call CFG_add_get(cfg, "refine%elec_dens", refine_elec_dens, &
          "Only refine if electron density is above this value")
-    call CFG_add_get(cfg, "derefine_dx", derefine_dx, &
+    call CFG_add_get(cfg, "refine%derefine_dx", derefine_dx, &
          "Only derefine if grid spacing if smaller than this value")
     call CFG_add_get(cfg, "refine%init_time", refine_init_time, &
          "Refine around initial conditions up to this time")
@@ -146,7 +146,8 @@ contains
 
        elec_dens = box%cc(IJK, i_electron)
 
-       if (adx > refine_adx .and. elec_dens > refine_elec_dens) then
+       if ((adx > refine_adx .and. elec_dens > refine_elec_dens) &
+            .or. cphi > refine_cphi) then
           cell_flags(IJK) = af_do_ref
        else if (adx < 0.125_dp * refine_adx .or. &
             elec_dens < 0.125_dp * refine_elec_dens) then

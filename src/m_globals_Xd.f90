@@ -31,7 +31,7 @@ module m_globals_$Dd
   integer, protected :: i_E        = -1 ! Electric field (x)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
   integer, protected :: i_ppc      = -1 ! Particles per cell
-
+  integer, protected :: i_energy   = -1 ! Energy density
   integer, parameter :: name_len = 12
 
   ! Names of the cell-centered variables
@@ -81,7 +81,6 @@ module m_globals_$Dd
   real(dp) :: ST_init_seed_sigma    = 1.0e-3_dp
   integer  :: ST_init_num_particles = 10000
 
-  real(dp) :: min_merge_increase = 1.1_dp
   real(dp) :: particle_min_weight = 1.0_dp
   real(dp) :: particle_max_weight = 1.0e20_dp
   real(dp) :: particle_per_cell = 100.0_dp
@@ -152,6 +151,7 @@ contains
     i_E = ST_add_cc_variable("E", .true.)
     i_rhs = ST_add_cc_variable("rhs", .true.)
     i_ppc = ST_add_cc_variable("ppc", .true.)
+    i_energy = ST_add_cc_variable("energy", .true.)
 
     call CFG_add_get(cfg, "cylindrical", ST_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")

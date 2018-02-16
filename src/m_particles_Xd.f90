@@ -9,6 +9,10 @@ module m_particles_$Dd
   ! Magnetic field vector
   real(dp), protected :: B_vec(3) = [0.0_dp, 0.0_dp, 0.0_dp]
 
+  real(dp) :: min_merge_increase = 1.25_dp
+
+  real(dp), parameter :: array_incr_fac = 1.25_dp
+
 contains
 
   subroutine init_particle(cfg, pc)
@@ -49,12 +53,12 @@ contains
 
     call CFG_add(cfg, "particle%max_number", 50*1000*1000, &
          "Maximum number of particles")
+    call CFG_add_get(cfg, "particle%min_merge_increase", min_merge_increase, &
+         "Minimum increase in particle count before merging")
     call CFG_add(cfg, "particle%lkptbl_size", 1000, &
          "The size of the lookup table for the collision rates")
     call CFG_add(cfg, "particle%max_energy_ev", 500.0_dp, &
          "The maximum energy in eV for particles in the simulation")
-    call CFG_add(cfg, "particle%mover", "verlet", &
-         "Which particle mover to use. Options: analytic, verlet, boris")
     call CFG_add(cfg, "boris_dt_factor", 0.1_dp, &
          "The maximum time step in terms of the cylotron frequency")
 
@@ -96,10 +100,14 @@ contains
     pc%outside_check => outside_check
 
     if (any(abs(B_vec) > 0)) then
+       print *, "Using Boris mover"
        pc%B_vec = B_vec
        pc%particle_mover => PC_boris_advance
        pc%after_mover => PC_after_dummy
        pc%dt_max = 2 * UC_pi / (30 * abs(UC_elec_q_over_m) * norm2(B_vec))
+       write(*, "(A,E10.2)") " Max time step Boris (s): ", pc%dt_max
+    else
+       print *, "Using Verlet mover"
     end if
 
     where (pc%colls(:)%type == CS_ionize_t .or. &
@@ -116,7 +124,7 @@ contains
     integer, allocatable      :: id_ipart(:)
 
     call sort_by_id(tree, pc, id_ipart)
-    print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
+    ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
     !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
        n_part_id = id_ipart(id+1) - id_ipart(id)
@@ -130,7 +138,7 @@ contains
     !$omp end parallel do
 
     call pc%clean_up()
-    print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
+    ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
   end subroutine adapt_weights
 
   subroutine sort_by_id(tree, pc, id_ipart)
@@ -149,10 +157,10 @@ contains
     allocate(id_count(tree%highest_id))
 
     if (.not. allocated(p_copy)) then
-       allocate(p_copy(nint(pc%n_part * 1.25_dp)))
+       allocate(p_copy(nint(pc%n_part * array_incr_fac)))
     else if (size(p_copy) < pc%n_part) then
        deallocate(p_copy)
-       allocate(p_copy(pc%n_part))
+       allocate(p_copy(nint(pc%n_part * array_incr_fac)))
     end if
 
     id_count(:) = 0
@@ -188,17 +196,28 @@ contains
 
     integer               :: n, i, n_part, n_events, n_photons, id
     real(dp)              :: x(3), v(3), a(3)
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: weights(:)
-    integer, allocatable  :: id_guess(:)
+    real(dp), allocatable, save :: coords(:, :)
+    real(dp), allocatable, save :: weights(:)
+    integer, allocatable, save  :: id_guess(:)
 
     n_part = pc%get_num_sim_part()
     n_events = events%n_stored
     n = max(n_part, n_events)
 
-    allocate(coords($D, n))
-    allocate(weights(n))
-    allocate(id_guess(n))
+    if (.not. allocated(weights)) then
+       n = nint(n * array_incr_fac)
+       allocate(coords($D, n))
+       allocate(weights(n))
+       allocate(id_guess(n))
+    else if (size(weights) < n) then
+       n = nint(n * array_incr_fac)
+       deallocate(coords)
+       deallocate(weights)
+       deallocate(id_guess)
+       allocate(coords($D, n))
+       allocate(weights(n))
+       allocate(id_guess(n))
+    end if
 
     !$omp parallel do
     do n = 1, n_part
@@ -247,14 +266,14 @@ contains
        call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
             weights(1:n_photons), n_photons, 1)
        ! print *, "n_photons", n_photons, n_events
+       v = 0
        do n = 1, n_photons
           x(1:$D) = coords(:, n)
 #if $D == 2
-          x(3)   = 0
+          x(3)    = 0
 #endif
-          v      = 0
-          a      = get_accel_pos(x(1:$D))
-          id     = a$D_get_id_at(tree, x(1:$D))
+          a       = get_accel_pos(x(1:$D))
+          id      = a$D_get_id_at(tree, x(1:$D))
 
           call pc%create_part(x, v, a, weights(n), 0.0_dp, id=id)
        end do
@@ -271,29 +290,18 @@ contains
 
 #if $D == 2
     accel(1:$D) = a$D_interp1(tree, x, [i_Ex, i_Ey], $D)
-    accel(1:$D) = accel(1:$D) * UC_elec_q_over_m
     accel(3) = 0.0_dp
 #elif $D == 3
     accel(1:$D) = a$D_interp1(tree, x, [i_Ex, i_Ey, i_Ez], $D)
-    accel(1:$D) = accel(1:$D) * UC_elec_q_over_m
 #endif
+    accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel_pos
 
   function get_accel(my_part) result(accel)
     use m_units_constants
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: accel(3)
-
-#if $D == 2
-    accel(1:$D) = a$D_interp1(tree, my_part%x(1:$D), [i_Ex, i_Ey], $D, my_part%id)
-    accel(3) = 0.0_dp
-#elif $D == 3
-    accel(1:$D) = a$D_interp1(tree, my_part%x(1:$D), [i_Ex, i_Ey, i_Ez], &
-         $D, my_part%id)
-#endif
-
-    accel(:) = accel(:) * UC_elec_q_over_m
-
+    accel    = get_accel_pos(my_part%x(1:$D))
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)

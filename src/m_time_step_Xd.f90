@@ -134,7 +134,7 @@ contains
 
        ! Get smallest grid delta
        min_dr = a$D_min_dr(tree)
-       dt_max = cfl_num * min_dr / vel_est
+       dt_max = cfl_num * min_dr / max(vel_est, 1e-10_dp)
     else
        dt_max = huge(1.0_dp)
     end if

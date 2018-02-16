@@ -52,8 +52,8 @@ contains
     ! print *, "Max abs. length photoi.", 1.0d3 / pi_min_inv_abs_len, "mm"
     ! print *, "Min abs. length photoi.", 1.0d3 / pi_max_inv_abs_len, "mm"
 
-    pi_quench_fac = (30.0D0 * UC_torr_to_bar) / &
-         (GAS_pressure + (30.0D0 * UC_torr_to_bar))
+    pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
+         (GAS_pressure + (40.0D0 * UC_torr_to_bar))
 
     call CFG_get_size(cfg, "photoi%efficiency_table", t_size)
     call CFG_get_size(cfg, "photoi%efield_table", t_size_2)
@@ -120,8 +120,9 @@ contains
   real(dp) function get_photoi_eff(fld)
     use m_lookup_table
     real(dp), intent(in) :: fld
-    call LT_lin_interp_list(pi_photo_eff_table1, &
-         pi_photo_eff_table2, fld, get_photoi_eff)
+    get_photoi_eff = 0.075_dp
+    ! call LT_lin_interp_list(pi_photo_eff_table1, &
+         ! pi_photo_eff_table2, fld, get_photoi_eff)
   end function get_photoi_eff
 
   ! Returns the inverse mean free path for a photon.
