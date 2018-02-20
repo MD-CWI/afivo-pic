@@ -149,8 +149,9 @@ contains
        if ((adx > refine_adx .and. elec_dens > refine_elec_dens) &
             .or. cphi > refine_cphi) then
           cell_flags(IJK) = af_do_ref
-       else if (adx < 0.125_dp * refine_adx .or. &
-            elec_dens < 0.125_dp * refine_elec_dens) then
+       else if ((adx < 0.125_dp * refine_adx .or. &
+            elec_dens < 0.125_dp * refine_elec_dens) .and. &
+            dx < derefine_dx) then
           cell_flags(IJK) = af_rm_ref
        else
           cell_flags(IJK) = af_keep_ref

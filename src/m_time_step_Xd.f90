@@ -18,6 +18,8 @@ module m_time_step_$Dd
   ! Time between writing output
   real(dp), protected :: ST_dt_output = 1.0e-10_dp
 
+  real(dp), protected :: cfl_particles = 0.5_dp
+
 contains
 
   subroutine time_step_init(cfg)
@@ -30,6 +32,8 @@ contains
          "The maximum timestep (s)")
     call CFG_add_get(cfg, "dt_min", ST_dt_min, &
          "The minimum timestep (s)")
+    call CFG_add_get(cfg, "cfl_particles", cfl_particles, &
+         "CFL number for particles")
 
   end subroutine time_step_init
 

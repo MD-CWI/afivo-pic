@@ -158,7 +158,7 @@ program apic_$Dd
      call pc%set_accel()
 
      n_elec      = pc%get_num_real_part()
-     dt_cfl      = PM_get_max_dt(pc, ST_rng, 1000, 0.5_dp)
+     dt_cfl      = PM_get_max_dt(pc, ST_rng, min(n_part, 1000), cfl_particles)
      dt_growth   = get_new_dt(ST_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
      ST_dt       = min(dt_cfl, dt_growth)
      n_elec_prev = n_elec
