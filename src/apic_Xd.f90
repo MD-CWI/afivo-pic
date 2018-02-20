@@ -22,13 +22,13 @@ program apic_$Dd
   real(dp)               :: dt
   real(dp)               :: wc_time, inv_count_rate, time_last_print
   integer                :: it
-  integer                :: n_part, n_prev_merge
+  integer                :: n_part, n_prev_merge, n_samples
   character(len=ST_slen) :: fname
   logical                :: write_out
   type(PC_events_t)      :: events
   type(ref_info_t)       :: ref_info
-  real(dp)               :: n_elec, n_elec_prev
-  real(dp)               :: dt_cfl, dt_growth
+  real(dp)               :: n_elec, n_elec_prev, max_elec_dens
+  real(dp)               :: dt_cfl, dt_growth, dt_drt
 
   real(dp) :: t0
   real(dp) :: wtime_start
@@ -157,10 +157,13 @@ program apic_$Dd
 
      call pc%set_accel()
 
+     n_samples = min(n_part, 1000)
+     call a$D_tree_max_cc(tree, i_electron, max_elec_dens)
      n_elec      = pc%get_num_real_part()
-     dt_cfl      = PM_get_max_dt(pc, ST_rng, min(n_part, 1000), cfl_particles)
+     dt_cfl      = PM_get_max_dt(pc, ST_rng, n_samples, cfl_particles)
+     dt_drt      = dielectric_relaxation_time(max_elec_dens)
      dt_growth   = get_new_dt(ST_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
-     ST_dt       = min(dt_cfl, dt_growth)
+     ST_dt       = min(dt_cfl, dt_growth, dt_drt)
      n_elec_prev = n_elec
 
      if (write_out) then

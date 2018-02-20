@@ -20,6 +20,9 @@ module m_time_step_$Dd
 
   real(dp), protected :: cfl_particles = 0.5_dp
 
+  ! Estimate of mobility for dielectric relaxation time
+  real(dp), protected :: drt_mobility = 0.075_dp
+
 contains
 
   subroutine time_step_init(cfg)
@@ -34,8 +37,18 @@ contains
          "The minimum timestep (s)")
     call CFG_add_get(cfg, "cfl_particles", cfl_particles, &
          "CFL number for particles")
+    call CFG_add_get(cfg, "drt_mobility", drt_mobility, &
+         "Estimate of mobility for dielectric relaxation time")
 
   end subroutine time_step_init
+
+  function dielectric_relaxation_time(n_max) result(drt)
+    use m_units_constants
+    real(dp), intent(in) :: n_max
+    real(dp)             :: drt
+
+    drt = UC_eps0 / (UC_elem_charge * n_max * drt_mobility)
+  end function dielectric_relaxation_time
 
   !> This routine can be used to estimate the error in the electric field. It
   !> should first be called with store_samples = .true., then a later call with
@@ -101,6 +114,7 @@ contains
                   max(norm2(fld), norm2(fld_samples(:,i)), avg_norm)
              fld_err  = max(fld_err, this_err)
           end do
+          print *, "avg_norm", avg_norm
        else
           error stop "PM_fld_error: no samples available"
        end if
