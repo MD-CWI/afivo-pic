@@ -40,32 +40,34 @@ contains
          [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
          "The inverse min/max absorption length, will be scaled by pO2")
 
-    frac_O2 = GAS_get_fraction("O2")
-    if (frac_O2 <= epsilon(1.0_dp)) then
-       error stop "There is no oxygen, you should disable photoionzation"
+    if (photoi_enabled) then
+       frac_O2 = GAS_get_fraction("O2")
+       if (frac_O2 <= epsilon(1.0_dp)) then
+          error stop "There is no oxygen, you should disable photoionzation"
+       end if
+
+       call CFG_get(cfg, "photoi%absorp_inv_lengths", temp_vec)
+       pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
+       pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
+
+       ! print *, "Max abs. length photoi.", 1.0d3 / pi_min_inv_abs_len, "mm"
+       ! print *, "Min abs. length photoi.", 1.0d3 / pi_max_inv_abs_len, "mm"
+
+       pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
+            (GAS_pressure + (40.0D0 * UC_torr_to_bar))
+
+       call CFG_get_size(cfg, "photoi%efficiency_table", t_size)
+       call CFG_get_size(cfg, "photoi%efield_table", t_size_2)
+       if (t_size_2 /= t_size) then
+          print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
+          stop
+       end if
+
+       allocate(pi_photo_eff_table1(t_size))
+       allocate(pi_photo_eff_table2(t_size))
+       call CFG_get(cfg, "photoi%efield_table", pi_photo_eff_table1)
+       call CFG_get(cfg, "photoi%efficiency_table", pi_photo_eff_table2)
     end if
-
-    call CFG_get(cfg, "photoi%absorp_inv_lengths", temp_vec)
-    pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
-    pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
-
-    ! print *, "Max abs. length photoi.", 1.0d3 / pi_min_inv_abs_len, "mm"
-    ! print *, "Min abs. length photoi.", 1.0d3 / pi_max_inv_abs_len, "mm"
-
-    pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
-         (GAS_pressure + (40.0D0 * UC_torr_to_bar))
-
-    call CFG_get_size(cfg, "photoi%efficiency_table", t_size)
-    call CFG_get_size(cfg, "photoi%efield_table", t_size_2)
-    if (t_size_2 /= t_size) then
-       print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
-       stop
-    end if
-
-    allocate(pi_photo_eff_table1(t_size))
-    allocate(pi_photo_eff_table2(t_size))
-    call CFG_get(cfg, "photoi%efield_table", pi_photo_eff_table1)
-    call CFG_get(cfg, "photoi%efficiency_table", pi_photo_eff_table2)
   end subroutine pi_initialize
 
   subroutine get_photoionization(events, photo_pos, photo_w, n_photons)
