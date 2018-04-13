@@ -13,6 +13,11 @@ module m_particles_$Dd
 
   real(dp), parameter :: array_incr_fac = 1.25_dp
 
+  real(dp), protected :: steps_per_period = 30.0_dp
+
+  real(dp) :: bfield_delay = 0.0_dp
+  real(dp) :: bfield_onset_duration = 0.0_dp
+
 contains
 
   subroutine init_particle(cfg, pc)
@@ -59,8 +64,8 @@ contains
          "The size of the lookup table for the collision rates")
     call CFG_add(cfg, "particle%max_energy_ev", 500.0_dp, &
          "The maximum energy in eV for particles in the simulation")
-    call CFG_add(cfg, "boris_dt_factor", 0.1_dp, &
-         "The maximum time step in terms of the cylotron frequency")
+    call CFG_add_get(cfg, "boris_steps_per_period", steps_per_period, &
+         "The minimum number of time steps per gyration")
 
     call CFG_get_size(cfg, "gas%components", n_gas_comp)
     call CFG_get_size(cfg, "gas%fractions", n_gas_frac)
@@ -78,6 +83,11 @@ contains
     call CFG_get(cfg, "particle%max_number", max_num_part)
     call CFG_add_get(cfg, "magnetic_field", B_vec, &
          "Magnetic field vector (T)")
+    call CFG_add_get(cfg, "magnetic_field_delay", bfield_delay, &
+         "Time (s) before applying the magnetic field")
+    call CFG_add_get(cfg, "magnetic_field_onset_duration", &
+         bfield_onset_duration, &
+         "Time (s) during which B goes from zero to final value")
 
     ! Initialize gas and electric field module
     call GAS_initialize(gas_names, gas_fracs, ST_gas_pressure, temperature)
@@ -104,7 +114,8 @@ contains
        pc%B_vec = B_vec
        pc%particle_mover => PC_boris_advance
        pc%after_mover => PC_after_dummy
-       pc%dt_max = 2 * UC_pi / (30 * abs(UC_elec_q_over_m) * norm2(B_vec))
+       pc%dt_max = 2 * UC_pi / (steps_per_period * &
+            abs(UC_elec_q_over_m) * norm2(B_vec))
        write(*, "(A,E10.2)") " Max time step Boris (s): ", pc%dt_max
     else
        print *, "Using Verlet mover"
@@ -116,6 +127,23 @@ contains
     end where
 
   end subroutine init_particle
+
+  subroutine update_bfield(time)
+    use m_units_constants
+    real(dp), intent(in) :: time
+
+    if (time < Bfield_delay) then
+       pc%B_vec = 0.0_dp
+    else if (time < Bfield_delay + Bfield_onset_duration) then
+       pc%B_vec = B_vec * (time - Bfield_delay) / Bfield_onset_duration
+    else
+       pc%B_vec = B_vec
+    end if
+
+    pc%dt_max = 2 * UC_pi / (steps_per_period * &
+         abs(UC_elec_q_over_m) * norm2(pc%B_vec))
+
+  end subroutine update_bfield
 
   subroutine adapt_weights(tree, pc)
     type(a$D_t), intent(in)   :: tree
@@ -283,7 +311,7 @@ contains
 
   end subroutine particles_to_density_and_events
 
-    function get_accel_pos(x) result(accel)
+  function get_accel_pos(x) result(accel)
     use m_units_constants
     real(dp), intent(in) :: x($D)
     real(dp)             :: accel(3)
