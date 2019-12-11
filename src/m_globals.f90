@@ -12,10 +12,10 @@ module m_globals
   implicit none
   public
 
-  type(CFG_t)            :: cfg  ! The configuration for the simulation
-  type(af_t)            :: tree ! This contains the full grid information
-  type(mg_t)           :: mg   ! Multigrid option struct
-  type(PC_t)             :: pc
+  type(CFG_t) :: cfg  ! The configuration for the simulation
+  type(af_t)  :: tree ! This contains the full grid information
+  type(mg_t)  :: mg   ! Multigrid option struct
+  type(PC_t)  :: pc
 
   ! Default length of strings
   integer, parameter :: ST_slen = 200
@@ -87,52 +87,11 @@ module m_globals
 
 contains
 
-  integer function ST_add_cc_variable(name, include_in_output)
-    character(len=*), intent(in) :: name
-    logical, intent(in)          :: include_in_output
-    integer                      :: i, n
-
-    ST_cc_names = [character(len=name_len) :: &
-         (ST_cc_names(i), i=1,n_var_cell), name]
-
-    if (include_in_output) then
-       if (allocated(vars_for_output)) then
-          n = size(vars_for_output)
-       else
-          n = 0
-       end if
-       vars_for_output = [(vars_for_output(i), i=1,n), n_var_cell+1]
-    end if
-
-    ST_add_cc_variable = n_var_cell + 1
-    n_var_cell         = n_var_cell + 1
-  end function ST_add_cc_variable
-
-  integer function ST_cc_var_index(name)
-    character(len=*), intent(in) :: name
-    integer :: n
-
-    ST_cc_var_index = -1
-    do n = 1, size(ST_cc_names)
-       if (ST_cc_names(n) == name) then
-          ST_cc_var_index = n
-          exit
-       end if
-    end do
-
-  end function ST_cc_var_index
-
-  integer function ST_add_fc_variable()
-    ST_add_fc_variable = n_var_face + 1
-    n_var_face         = n_var_face + 1
-  end function ST_add_fc_variable
-
   !> Create the configuration file with default values
   subroutine ST_initialize(cfg, ndim)
     use iso_fortran_env, only: int64
     use m_config
     use omp_lib
-    use m_af_types
     type(CFG_t), intent(inout) :: cfg  !< The configuration for the simulation
     integer, intent(in)        :: ndim !< Number of dimensions
     integer                    :: n_threads
@@ -140,18 +99,18 @@ contains
          [8123, 91234, 12399, 293434]
     integer(int64)             :: rng_int8_seed(2)
 
-    i_electron = ST_add_cc_variable("electron", .true.)
-    i_pos_ion = ST_add_cc_variable("pos_ion", .true.)
-    i_phi = ST_add_cc_variable("phi", .true.)
-    i_Ex = ST_add_cc_variable("Ex", .true.)
-    i_Ey = ST_add_cc_variable("Ey", .true.)
+    call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
+    call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
+    call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
+    call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
+    call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
     if (ndim > 2) then
-       i_Ez = ST_add_cc_variable("Ez", .true.)
+       call af_add_cc_variable(tree, "Ez", .true., ix=i_Ez)
     end if
-    i_E = ST_add_cc_variable("E", .true.)
-    i_rhs = ST_add_cc_variable("rhs", .true.)
-    i_ppc = ST_add_cc_variable("ppc", .true.)
-    i_energy = ST_add_cc_variable("energy", .true.)
+    call af_add_cc_variable(tree, "E", .true., ix=i_E)
+    call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
+    call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
+    call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
 
     call CFG_add_get(cfg, "cylindrical", ST_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")

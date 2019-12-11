@@ -41,11 +41,11 @@ contains
     ! Gas parameters
     call CFG_add(cfg, "gas%temperature", 300.0_dp, &
          "The gas temperature (Kelvin)")
-    call CFG_add(cfg, "gas%components", (/"N2"/), &
+    call CFG_add(cfg, "gas%components", ["N2"], &
          "The names of the gases used in the simulation", .true.)
     call CFG_add(cfg, "gas%file", "input/cs_example.txt", &
          "The file in which to find cross section data")
-    call CFG_add(cfg, "gas%fractions", (/1.0_dp /), &
+    call CFG_add(cfg, "gas%fractions", [1.0_dp ], &
          & "The partial pressure of the gases (as if they were ideal gases)", .true.)
 
     ! Particle model related parameters
@@ -159,7 +159,7 @@ contains
        n_part_id = id_ipart(id+1) - id_ipart(id)
        if (n_part_id > 0) then
           call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
-               (/.true., .true., .false./), 1e-12_dp, &
+               [.true., .true., .false.], 1e-12_dp, &
                .true., get_desired_weight, 1.0e10_dp, &
                PC_merge_part_rxv, PC_split_part)
        end if

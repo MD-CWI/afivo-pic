@@ -32,7 +32,6 @@ module m_init_cond
 
   public :: init_cond_initialize
   public :: init_cond_particles
-  public :: init_cond_set_box
 
 contains
 
@@ -171,42 +170,5 @@ contains
        end do
     end do
   end subroutine init_cond_particles
-
-  !> Sets the initial condition
-  subroutine init_cond_set_box(box)
-    use m_geometry
-    type(box_t), intent(inout) :: box
-    integer                     :: IJK, n, nc
-    real(dp)                    :: rr(NDIM)
-    real(dp)                    :: density
-
-    nc = box%n_cell
-    box%cc(DTIMES(:), i_electron) = init_conds%background_density
-    box%cc(DTIMES(:), i_pos_ion)  = init_conds%background_density
-    box%cc(DTIMES(:), i_phi)      = 0 ! Inital potential set to zero
-
-    do KJI_DO(0,nc+1)
-       rr   = af_r_cc(box, [IJK])
-
-       do n = 1, init_conds%n_cond
-          density = init_conds%seed_density(n) * &
-               GM_density_line(rr, init_conds%seed_r0(:, n), &
-               init_conds%seed_r1(:, n), NDIM, &
-               init_conds%seed_width(n), &
-               init_conds%seed_falloff(n))
-
-          ! Add electrons and/or ions depending on the seed charge type
-          ! (positive, negative or neutral)
-          if (init_conds%seed_charge_type(n) <= 0) then
-             box%cc(IJK, i_electron) = box%cc(IJK, i_electron) + density
-          end if
-
-          if (init_conds%seed_charge_type(n) >= 0) then
-             box%cc(IJK, i_pos_ion) = box%cc(IJK, i_pos_ion) + density
-          end if
-       end do
-    end do; CLOSE_DO
-
-  end subroutine init_cond_set_box
 
 end module m_init_cond
