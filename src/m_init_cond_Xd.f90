@@ -1,8 +1,8 @@
-#include "afivo/src/cpp_macros_$Dd.h"
-module m_init_cond_$Dd
-  use m_globals_$Dd
-  use m_a$D_all
-  use m_domain_$Dd
+#include "afivo/src/cpp_macros.h"
+module m_init_cond
+  use m_globals
+  use m_af_all
+  use m_domain
 
   implicit none
   private
@@ -131,7 +131,7 @@ contains
 
   subroutine init_cond_particles(tree, pc)
     use m_particle_core
-    type(a$D_t), intent(inout) :: tree
+    type(af_t), intent(inout) :: tree
     type(PC_t), intent(inout) :: pc
     integer                   :: n, i
     real(dp)                  :: pos(3)
@@ -147,19 +147,19 @@ contains
     ! end do
 
     do n = 1, num_particle_seeds
-#if $D == 2
+#if NDIM == 2
        pos(1:2)  = tree%r_base + seed_pos(1:2, n)
        pos(3)    = 0.0_dp
        part%x(3) = pos(3)
-#elif $D == 3
+#elif NDIM == 3
        pos(1:3)  = tree%r_base + seed_pos(1:3, n)
 #endif
        part%w    = seed_weights(n)
 
        do i = 1, seed_counts(n)
-#if $D == 2
+#if NDIM == 2
           part%x(1:2) = pos(1:2) + ST_rng%two_normals() * seed_sigmas(n)
-#elif $D == 3
+#elif NDIM == 3
           ! TODO: avoid setting x(2) twice
           part%x(1:2) = pos(1:2) + ST_rng%two_normals() * seed_sigmas(n)
           part%x(2:3) = pos(2:3) + ST_rng%two_normals() * seed_sigmas(n)
@@ -175,9 +175,9 @@ contains
   !> Sets the initial condition
   subroutine init_cond_set_box(box)
     use m_geometry
-    type(box$D_t), intent(inout) :: box
+    type(box_t), intent(inout) :: box
     integer                     :: IJK, n, nc
-    real(dp)                    :: rr($D)
+    real(dp)                    :: rr(NDIM)
     real(dp)                    :: density
 
     nc = box%n_cell
@@ -186,12 +186,12 @@ contains
     box%cc(DTIMES(:), i_phi)      = 0 ! Inital potential set to zero
 
     do KJI_DO(0,nc+1)
-       rr   = a$D_r_cc(box, [IJK])
+       rr   = af_r_cc(box, [IJK])
 
        do n = 1, init_conds%n_cond
           density = init_conds%seed_density(n) * &
                GM_density_line(rr, init_conds%seed_r0(:, n), &
-               init_conds%seed_r1(:, n), $D, &
+               init_conds%seed_r1(:, n), NDIM, &
                init_conds%seed_width(n), &
                init_conds%seed_falloff(n))
 
@@ -209,4 +209,4 @@ contains
 
   end subroutine init_cond_set_box
 
-end module m_init_cond_$Dd
+end module m_init_cond

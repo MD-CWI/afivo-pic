@@ -1,7 +1,7 @@
-#include "afivo/src/cpp_macros_$Dd.h"
-module m_refine_$Dd
-  use m_globals_$Dd
-  use m_a$D_all
+#include "afivo/src/cpp_macros.h"
+module m_refine
+  use m_globals
+  use m_af_all
   use m_lookup_table
 
   implicit none
@@ -121,14 +121,14 @@ contains
   ! This routine sets the cell refinement flags for box
   subroutine refine_routine(box, cell_flags)
     use m_geometry
-    use m_init_cond_$Dd
-    type(box$D_t), intent(in) :: box
+    use m_init_cond
+    type(box_t), intent(in) :: box
     ! Refinement flags for the cells of the box
     integer, intent(out)     :: &
          cell_flags(DTIMES(box%n_cell))
     integer                  :: IJK, n, nc
     real(dp)                 :: dx, dx2, fld, alpha, adx, cphi, elec_dens
-    real(dp)                 :: rmin($D), rmax($D)
+    real(dp)                 :: rmin(NDIM), rmax(NDIM)
 
     nc = box%n_cell
     dx = box%dr
@@ -214,4 +214,4 @@ contains
 
   end subroutine load_transport_data
 
-end module m_refine_$Dd
+end module m_refine

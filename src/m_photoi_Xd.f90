@@ -1,5 +1,5 @@
-module m_photoi_$Dd
-  use m_globals_$Dd
+module m_photoi
+  use m_globals
 
   implicit none
   private
@@ -74,7 +74,7 @@ contains
     use m_cross_sec
     use m_particle_core
     use m_units_constants
-    use m_domain_$Dd
+    use m_domain
 
     type(PC_events_t), intent(in) :: events
     real(dp), intent(inout)       :: photo_pos(:, :)
@@ -106,7 +106,7 @@ contains
                 i_cpy = i
                 !$omp end critical
                 if (i_cpy > size(photo_w)) error stop "Too many photons were generated"
-                photo_pos(:, i_cpy) = x(1:$D)
+                photo_pos(:, i_cpy) = x(1:NDIM)
                 photo_w(i_cpy)      = particle_min_weight
              end if
           end do
@@ -134,4 +134,4 @@ contains
          (pi_max_inv_abs_len/pi_min_inv_abs_len)**en_frac
   end function get_photoi_lambda
 
-end module m_photoi_$Dd
+end module m_photoi

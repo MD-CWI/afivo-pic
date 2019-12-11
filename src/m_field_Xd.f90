@@ -1,8 +1,8 @@
-#include "afivo/src/cpp_macros_$Dd.h"
-module m_field_$Dd
-  use m_a$D_all
-  use m_globals_$Dd
-  use m_domain_$Dd
+#include "afivo/src/cpp_macros.h"
+module m_field
+  use m_af_all
+  use m_globals
+  use m_domain
 
   implicit none
   private
@@ -57,7 +57,7 @@ contains
   !> Set boundary conditions for the electric potential/field
   subroutine field_initialize(cfg, mg)
     type(CFG_t), intent(inout)  :: cfg !< Settings
-    type(mg$D_t), intent(inout) :: mg  !< Multigrid option struct
+    type(mg_t), intent(inout) :: mg  !< Multigrid option struct
 
     call CFG_add_get(cfg, "field%mod_t0", field_mod_t0, &
          "Modify electric field after this time (s)")
@@ -111,8 +111,8 @@ contains
   !> potential, then take numerical gradient to geld field.
   subroutine field_compute(tree, mg, have_guess)
     use m_units_constants
-    type(a$D_t), intent(inout) :: tree
-    type(mg$D_t), intent(in)   :: mg ! Multigrid option struct
+    type(af_t), intent(inout) :: tree
+    type(mg_t), intent(in)   :: mg ! Multigrid option struct
     logical, intent(in)        :: have_guess
     real(dp), parameter        :: fac = UC_elem_charge / UC_eps0
     integer                    :: lvl, i, id, nc
@@ -137,22 +137,22 @@ contains
 
     if (.not. have_guess) then
        ! Perform a FMG cycle when we have no guess
-       call mg$D_fas_fmg(tree, mg, .false., have_guess)
+       call mg_fas_fmg(tree, mg, .false., have_guess)
     else
        ! Perform cheaper V-cycles
        do i = 1, multigrid_num_vcycles
-          call mg$D_fas_vcycle(tree, mg, .false.)
+          call mg_fas_vcycle(tree, mg, .false.)
        end do
     end if
 
     ! Compute field from potential
-    call a$D_loop_box(tree, field_from_potential)
+    call af_loop_box(tree, field_from_potential)
 
     ! Set the field norm also in ghost cells
-#if $D == 2
-    call a$D_gc_tree(tree, [i_Ex, i_Ey, i_E], a$D_gc_interp, a$D_bc_neumann_zero)
-#elif $D == 3
-    call a$D_gc_tree(tree, [i_Ex, i_Ey, i_Ez, i_E], a$D_gc_interp, a$D_bc_neumann_zero)
+#if NDIM == 2
+    call af_gc_tree(tree, [i_Ex, i_Ey, i_E], af_gc_interp, af_bc_neumann_zero)
+#elif NDIM == 3
+    call af_gc_tree(tree, [i_Ex, i_Ey, i_Ez, i_E], af_gc_interp, af_bc_neumann_zero)
 #endif
 
   end subroutine field_compute
@@ -183,7 +183,7 @@ contains
 
   !> This fills ghost cells near physical boundaries for the potential
   subroutine field_bc_homogeneous(box, nb, iv, bc_type)
-    type(box$D_t), intent(inout) :: box
+    type(box_t), intent(inout) :: box
     integer, intent(in)         :: nb ! Direction for the boundary condition
     integer, intent(in)         :: iv ! Index of variable
     integer, intent(out)        :: bc_type ! Type of boundary condition
@@ -192,20 +192,20 @@ contains
     nc = box%n_cell
 
     select case (nb)
-#if $D == 2
-    case (a$D_neighb_lowx)
+#if NDIM == 2
+    case (af_neighb_lowx)
        bc_type = af_bc_neumann
        box%cc(   0, 1:nc, iv) = 0
-    case (a$D_neighb_highx)
+    case (af_neighb_highx)
        bc_type = af_bc_neumann
        box%cc(nc+1, 1:nc, iv) = 0
-    case (a$D_neighb_lowy)
+    case (af_neighb_lowy)
        bc_type = af_bc_dirichlet
        box%cc(1:nc,    0, iv) = 0
-    case (a$D_neighb_highy)
+    case (af_neighb_highy)
        bc_type = af_bc_dirichlet
        box%cc(1:nc, nc+1, iv) = field_voltage
-#elif $D == 3
+#elif NDIM == 3
     case (a3_neighb_lowx)
        bc_type = af_bc_neumann
        box%cc(   0, 1:nc, 1:nc, iv) = 0
@@ -230,20 +230,20 @@ contains
   end subroutine field_bc_homogeneous
 
   subroutine field_bc_dropoff_lin(box, nb, iv, bc_type)
-    type(box$D_t), intent(inout) :: box
+    type(box_t), intent(inout) :: box
     integer, intent(in)          :: nb      ! Direction for the boundary condition
     integer, intent(in)          :: iv      ! Index of variable
     integer, intent(out)         :: bc_type ! Type of boundary condition
     integer                      :: nc, i
-#if $D == 3
+#if NDIM == 3
     integer                      :: j
 #endif
-    real(dp)                     :: rr($D), rdist
+    real(dp)                     :: rr(NDIM), rdist
 
     nc = box%n_cell
 
     select case (nb)
-#if $D == 2
+#if NDIM == 2
     case (a2_neighb_highy)
        bc_type = af_bc_dirichlet
 
@@ -260,7 +260,7 @@ contains
                   max(0.0_dp, (1 - rdist))
           end if
        end do
-#elif $D == 3
+#elif NDIM == 3
     case (a3_neighb_highz)
        bc_type = af_bc_dirichlet
 
@@ -286,21 +286,21 @@ contains
   end subroutine field_bc_dropoff_lin
 
   subroutine field_bc_dropoff_log(box, nb, iv, bc_type)
-    type(box$D_t), intent(inout) :: box
+    type(box_t), intent(inout) :: box
     integer, intent(in)          :: nb      ! Direction for the boundary condition
     integer, intent(in)          :: iv      ! Index of variable
     integer, intent(out)         :: bc_type ! Type of boundary condition
     integer                      :: nc, i
-#if $D == 3
+#if NDIM == 3
     integer                      :: j
 #endif
-    real(dp)                     :: rr($D), rdist, tmp
+    real(dp)                     :: rr(NDIM), rdist, tmp
 
     nc = box%n_cell
     tmp = field_dropoff_relwidth * domain_len
 
     select case (nb)
-#if $D == 2
+#if NDIM == 2
     case (a2_neighb_highy)
        bc_type = af_bc_dirichlet
 
@@ -315,7 +315,7 @@ contains
                   log(1 + tmp/rdist) / log(1 + tmp/field_dropoff_radius)
           end if
        end do
-#elif $D == 3
+#elif NDIM == 3
     case (a3_neighb_highz)
        bc_type = af_bc_dirichlet
 
@@ -340,21 +340,21 @@ contains
 
   !> Compute electric field from electrical potential
   subroutine field_from_potential(box)
-    type(box$D_t), intent(inout) :: box
+    type(box_t), intent(inout) :: box
     integer                     :: nc
     real(dp)                    :: inv_dr
 
     nc     = box%n_cell
     inv_dr = 1 / box%dr
 
-#if $D == 2
+#if NDIM == 2
     box%cc(1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr * &
          (box%cc(0:nc-1, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, i_phi))
     box%cc(1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr * &
          (box%cc(1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 2:nc+1, i_phi))
     box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
          box%cc(1:nc, 1:nc, i_Ey)**2)
-#elif $D == 3
+#elif NDIM == 3
     box%cc(1:nc, 1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr * &
          (box%cc(0:nc-1, 1:nc, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, 1:nc, i_phi))
     box%cc(1:nc, 1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr * &
@@ -369,4 +369,4 @@ contains
 
   end subroutine field_from_potential
 
-end module m_field_$Dd
+end module m_field

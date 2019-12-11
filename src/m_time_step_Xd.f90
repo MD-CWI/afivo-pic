@@ -1,7 +1,7 @@
-module m_time_step_$Dd
-  use m_a$D_all
+module m_time_step
+  use m_af_all
   use m_particle_core
-  use m_globals_$Dd
+  use m_globals
 
   implicit none
   public
@@ -55,7 +55,7 @@ contains
   !> store_samples = .false. sets the error in fld_err.
   subroutine PM_fld_error(tree, pc, rng, n_samples, fld_err, store_samples)
     use m_random
-    type(a$D_t), intent(in)    :: tree
+    type(af_t), intent(in)    :: tree
     class(PC_t), intent(in)    :: pc
     type(RNG_t), intent(inout) :: rng
     integer, intent(in)        :: n_samples
@@ -63,7 +63,7 @@ contains
     logical, intent(in)        :: store_samples
 
     integer                     :: i, n
-    real(dp)                    :: fld($D), this_err, avg_norm
+    real(dp)                    :: fld(NDIM), this_err, avg_norm
     real(dp), allocatable, save :: pos_samples(:, :)
     real(dp), allocatable, save :: fld_samples(:, :)
     logical, save               :: have_samples = .false.
@@ -78,19 +78,19 @@ contains
           have_samples = .true.
           if (allocated(fld_samples)) deallocate(fld_samples)
           if (allocated(pos_samples)) deallocate(pos_samples)
-          allocate(fld_samples($D, n_samples))
-          allocate(pos_samples($D, n_samples))
+          allocate(fld_samples(NDIM, n_samples))
+          allocate(pos_samples(NDIM, n_samples))
 
           do i = 1, n_samples
              ! Randomly select a particle
              n = floor(rng%unif_01() * pc%n_part) + 1
-             pos_samples(:,i) = pc%particles(n)%x(1:$D)
-#if $D == 2
-             fld_samples(:,i) = a$D_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey], $D)
-#elif $D == 3
-             fld_samples(:,i) = a$D_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey, i_Ez], $D)
+             pos_samples(:,i) = pc%particles(n)%x(1:NDIM)
+#if NDIM == 2
+             fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
+                  [i_Ex, i_Ey], NDIM)
+#elif NDIM == 3
+             fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
+                  [i_Ex, i_Ey, i_Ez], NDIM)
 #endif
           end do
        end if
@@ -103,12 +103,12 @@ contains
           avg_norm = norm2(fld_samples) / sqrt(1.0_dp * n_samples)
 
           do i = 1, n_samples
-#if $D == 2
-             fld = a$D_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey], $D)
-#elif $D == 3
-             fld = a$D_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey, i_Ez], $D)
+#if NDIM == 2
+             fld = af_interp1(tree, pos_samples(:,i), &
+                  [i_Ex, i_Ey], NDIM)
+#elif NDIM == 3
+             fld = af_interp1(tree, pos_samples(:,i), &
+                  [i_Ex, i_Ey, i_Ez], NDIM)
 #endif
              this_err = norm2(fld - fld_samples(:,i)) / &
                   max(norm2(fld), norm2(fld_samples(:,i)), avg_norm)
@@ -151,7 +151,7 @@ contains
        vel_est = velocities(nint(n_samples * 0.9_dp))
 
        ! Get smallest grid delta
-       min_dr = a$D_min_dr(tree)
+       min_dr = af_min_dr(tree)
        dt_max = cfl_num * min_dr / max(vel_est, 1e-10_dp)
     else
        dt_max = huge(1.0_dp)
@@ -181,4 +181,4 @@ contains
 
   end function get_new_dt
 
-end module m_time_step_$Dd
+end module m_time_step

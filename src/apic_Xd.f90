@@ -1,23 +1,23 @@
-#include "afivo/src/cpp_macros_$Dd.h"
-!> Program to perform $Dd discharge simulations in Cartesian and cylindrical coordinates
-program apic_$Dd
+#include "afivo/src/cpp_macros.h"
+!> Program to perform discharge simulations in Cartesian and cylindrical coordinates
+program apic
 
   use omp_lib
-  use m_a$D_all
-  use m_globals_$Dd
-  use m_field_$Dd
-  use m_init_cond_$Dd
+  use m_af_all
+  use m_globals
+  use m_field
+  use m_init_cond
   use m_particle_core
-  use m_photoi_$Dd
-  use m_domain_$Dd
-  use m_refine_$Dd
-  use m_time_step_$Dd
-  use m_particles_$Dd
+  use m_photoi
+  use m_domain
+  use m_refine
+  use m_time_step
+  use m_particles
 
   implicit none
 
   integer, parameter     :: int8 = selected_int_kind(18)
-  integer, parameter     :: ndim = $D
+  integer, parameter     :: ndim = NDIM
   integer(int8)          :: t_start, t_current, count_rate
   real(dp)               :: dt
   real(dp)               :: wc_time, inv_count_rate, time_last_print
@@ -67,16 +67,16 @@ program apic_$Dd
   mg%i_rhs = i_rhs
 
   ! This automatically handles cylindrical symmetry
-  mg%box_op => mg$D_auto_op
-  mg%box_gsrb => mg$D_auto_gsrb
-  mg%box_corr => mg$D_auto_corr
+  mg%box_op => mg_auto_op
+  mg%box_gsrb => mg_auto_gsrb
+  mg%box_corr => mg_auto_corr
 
   ! This routine always needs to be called when using multigrid
-  call mg$D_init_mg(mg)
+  call mg_init_mg(mg)
 
-  call a$D_set_cc_methods(tree, i_electron, a$D_bc_neumann_zero)
-  call a$D_set_cc_methods(tree, i_pos_ion, a$D_bc_neumann_zero)
-  call a$D_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
+  call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
 
   output_cnt      = 0         ! Number of output files written
   ST_time         = 0         ! Simulation time (all times are in s)
@@ -85,11 +85,11 @@ program apic_$Dd
   call init_cond_particles(tree, pc)
 
   do
-     call a$D_tree_clear_cc(tree, i_pos_ion)
-     call a$D_loop_box(tree, init_cond_set_box)
+     call af_tree_clear_cc(tree, i_pos_ion)
+     call af_loop_box(tree, init_cond_set_box)
      call particles_to_density_and_events(tree, pc, events, .true.)
      call field_compute(tree, mg, .false.)
-     call a$D_adjust_refinement(tree, refine_routine, ref_info, &
+     call af_adjust_refinement(tree, refine_routine, ref_info, &
           refine_buffer_width, .true.)
      if (ref_info%n_add == 0) exit
   end do
@@ -97,7 +97,7 @@ program apic_$Dd
   call pc%set_accel()
 
   print *, "Number of threads", af_get_max_threads()
-  call a$D_print_info(tree)
+  call af_print_info(tree)
 
   ! Start from small time step
   ST_dt   = ST_dt_min
@@ -160,7 +160,7 @@ program apic_$Dd
      call pc%set_accel()
 
      n_samples = min(n_part, 1000)
-     call a$D_tree_max_cc(tree, i_electron, max_elec_dens)
+     call af_tree_max_cc(tree, i_electron, max_elec_dens)
      n_elec      = pc%get_num_real_part()
      dt_cfl      = PM_get_max_dt(pc, ST_rng, n_samples, cfl_particles)
      dt_drt      = dielectric_relaxation_time(max_elec_dens)
@@ -173,7 +173,7 @@ program apic_$Dd
         call set_output_variables()
 
         write(fname, "(A,I6.6)") trim(ST_simulation_name) // "_", output_cnt
-        call a$D_write_silo(tree, fname, output_cnt, ST_time, &
+        call af_write_silo(tree, fname, output_cnt, ST_time, &
              vars_for_output, dir=ST_output_dir)
         call print_info()
         wtime_io = wtime_io + omp_get_wtime() - t0
@@ -181,7 +181,7 @@ program apic_$Dd
 
      if (mod(it, refine_per_steps) == 0) then
         t0 = omp_get_wtime()
-        call a$D_adjust_refinement(tree, refine_routine, ref_info, &
+        call af_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width, .true.)
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
@@ -198,21 +198,21 @@ contains
 
   !> Initialize the AMR tree
   subroutine init_tree(tree)
-    type(a$D_t), intent(inout) :: tree
+    type(af_t), intent(inout) :: tree
 
     ! Variables used below to initialize tree
     real(dp)                  :: dr
     integer                   :: id
-    integer                   :: ix_list($D, 1) ! Spatial indices of initial boxes
+    integer                   :: ix_list(NDIM, 1) ! Spatial indices of initial boxes
 
     dr = domain_len / box_size
 
     ! Initialize tree
     if (ST_cylindrical) then
-       call a$D_init(tree, box_size, n_var_cell, n_var_face, dr, &
+       call af_init(tree, box_size, n_var_cell, n_var_face, dr, &
             coarsen_to=2, coord=af_cyl, cc_names=ST_cc_names)
     else
-       call a$D_init(tree, box_size, n_var_cell, n_var_face, dr, &
+       call af_init(tree, box_size, n_var_cell, n_var_face, dr, &
             coarsen_to=2, cc_names=ST_cc_names)
     end if
 
@@ -221,7 +221,7 @@ contains
     ix_list(:, id) = 1          ! With index 1,1 ...
 
     ! Create the base mesh
-    call a$D_set_base(tree, 1, ix_list)
+    call af_set_base(tree, 1, ix_list)
 
   end subroutine init_tree
 
@@ -229,7 +229,7 @@ contains
     write(*, "(F7.2,A,I0,A,E10.3,A,E10.3,A,E10.3,A,E10.3,A,E10.3)") &
          100 * ST_time / ST_end_time, "% it: ", it, &
          " t:", ST_time, " dt:", ST_dt, " wc:", wc_time, &
-         " ncell:", real(a$D_num_cells_used(tree), dp), &
+         " ncell:", real(af_num_cells_used(tree), dp), &
          " npart:", real(pc%get_num_sim_part(), dp)
   end subroutine print_status
 
@@ -239,11 +239,11 @@ contains
     real(dp) :: sum_elec, sum_pos_ion
     real(dp) :: mean_en, n_elec, n_part
 
-    call a$D_tree_max_cc(tree, i_E, max_fld)
-    call a$D_tree_max_cc(tree, i_electron, max_elec)
-    call a$D_tree_max_cc(tree, i_pos_ion, max_pion)
-    call a$D_tree_sum_cc(tree, i_electron, sum_elec)
-    call a$D_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
+    call af_tree_max_cc(tree, i_E, max_fld)
+    call af_tree_max_cc(tree, i_electron, max_elec)
+    call af_tree_max_cc(tree, i_pos_ion, max_pion)
+    call af_tree_sum_cc(tree, i_electron, sum_elec)
+    call af_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
     mean_en = pc%get_mean_energy()
     n_part  = pc%get_num_sim_part()
     n_elec  = pc%get_num_real_part()
@@ -277,7 +277,7 @@ contains
     ! integer, allocatable :: ionize_ix(:)
 
     n_part = pc%get_num_sim_part()
-    allocate(coords($D, n_part))
+    allocate(coords(NDIM, n_part))
     allocate(weights(n_part))
     allocate(energy(n_part))
     allocate(id_guess(n_part))
@@ -286,7 +286,7 @@ contains
 
     !$omp parallel do
     do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:$D)
+       coords(:, n) = pc%particles(n)%x(1:NDIM)
        weights(n) = 1.0_dp
        energy(n) = pc%particles(n)%w * &
             PC_v_to_en(pc%particles(n)%v, UC_elec_mass) / &
@@ -295,22 +295,22 @@ contains
     end do
     !$omp end parallel do
 
-    call a$D_tree_clear_cc(tree, i_ppc)
+    call af_tree_clear_cc(tree, i_ppc)
     ! Don't divide by cell volume (last .false. argument)
-    call a$D_particles_to_grid(tree, i_ppc, coords(:, 1:n_part), &
+    call af_particles_to_grid(tree, i_ppc, coords(:, 1:n_part), &
          weights(1:n_part), n_part, 0, id_guess(1:n_part), &
          density=.false., fill_gc=.false.)
 
-    call a$D_tree_clear_cc(tree, i_energy)
-    call a$D_particles_to_grid(tree, i_energy, coords(:, 1:n_part), &
+    call af_tree_clear_cc(tree, i_energy)
+    call af_particles_to_grid(tree, i_energy, coords(:, 1:n_part), &
          energy(1:n_part), n_part, 1, id_guess(1:n_part), &
          fill_gc=.false.)
-    call a$D_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
+    call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output
-    call a$D_gc_tree(tree, i_electron)
-    call a$D_gc_tree(tree, i_pos_ion)
+    call af_gc_tree(tree, i_electron)
+    call af_gc_tree(tree, i_pos_ion)
 
   end subroutine set_output_variables
 
-end program apic_$Dd
+end program apic

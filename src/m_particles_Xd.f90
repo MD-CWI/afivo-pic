@@ -1,7 +1,7 @@
-module m_particles_$Dd
+module m_particles
   use m_particle_core
-  use m_a$D_all
-  use m_globals_$Dd
+  use m_af_all
+  use m_globals
 
   implicit none
   public
@@ -25,8 +25,8 @@ contains
     use m_gas
     use m_cross_sec
     use m_config
-    use m_domain_$Dd
-    use m_field_$Dd
+    use m_domain
+    use m_field
     type(CFG_t), intent(inout) :: cfg
     type(PC_t), intent(inout) :: pc
 
@@ -146,7 +146,7 @@ contains
   end subroutine update_bfield
 
   subroutine adapt_weights(tree, pc)
-    type(a$D_t), intent(in)   :: tree
+    type(af_t), intent(in)   :: tree
     type(PC_t), intent(inout) :: pc
     integer                   :: id, n_part_id
     integer, allocatable      :: id_ipart(:)
@@ -170,7 +170,7 @@ contains
   end subroutine adapt_weights
 
   subroutine sort_by_id(tree, pc, id_ipart)
-    type(a$D_t), intent(in)              :: tree
+    type(af_t), intent(in)              :: tree
     type(PC_t), intent(inout)           :: pc
     integer, intent(inout), allocatable :: id_ipart(:)
 
@@ -216,8 +216,8 @@ contains
 
   subroutine particles_to_density_and_events(tree, pc, events, init_cond)
     use m_cross_sec
-    use m_photoi_$Dd
-    type(a$D_t), intent(inout)        :: tree
+    use m_photoi
+    type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     type(PC_events_t), intent(inout) :: events
     logical, intent(in)              :: init_cond
@@ -234,7 +234,7 @@ contains
 
     if (.not. allocated(weights)) then
        n = nint(n * array_incr_fac)
-       allocate(coords($D, n))
+       allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
     else if (size(weights) < n) then
@@ -242,28 +242,28 @@ contains
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
-       allocate(coords($D, n))
+       allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
     end if
 
     !$omp parallel do
     do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:$D)
+       coords(:, n) = pc%particles(n)%x(1:NDIM)
        weights(n) = pc%particles(n)%w
        id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
 
     if (init_cond) then
-       call a$D_tree_clear_cc(tree, i_electron)
-       call a$D_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
+       call af_tree_clear_cc(tree, i_electron)
+       call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
-       call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
+       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
     else
-       call a$D_tree_clear_cc(tree, i_electron)
-       call a$D_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
+       call af_tree_clear_cc(tree, i_electron)
+       call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, 1, id_guess(1:n_part))
     end if
 
@@ -273,35 +273,35 @@ contains
     do n = 1, n_events
        if (events%list(n)%ctype == CS_ionize_t) then
           i = i + 1
-          coords(:, i) = events%list(n)%part%x(1:$D)
+          coords(:, i) = events%list(n)%part%x(1:NDIM)
           weights(i) = events%list(n)%part%w
           id_guess(i) = events%list(n)%part%id
        else if (events%list(n)%ctype == CS_attach_t) then
           i = i + 1
-          coords(:, i) = events%list(n)%part%x(1:$D)
+          coords(:, i) = events%list(n)%part%x(1:NDIM)
           weights(i) = -events%list(n)%part%w
           id_guess(i) = events%list(n)%part%id
        end if
     end do
 
     if (i > 0) then
-       call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
+       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, 1, id_guess(1:i))
     end if
 
     if (photoi_enabled) then
        call get_photoionization(events, coords, weights, n_photons)
-       call a$D_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
+       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
             weights(1:n_photons), n_photons, 1)
        ! print *, "n_photons", n_photons, n_events
        v = 0
        do n = 1, n_photons
-          x(1:$D) = coords(:, n)
-#if $D == 2
+          x(1:NDIM) = coords(:, n)
+#if NDIM == 2
           x(3)    = 0
 #endif
-          a       = get_accel_pos(x(1:$D))
-          id      = a$D_get_id_at(tree, x(1:$D))
+          a       = get_accel_pos(x(1:NDIM))
+          id      = af_get_id_at(tree, x(1:NDIM))
 
           call pc%create_part(x, v, a, weights(n), 0.0_dp, id=id)
        end do
@@ -313,14 +313,14 @@ contains
 
   function get_accel_pos(x) result(accel)
     use m_units_constants
-    real(dp), intent(in) :: x($D)
+    real(dp), intent(in) :: x(NDIM)
     real(dp)             :: accel(3)
 
-#if $D == 2
-    accel(1:$D) = a$D_interp1(tree, x, [i_Ex, i_Ey], $D)
+#if NDIM == 2
+    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey], NDIM)
     accel(3) = 0.0_dp
-#elif $D == 3
-    accel(1:$D) = a$D_interp1(tree, x, [i_Ex, i_Ey, i_Ez], $D)
+#elif NDIM == 3
+    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey, i_Ez], NDIM)
 #endif
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel_pos
@@ -329,23 +329,23 @@ contains
     use m_units_constants
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: accel(3)
-    accel    = get_accel_pos(my_part%x(1:$D))
+    accel    = get_accel_pos(my_part%x(1:NDIM))
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: weight, n_elec
-    type(a$D_loc_t)              :: loc
-    integer                     :: id, ix($D)
+    type(af_loc_t)              :: loc
+    integer                     :: id, ix(NDIM)
 
-    loc = a$D_get_loc(tree, my_part%x(1:$D), my_part%id)
+    loc = af_get_loc(tree, my_part%x(1:NDIM), my_part%id)
     id = loc%id
     ix = loc%ix
 
-#if $D == 2
+#if NDIM == 2
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * &
          tree%boxes(id)%dr**2
-#elif $D == 3
+#elif NDIM == 3
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), ix(3), i_electron) * &
          tree%boxes(id)%dr**3
 #endif
@@ -354,4 +354,4 @@ contains
     weight = max(particle_min_weight, min(particle_max_weight, weight))
   end function get_desired_weight
 
-end module m_particles_$Dd
+end module m_particles

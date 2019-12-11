@@ -3,8 +3,8 @@
 !! * Names of the cell-centered variables
 !! * Indices of face-centered variables
 !! * Indices of transport data
-module m_globals_$Dd
-  use m_a$D_all
+module m_globals
+  use m_af_all
   use m_particle_core
   use m_config
   use m_random
@@ -13,8 +13,8 @@ module m_globals_$Dd
   public
 
   type(CFG_t)            :: cfg  ! The configuration for the simulation
-  type(a$D_t)            :: tree ! This contains the full grid information
-  type(mg$D_t)           :: mg   ! Multigrid option struct
+  type(af_t)            :: tree ! This contains the full grid information
+  type(mg_t)           :: mg   ! Multigrid option struct
   type(PC_t)             :: pc
 
   ! Default length of strings
@@ -196,4 +196,4 @@ contains
     end do
   end function get_random_seed
 
-end module m_globals_$Dd
+end module m_globals

@@ -1,4 +1,4 @@
-module m_domain_$Dd
+module m_domain
   implicit none
   public
 
@@ -25,9 +25,9 @@ contains
 
   pure integer function outside_check_pos(x)
     use m_particle_core
-    real(dp), intent(in) :: x($D)
+    real(dp), intent(in) :: x(NDIM)
 
-    if (any(x(1:$D) < 0.0_dp .or. x(1:$D) > domain_len)) then
+    if (any(x(1:NDIM) < 0.0_dp .or. x(1:NDIM) > domain_len)) then
        outside_check_pos = 1
     else
        outside_check_pos = 0
@@ -38,7 +38,7 @@ contains
     use m_particle_core
     type(PC_part_t), intent(in) :: my_part
 
-    outside_check = outside_check_pos(my_part%x(1:$D))
+    outside_check = outside_check_pos(my_part%x(1:NDIM))
   end function outside_check
 
-end module m_domain_$Dd
+end module m_domain
