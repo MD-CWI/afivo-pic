@@ -103,8 +103,9 @@ contains
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
-    call pc%initialize(UC_elec_mass, cross_secs, &
-         tbl_size, max_ev, max_num_part, get_random_seed())
+    call pc%initialize(UC_elec_mass, max_num_part, &
+         rng_seed=get_random_seed())
+    call pc%use_cross_secs(max_ev, tbl_size, cross_secs)
 
     pc%accel_function => get_accel
     pc%outside_check => outside_check
@@ -214,23 +215,19 @@ contains
     end do
   end subroutine sort_by_id
 
-  subroutine particles_to_density_and_events(tree, pc, events, init_cond)
+  subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
-    use m_photoi
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
-    type(PC_events_t), intent(inout) :: events
     logical, intent(in)              :: init_cond
 
-    integer               :: n, i, n_part, n_events, n_photons, id
-    real(dp)              :: x(3), v(3), a(3)
+    integer                     :: n, i, n_part
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
 
     n_part = pc%get_num_sim_part()
-    n_events = events%n_stored
-    n = max(n_part, n_events)
+    n = max(n_part, pc%n_events)
 
     if (.not. allocated(weights)) then
        n = nint(n * array_incr_fac)
@@ -270,17 +267,17 @@ contains
     pc%particles(1:n_part)%id = id_guess(1:n_part)
 
     i = 0
-    do n = 1, n_events
-       if (events%list(n)%ctype == CS_ionize_t) then
+    do n = 1, pc%n_events
+       if (pc%event_list(n)%ctype == CS_ionize_t) then
           i = i + 1
-          coords(:, i) = events%list(n)%part%x(1:NDIM)
-          weights(i) = events%list(n)%part%w
-          id_guess(i) = events%list(n)%part%id
-       else if (events%list(n)%ctype == CS_attach_t) then
+          coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
+          weights(i) = pc%event_list(n)%part%w
+          id_guess(i) = pc%event_list(n)%part%id
+       else if (pc%event_list(n)%ctype == CS_attach_t) then
           i = i + 1
-          coords(:, i) = events%list(n)%part%x(1:NDIM)
-          weights(i) = -events%list(n)%part%w
-          id_guess(i) = events%list(n)%part%id
+          coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
+          weights(i) = -pc%event_list(n)%part%w
+          id_guess(i) = pc%event_list(n)%part%id
        end if
     end do
 
@@ -289,25 +286,7 @@ contains
             weights(1:i), i, 1, id_guess(1:i))
     end if
 
-    if (photoi_enabled) then
-       call get_photoionization(events, coords, weights, n_photons)
-       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
-            weights(1:n_photons), n_photons, 1)
-       ! print *, "n_photons", n_photons, n_events
-       v = 0
-       do n = 1, n_photons
-          x(1:NDIM) = coords(:, n)
-#if NDIM == 2
-          x(3)    = 0
-#endif
-          a       = get_accel_pos(x(1:NDIM))
-          id      = af_get_id_at(tree, x(1:NDIM))
-
-          call pc%create_part(x, v, a, weights(n), 0.0_dp, id=id)
-       end do
-    end if
-
-    events%n_stored = 0
+    pc%n_events = 0
 
   end subroutine particles_to_density_and_events
 
@@ -315,21 +294,22 @@ contains
     use m_units_constants
     real(dp), intent(in) :: x(NDIM)
     real(dp)             :: accel(3)
+    logical              :: success
 
 #if NDIM == 2
-    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey], NDIM)
+    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey], success)
     accel(3) = 0.0_dp
 #elif NDIM == 3
-    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey, i_Ez], NDIM)
+    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey, i_Ez], success)
 #endif
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel_pos
 
   function get_accel(my_part) result(accel)
     use m_units_constants
-    type(PC_part_t), intent(in) :: my_part
-    real(dp)                    :: accel(3)
-    accel    = get_accel_pos(my_part%x(1:NDIM))
+    type(PC_part_t), intent(inout) :: my_part
+    real(dp)                       :: accel(3)
+    accel = get_accel_pos(my_part%x(1:NDIM))
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)
@@ -344,10 +324,10 @@ contains
 
 #if NDIM == 2
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * &
-         tree%boxes(id)%dr**2
+         product(tree%boxes(id)%dr)
 #elif NDIM == 3
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), ix(3), i_electron) * &
-         tree%boxes(id)%dr**3
+         product(tree%boxes(id)%dr)
 #endif
 
     weight = n_elec / particle_per_cell

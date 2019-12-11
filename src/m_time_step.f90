@@ -67,6 +67,7 @@ contains
     real(dp), allocatable, save :: pos_samples(:, :)
     real(dp), allocatable, save :: fld_samples(:, :)
     logical, save               :: have_samples = .false.
+    logical                     :: success
 
     if (store_samples) then
        ! Store samples of the electric field
@@ -87,10 +88,10 @@ contains
              pos_samples(:,i) = pc%particles(n)%x(1:NDIM)
 #if NDIM == 2
              fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey], NDIM)
+                  [i_Ex, i_Ey], success)
 #elif NDIM == 3
              fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey, i_Ez], NDIM)
+                  [i_Ex, i_Ey, i_Ez], success)
 #endif
           end do
        end if
@@ -105,10 +106,10 @@ contains
           do i = 1, n_samples
 #if NDIM == 2
              fld = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey], NDIM)
+                  [i_Ex, i_Ey], success)
 #elif NDIM == 3
              fld = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey, i_Ez], NDIM)
+                  [i_Ex, i_Ey, i_Ez], success)
 #endif
              this_err = norm2(fld - fld_samples(:,i)) / &
                   max(norm2(fld), norm2(fld_samples(:,i)), avg_norm)

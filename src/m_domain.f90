@@ -34,9 +34,9 @@ contains
     end if
   end function outside_check_pos
 
-  pure integer function outside_check(my_part)
+  integer function outside_check(my_part)
     use m_particle_core
-    type(PC_part_t), intent(in) :: my_part
+    type(PC_part_t), intent(inout) :: my_part
 
     outside_check = outside_check_pos(my_part%x(1:NDIM))
   end function outside_check

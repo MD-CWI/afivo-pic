@@ -8,7 +8,6 @@ program apic
   use m_field
   use m_init_cond
   use m_particle_core
-  use m_photoi
   use m_domain
   use m_refine
   use m_time_step
