@@ -1,4 +1,4 @@
-#include "afivo/src/cpp_macros.h"
+#include "../afivo/src/cpp_macros.h"
 module m_refine
   use m_globals
   use m_af_all

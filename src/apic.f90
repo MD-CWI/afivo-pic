@@ -1,4 +1,4 @@
-#include "afivo/src/cpp_macros.h"
+#include "../afivo/src/cpp_macros.h"
 !> Program to perform discharge simulations in Cartesian and cylindrical coordinates
 program apic
 

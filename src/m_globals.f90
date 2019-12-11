@@ -132,7 +132,7 @@ contains
     use iso_fortran_env, only: int64
     use m_config
     use omp_lib
-    use m_afivo_types
+    use m_af_types
     type(CFG_t), intent(inout) :: cfg  !< The configuration for the simulation
     integer, intent(in)        :: ndim !< Number of dimensions
     integer                    :: n_threads
