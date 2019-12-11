@@ -1,8 +1,8 @@
 [submodule "particle_core"]
-	path = src/particle_core
+	path = particle_core
 	url = https://github.com/jannisteunissen/particle_core
 [submodule "afivo"]
-	path = src/afivo
+	path = afivo
 	url = https://gitlab.com/MD-CWI-NL/afivo.git
 [submodule "config_fortran"]
 	path = src/config_fortran
