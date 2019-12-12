@@ -8,6 +8,9 @@ module m_domain
   ! The length of the (square) domain
   real(dp), protected :: domain_len(NDIM) = 4e-3_dp
 
+  ! The coarse grid size (in number of cells)
+  integer, protected :: coarse_grid_size(NDIM)
+
   ! The size of the boxes that we use to construct our mesh
   integer, protected :: box_size = 8
 
@@ -21,6 +24,8 @@ contains
          "The length of the domain (m)")
     call CFG_add_get(cfg, "box_size", box_size, &
          "The number of grid cells per coordinate in a box")
+
+    coarse_grid_size = nint(domain_len/minval(domain_len)) * box_size
 
   end subroutine domain_init
 

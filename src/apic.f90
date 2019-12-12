@@ -195,15 +195,14 @@ contains
   !> Initialize the AMR tree
   subroutine init_tree(tree)
     type(af_t), intent(inout) :: tree
-    integer                   :: coarse_grid(NDIM)
-
-    coarse_grid = box_size
 
     ! Initialize tree
     if (GL_cylindrical) then
-       call af_init(tree, box_size, domain_len, coarse_grid, coord=af_cyl)
+       call af_init(tree, box_size, domain_len, &
+            coarse_grid_size, coord=af_cyl)
     else
-       call af_init(tree, box_size, domain_len, coarse_grid)
+       call af_init(tree, box_size, domain_len, &
+            coarse_grid_size)
     end if
 
   end subroutine init_tree
