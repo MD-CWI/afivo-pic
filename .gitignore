@@ -4,4 +4,7 @@
 /lib_3d/*.o
 /lib_3d/*.mod
 /lib_3d/*.a
-
+/programs/*/m_user.o
+/programs/*/m_user.mod
+/programs/*/output/*
+/programs/*/apic
