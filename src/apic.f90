@@ -130,8 +130,6 @@ program apic
         dt        = ST_dt
      end if
 
-     call update_bfield(ST_time)
-
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt, events)
      call pc%after_mover(dt)

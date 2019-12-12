@@ -6,17 +6,11 @@ module m_particles
   implicit none
   public
 
-  ! Magnetic field vector
-  real(dp), protected :: B_vec(3) = [0.0_dp, 0.0_dp, 0.0_dp]
-
   real(dp) :: min_merge_increase = 1.25_dp
 
   real(dp), parameter :: array_incr_fac = 1.25_dp
 
   real(dp), protected :: steps_per_period = 30.0_dp
-
-  real(dp) :: bfield_delay = 0.0_dp
-  real(dp) :: bfield_onset_duration = 0.0_dp
 
 contains
 
@@ -81,13 +75,6 @@ contains
     call CFG_get(cfg, "gas%file", cs_file)
     call CFG_get(cfg, "particle%max_energy_ev", max_ev)
     call CFG_get(cfg, "particle%max_number", max_num_part)
-    call CFG_add_get(cfg, "magnetic_field", B_vec, &
-         "Magnetic field vector (T)")
-    call CFG_add_get(cfg, "magnetic_field_delay", bfield_delay, &
-         "Time (s) before applying the magnetic field")
-    call CFG_add_get(cfg, "magnetic_field_onset_duration", &
-         bfield_onset_duration, &
-         "Time (s) during which B goes from zero to final value")
 
     ! Initialize gas and electric field module
     call GAS_initialize(gas_names, gas_fracs, ST_gas_pressure, temperature)
@@ -110,41 +97,12 @@ contains
     pc%accel_function => get_accel
     pc%outside_check => outside_check
 
-    if (any(abs(B_vec) > 0)) then
-       print *, "Using Boris mover"
-       pc%B_vec = B_vec
-       pc%particle_mover => PC_boris_advance
-       pc%after_mover => PC_after_dummy
-       pc%dt_max = 2 * UC_pi / (steps_per_period * &
-            abs(UC_elec_q_over_m) * norm2(B_vec))
-       write(*, "(A,E10.2)") " Max time step Boris (s): ", pc%dt_max
-    else
-       print *, "Using Verlet mover"
-    end if
-
     where (pc%colls(:)%type == CS_ionize_t .or. &
          pc%colls(:)%type == CS_attach_t)
        pc%coll_is_event(:) = .true.
     end where
 
   end subroutine init_particle
-
-  subroutine update_bfield(time)
-    use m_units_constants
-    real(dp), intent(in) :: time
-
-    if (time < Bfield_delay) then
-       pc%B_vec = 0.0_dp
-    else if (time < Bfield_delay + Bfield_onset_duration) then
-       pc%B_vec = B_vec * (time - Bfield_delay) / Bfield_onset_duration
-    else
-       pc%B_vec = B_vec
-    end if
-
-    pc%dt_max = 2 * UC_pi / (steps_per_period * &
-         abs(UC_elec_q_over_m) * norm2(pc%B_vec))
-
-  end subroutine update_bfield
 
   subroutine adapt_weights(tree, pc)
     type(af_t), intent(in)   :: tree
