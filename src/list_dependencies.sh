@@ -2,7 +2,7 @@
 
 # Get all occurrences of use m_... in source files
 # deps="$(grep -r -e "use m_" --include \*.f90)"
-deps="$(find . -maxdepth 1 -iname "*.f90" -type f -exec grep -H "use m_" {} \;)"
+deps="$(find . -maxdepth 1 -iname "m_*.f90" -type f -exec grep -H "use m_" {} \;)"
 
 # Remove comments
 deps=$(echo "$deps" | sed 's/!.*$//')

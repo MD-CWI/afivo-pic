@@ -76,7 +76,7 @@ contains
     call CFG_add_get(cfg, "multigrid_num_vcycles", multigrid_num_vcycles, &
          "Number of V-cycles to perform per time step")
 
-    field_voltage = -domain_len * field_amplitude
+    call field_set_voltage(0.0_dp)
 
     mg%sides_bc => field_bc_homogeneous
   end subroutine field_initialize
@@ -152,7 +152,7 @@ contains
   subroutine field_set_voltage(time)
     real(dp), intent(in) :: time
 
-    field_voltage = -domain_len * field_get_amplitude(time)
+    field_voltage = -domain_len(NDIM) * field_get_amplitude(time)
   end subroutine field_set_voltage
 
   !> This fills ghost cells near physical boundaries for the potential

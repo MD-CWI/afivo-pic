@@ -22,20 +22,11 @@ module m_refine
   ! Refine if alpha*dx is larger than this value
   real(dp), protected :: refine_adx = 1.0_dp
 
-  ! Refine if dx^2 * rhs is larger than this value (Volts)
-  real(dp), protected :: refine_cphi = 1.0e50_dp
-
   ! Only refine if electron density is above this value
   real(dp), protected :: refine_elec_dens = 1.0e13_dp
 
   ! Only derefine if grid spacing if smaller than this value
   real(dp), protected :: derefine_dx = 5e-5_dp
-
-  ! Refine around initial conditions up to this time
-  real(dp), protected :: refine_init_time = 10e-9_dp
-
-  ! Refine until dx is smaller than this factor times the seed width
-  real(dp), protected :: refine_init_fac = 0.25_dp
 
   ! Refine a region up to this grid spacing
   real(dp), protected, allocatable :: refine_regions_dr(:)
@@ -79,16 +70,10 @@ contains
 
     call CFG_add_get(cfg, "refine%adx", refine_adx, &
          "Refine if alpha*dx is larger than this value")
-    call CFG_add_get(cfg, "refine%cphi", refine_cphi, &
-         "Refine if the curvature in phi is larger than this value")
     call CFG_add_get(cfg, "refine%elec_dens", refine_elec_dens, &
          "Only refine if electron density is above this value")
     call CFG_add_get(cfg, "refine%derefine_dx", derefine_dx, &
          "Only derefine if grid spacing if smaller than this value")
-    call CFG_add_get(cfg, "refine%init_time", refine_init_time, &
-         "Refine around initial conditions up to this time")
-    call CFG_add_get(cfg, "refine%init_fac", refine_init_fac, &
-         "Refine until dx is smaller than this factor times the seed width")
 
     call CFG_add(cfg, "refine%regions_dr", [1.0e99_dp], &
          "Refine regions up to this grid spacing", .true.)
@@ -121,7 +106,6 @@ contains
   ! This routine sets the cell refinement flags for box
   subroutine refine_routine(box, cell_flags)
     use m_geometry
-    use m_init_cond
     type(box_t), intent(in) :: box
     ! Refinement flags for the cells of the box
     integer, intent(out)     :: &

@@ -6,7 +6,7 @@ module m_domain
   integer, parameter, private :: dp = kind(0.0d0)
 
   ! The length of the (square) domain
-  real(dp), protected :: domain_len = 4e-3_dp
+  real(dp), protected :: domain_len(NDIM) = 4e-3_dp
 
   ! The size of the boxes that we use to construct our mesh
   integer, protected :: box_size = 8

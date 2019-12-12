@@ -49,9 +49,6 @@ module m_globals
   ! Random number generator
   type(rng_t) :: ST_rng
 
-  ! Parallel random number generator
-  type(prng_t) :: ST_prng
-
   ! Name of the simulations
   character(len=ST_slen), protected :: ST_simulation_name = "sim"
 
@@ -94,10 +91,6 @@ contains
     use omp_lib
     type(CFG_t), intent(inout) :: cfg  !< The configuration for the simulation
     integer, intent(in)        :: ndim !< Number of dimensions
-    integer                    :: n_threads
-    integer                    :: rng_int4_seed(4) = &
-         [8123, 91234, 12399, 293434]
-    integer(int64)             :: rng_int8_seed(2)
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
@@ -129,30 +122,8 @@ contains
     call CFG_add_get(cfg, "gas%frac_O2", ST_gas_frac_O2, &
          "Fraction of O2, used for photoionization")
 
-    call CFG_add_get(cfg, "rng_seed", rng_int4_seed, &
-         "Seed for random numbers. If all zero, generate from clock.")
-
-    if (all(rng_int4_seed == 0)) then
-       rng_int4_seed = get_random_seed()
-       print *, "RNG seed: ", rng_int4_seed
-    end if
-
-    rng_int8_seed = transfer(rng_int4_seed, rng_int8_seed)
-    call ST_rng%set_seed(rng_int8_seed)
-    n_threads = af_get_max_threads()
-    call ST_prng%init_parallel(n_threads, ST_rng)
+    call ST_rng%set_random_seed()
 
   end subroutine ST_initialize
-
-  !> Get a random seed based on the current time
-  function get_random_seed() result(seed)
-    integer :: seed(4)
-    integer :: time, i
-
-    call system_clock(time)
-    do i = 1, 4
-       seed(i) = ishftc(time, i*8)
-    end do
-  end function get_random_seed
 
 end module m_globals

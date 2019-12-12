@@ -90,8 +90,10 @@ contains
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
-    call pc%initialize(UC_elec_mass, max_num_part, &
-         rng_seed=get_random_seed())
+    pc%particle_mover => PC_verlet_advance
+    pc%after_mover => PC_verlet_correct_accel
+
+    call pc%initialize(UC_elec_mass, max_num_part)
     call pc%use_cross_secs(max_ev, tbl_size, cross_secs)
 
     pc%accel_function => get_accel

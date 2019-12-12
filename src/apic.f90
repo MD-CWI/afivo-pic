@@ -6,12 +6,13 @@ program apic
   use m_af_all
   use m_globals
   use m_field
-  use m_init_cond
   use m_particle_core
   use m_domain
   use m_refine
   use m_time_step
   use m_particles
+  use m_user
+  use m_user_methods
 
   implicit none
 
@@ -24,7 +25,6 @@ program apic
   integer                :: n_part, n_prev_merge, n_samples
   character(len=ST_slen) :: fname
   logical                :: write_out
-  type(PC_events_t)      :: events
   type(ref_info_t)       :: ref_info
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
@@ -38,21 +38,19 @@ program apic
   real(dp) :: wtime_field = 0.0_dp
   real(dp) :: wtime_io = 0.0_dp
   real(dp) :: wtime_amr = 0.0_dp
-
   integer :: output_cnt = 0 ! Number of output files written
 
   wtime_start = omp_get_wtime()
 
   call CFG_update_from_arguments(cfg)
+  call check_path_writable(trim(ST_output_dir))
+  call user_initialize(cfg)
   call domain_init(cfg)
   call refine_init(cfg, ndim)
   call time_step_init(cfg)
   call ST_initialize(cfg, ndim)
-
   call field_initialize(cfg, mg)
-  call init_cond_initialize(cfg, ndim)
   call init_particle(cfg, pc)
-  call pi_initialize(cfg)
 
   fname = trim(ST_output_dir) // "/" // trim(ST_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
@@ -71,7 +69,7 @@ program apic
   mg%box_corr => mg_auto_corr
 
   ! This routine always needs to be called when using multigrid
-  call mg_init_mg(mg)
+  call mg_init(tree, mg)
 
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero)
@@ -81,15 +79,16 @@ program apic
   ST_time         = 0         ! Simulation time (all times are in s)
 
   ! Set up the initial conditions
-  call init_cond_particles(tree, pc)
+  if (.not. associated(user_initial_particles)) &
+       error stop "user_initial_particles not defined"
+  call user_initial_particles(pc)
 
   do
      call af_tree_clear_cc(tree, i_pos_ion)
-     call af_loop_box(tree, init_cond_set_box)
-     call particles_to_density_and_events(tree, pc, events, .true.)
+     call particles_to_density_and_events(tree, pc, .true.)
      call field_compute(tree, mg, .false.)
      call af_adjust_refinement(tree, refine_routine, ref_info, &
-          refine_buffer_width, .true.)
+          refine_buffer_width)
      if (ref_info%n_add == 0) exit
   end do
 
@@ -131,14 +130,14 @@ program apic
      end if
 
      t0 = omp_get_wtime()
-     call pc%advance_openmp(dt, events)
+     call pc%advance_openmp(dt)
      call pc%after_mover(dt)
      wtime_advance = wtime_advance + omp_get_wtime() - t0
 
      ST_time = ST_time + dt
 
      t0 = omp_get_wtime()
-     call particles_to_density_and_events(tree, pc, events, .false.)
+     call particles_to_density_and_events(tree, pc, .false.)
      wtime_density = wtime_density + omp_get_wtime() - t0
 
      n_part = pc%get_num_sim_part()
@@ -179,11 +178,11 @@ program apic
      if (mod(it, refine_per_steps) == 0) then
         t0 = omp_get_wtime()
         call af_adjust_refinement(tree, refine_routine, ref_info, &
-             refine_buffer_width, .true.)
+             refine_buffer_width)
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
            ! Compute the field on the new mesh
-           call particles_to_density_and_events(tree, pc, events, .false.)
+           call particles_to_density_and_events(tree, pc, .false.)
            call field_compute(tree, mg, .true.)
            call adapt_weights(tree, pc)
         end if
@@ -196,29 +195,16 @@ contains
   !> Initialize the AMR tree
   subroutine init_tree(tree)
     type(af_t), intent(inout) :: tree
+    integer                   :: coarse_grid(NDIM)
 
-    ! Variables used below to initialize tree
-    real(dp)                  :: dr
-    integer                   :: id
-    integer                   :: ix_list(NDIM, 1) ! Spatial indices of initial boxes
-
-    dr = domain_len / box_size
+    coarse_grid = box_size
 
     ! Initialize tree
     if (ST_cylindrical) then
-       call af_init(tree, box_size, n_var_cell, n_var_face, dr, &
-            coarsen_to=2, coord=af_cyl, cc_names=ST_cc_names)
+       call af_init(tree, box_size, domain_len, coarse_grid, coord=af_cyl)
     else
-       call af_init(tree, box_size, n_var_cell, n_var_face, dr, &
-            coarsen_to=2, cc_names=ST_cc_names)
+       call af_init(tree, box_size, domain_len, coarse_grid)
     end if
-
-    ! Set up geometry
-    id             = 1          ! One box ...
-    ix_list(:, id) = 1          ! With index 1,1 ...
-
-    ! Create the base mesh
-    call af_set_base(tree, 1, ix_list)
 
   end subroutine init_tree
 
@@ -309,5 +295,18 @@ contains
     call af_gc_tree(tree, i_pos_ion)
 
   end subroutine set_output_variables
+
+  subroutine check_path_writable(pathname)
+    character(len=*), intent(in) :: pathname
+    integer                      :: my_unit, iostate
+
+    open(newunit=my_unit, file=trim(pathname)//"/DUMMY", iostat=iostate)
+    if (iostate /= 0) then
+       print *, "Output directory: " // trim(pathname)
+       error stop "Directory not writable (does it exist?)"
+    else
+       close(my_unit, status='delete')
+    end if
+  end subroutine check_path_writable
 
 end program apic

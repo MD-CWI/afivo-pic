@@ -1,4 +1,7 @@
 /lib_2d/*.o
 /lib_2d/*.mod
+/lib_2d/*.a
 /lib_3d/*.o
 /lib_3d/*.mod
+/lib_3d/*.a
+
