@@ -50,7 +50,7 @@ contains
     call CFG_add_get(cfg, "particle%max_weight", particle_max_weight, &
          "Maximum weight for simulation particles")
 
-    call CFG_add(cfg, "particle%max_number", 50*1000*1000, &
+    call CFG_add(cfg, "particle%max_number", 15*1000*1000, &
          "Maximum number of particles")
     call CFG_add_get(cfg, "particle%min_merge_increase", min_merge_increase, &
          "Minimum increase in particle count before merging")

@@ -48,9 +48,9 @@ program apic
   call refine_init(cfg, ndim)
   call time_step_init(cfg)
   call GL_initialize(cfg, ndim)
+  call check_path_writable(trim(GL_output_dir))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
-  call check_path_writable(trim(GL_output_dir))
 
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
