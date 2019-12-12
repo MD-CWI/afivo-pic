@@ -18,7 +18,7 @@ module m_globals
   type(PC_t)  :: pc
 
   ! Default length of strings
-  integer, parameter :: ST_slen = 200
+  integer, parameter :: GL_slen = 200
 
   ! ** Indices of cell-centered variables **
   integer, protected :: n_var_cell = 0  ! Number of variables
@@ -34,49 +34,40 @@ module m_globals
   integer, protected :: i_energy   = -1 ! Energy density
   integer, parameter :: name_len = 12
 
-  ! Names of the cell-centered variables
-  character(len=name_len), allocatable :: ST_cc_names(:)
-
-  ! Indices of variables to be included in output
-  integer, allocatable :: vars_for_output(:)
-
-  ! ** Indices of face-centered variables **
-  integer, protected :: n_var_face   = 0 ! Number of variables
-
   ! Whether cylindrical coordinates are used
-  logical :: ST_cylindrical = .false.
+  logical :: GL_cylindrical = .false.
 
   ! Random number generator
-  type(rng_t) :: ST_rng
+  type(rng_t) :: GL_rng
 
   ! Name of the simulations
-  character(len=ST_slen), protected :: ST_simulation_name = "sim"
+  character(len=GL_slen), protected :: GL_simulation_name = "sim"
 
   ! Output directory
-  character(len=ST_slen), protected :: ST_output_dir = "output"
+  character(len=GL_slen), protected :: GL_output_dir = "output"
 
   ! Print status every this many seconds
-  real(dp), protected :: ST_print_status_sec = 60.0_dp
+  real(dp), protected :: GL_print_status_sec = 60.0_dp
 
   ! Current time
-  real(dp)  :: ST_time
+  real(dp)  :: GL_time
 
   ! End time of the simulation
-  real(dp), protected :: ST_end_time = 10e-9_dp
+  real(dp), protected :: GL_end_time = 10e-9_dp
 
   ! Pressure of the gas in bar
-  real(dp), protected :: ST_gas_pressure = 1.0_dp
+  real(dp), protected :: GL_gas_pressure = 1.0_dp
 
   ! Name of the gas mixture
-  character(len=ST_slen) :: ST_gas_name = "AIR"
+  character(len=GL_slen) :: GL_gas_name = "AIR"
 
   ! Fraction of O2
-  real(dp), protected :: ST_gas_frac_O2 = 0.2_dp
+  real(dp), protected :: GL_gas_frac_O2 = 0.2_dp
 
   ! Position of initial electron seed
-  real(dp) :: ST_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.9_dp]
-  real(dp) :: ST_init_seed_sigma    = 1.0e-3_dp
-  integer  :: ST_init_num_particles = 10000
+  real(dp) :: GL_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.9_dp]
+  real(dp) :: GL_init_seed_sigma    = 1.0e-3_dp
+  integer  :: GL_init_num_particles = 10000
 
   real(dp) :: particle_min_weight = 1.0_dp
   real(dp) :: particle_max_weight = 1.0e20_dp
@@ -85,7 +76,7 @@ module m_globals
 contains
 
   !> Create the configuration file with default values
-  subroutine ST_initialize(cfg, ndim)
+  subroutine GL_initialize(cfg, ndim)
     use iso_fortran_env, only: int64
     use m_config
     use omp_lib
@@ -105,25 +96,25 @@ contains
     call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
 
-    call CFG_add_get(cfg, "cylindrical", ST_cylindrical, &
+    call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")
-    call CFG_add_get(cfg, "end_time", ST_end_time, &
+    call CFG_add_get(cfg, "end_time", GL_end_time, &
          "The desired endtime (s) of the simulation")
-    call CFG_add_get(cfg, "simulation_name", ST_simulation_name, &
+    call CFG_add_get(cfg, "simulation_name", GL_simulation_name, &
          "The name of the simulation")
-    call CFG_add_get(cfg, "output_dir", ST_output_dir, &
+    call CFG_add_get(cfg, "output_dir", GL_output_dir, &
          "Directory where the output should be written")
-    call CFG_add_get(cfg, "print_status_sec", ST_print_status_sec, &
+    call CFG_add_get(cfg, "print_status_sec", GL_print_status_sec, &
          "Print status every this many seconds")
-    call CFG_add_get(cfg, "gas%pressure", ST_gas_pressure, &
+    call CFG_add_get(cfg, "gas%pressure", GL_gas_pressure, &
          "The gas pressure (bar), used for photoionization")
-    call CFG_add_get(cfg, "gas%name", ST_gas_name, &
+    call CFG_add_get(cfg, "gas%name", GL_gas_name, &
          "The name of the gas mixture used")
-    call CFG_add_get(cfg, "gas%frac_O2", ST_gas_frac_O2, &
+    call CFG_add_get(cfg, "gas%frac_O2", GL_gas_frac_O2, &
          "Fraction of O2, used for photoionization")
 
-    call ST_rng%set_random_seed()
+    call GL_rng%set_random_seed()
 
-  end subroutine ST_initialize
+  end subroutine GL_initialize
 
 end module m_globals

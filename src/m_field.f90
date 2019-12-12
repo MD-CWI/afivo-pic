@@ -38,7 +38,7 @@ module m_field
   ! Number of V-cycles to perform per time step
   integer, protected :: multigrid_num_vcycles = 2
 
-  character(ST_slen) :: field_bc_type = "homogeneous"
+  character(GL_slen) :: field_bc_type = "homogeneous"
 
   public :: field_initialize
   public :: field_compute
@@ -107,7 +107,7 @@ contains
     end do
     !$omp end parallel
 
-    call field_set_voltage(ST_time)
+    call field_set_voltage(GL_time)
 
     if (.not. have_guess) then
        ! Perform a FMG cycle when we have no guess

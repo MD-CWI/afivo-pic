@@ -140,7 +140,7 @@ contains
     rmax = box%r_min + box%dr * box%n_cell
 
     do n = 1, size(refine_regions_dr)
-       if (ST_time <= refine_regions_tstop(n) .and. &
+       if (GL_time <= refine_regions_tstop(n) .and. &
             max_dx > refine_regions_dr(n) .and. all(&
             rmax >= refine_regions_rmin(:, n) .and. &
             rmin <= refine_regions_rmax(:, n))) then
@@ -165,11 +165,11 @@ contains
 
     type(CFG_t), intent(inout) :: cfg
 
-    character(len=ST_slen)     :: td_file = "input/transport_data.txt"
+    character(len=GL_slen)     :: td_file = "input/transport_data.txt"
     integer                    :: table_size       = 500
     real(dp)                   :: max_electric_fld = 3e7_dp
     real(dp), allocatable      :: x_data(:), y_data(:)
-    character(len=ST_slen)     :: data_name
+    character(len=GL_slen)     :: data_name
 
     call CFG_add_get(cfg, "gas%transport_data_file", td_file, &
          "Input file with transport data")
@@ -185,7 +185,7 @@ contains
     data_name = "efield[V/m]_vs_alpha[1/m]"
     call CFG_add_get(cfg, "td_alpha_name", data_name, &
          "The name of the eff. ionization coeff.")
-    call TD_get_from_file(td_file, ST_gas_name, &
+    call TD_get_from_file(td_file, GL_gas_name, &
          trim(data_name), x_data, y_data)
     call LT_set_col(td_tbl, i_td_alpha, x_data, y_data)
 

@@ -77,7 +77,7 @@ contains
     call CFG_get(cfg, "particle%max_number", max_num_part)
 
     ! Initialize gas and electric field module
-    call GAS_initialize(gas_names, gas_fracs, ST_gas_pressure, temperature)
+    call GAS_initialize(gas_names, gas_fracs, GL_gas_pressure, temperature)
 
     do nn = 1, n_gas_comp
        call CS_add_from_file(trim(cs_file), &
@@ -86,7 +86,7 @@ contains
     end do
 
     call CS_write_summary(cross_secs, &
-         trim(ST_output_dir) // "/" // trim(ST_simulation_name) // "_cs_summary.txt")
+         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_summary.txt")
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 

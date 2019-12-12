@@ -23,7 +23,7 @@ program apic
   real(dp)               :: wc_time, inv_count_rate, time_last_print
   integer                :: it
   integer                :: n_part, n_prev_merge, n_samples
-  character(len=ST_slen) :: fname
+  character(len=GL_slen) :: fname
   logical                :: write_out
   type(ref_info_t)       :: ref_info
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
@@ -43,16 +43,16 @@ program apic
   wtime_start = omp_get_wtime()
 
   call CFG_update_from_arguments(cfg)
-  call check_path_writable(trim(ST_output_dir))
+  call check_path_writable(trim(GL_output_dir))
   call user_initialize(cfg)
   call domain_init(cfg)
   call refine_init(cfg, ndim)
   call time_step_init(cfg)
-  call ST_initialize(cfg, ndim)
+  call GL_initialize(cfg, ndim)
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
 
-  fname = trim(ST_output_dir) // "/" // trim(ST_simulation_name) // "_out.cfg"
+  fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
 
   ! Initialize the tree (which contains all the mesh information)
@@ -76,7 +76,7 @@ program apic
   call af_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
 
   output_cnt      = 0         ! Number of output files written
-  ST_time         = 0         ! Simulation time (all times are in s)
+  GL_time         = 0         ! Simulation time (all times are in s)
 
   ! Set up the initial conditions
   if (.not. associated(user_initial_particles)) &
@@ -98,7 +98,7 @@ program apic
   call af_print_info(tree)
 
   ! Start from small time step
-  ST_dt   = ST_dt_min
+  GL_dt   = GL_dt_min
 
   ! Initial wall clock time
   call system_clock(t_start, count_rate)
@@ -108,25 +108,25 @@ program apic
   n_elec_prev = pc%get_num_real_part()
 
   do it = 1, huge(1)-1
-     if (ST_time >= ST_end_time) exit
+     if (GL_time >= GL_end_time) exit
 
      call system_clock(t_current)
      wc_time = (t_current - t_start) * inv_count_rate
 
-     ! Every ST_print_status_interval, print some info about progress
-     if (wc_time - time_last_print > ST_print_status_sec) then
+     ! Every GL_print_status_interval, print some info about progress
+     if (wc_time - time_last_print > GL_print_status_sec) then
         call print_status()
         time_last_print = wc_time
      end if
 
-     ! Every ST_dt_output, write output
-     if (output_cnt * ST_dt_output <= ST_time + ST_dt) then
+     ! Every GL_dt_output, write output
+     if (output_cnt * GL_dt_output <= GL_time + GL_dt) then
         write_out  = .true.
-        dt         = output_cnt * ST_dt_output - ST_time
+        dt         = output_cnt * GL_dt_output - GL_time
         output_cnt = output_cnt + 1
      else
         write_out = .false.
-        dt        = ST_dt
+        dt        = GL_dt
      end if
 
      t0 = omp_get_wtime()
@@ -134,7 +134,7 @@ program apic
      call pc%after_mover(dt)
      wtime_advance = wtime_advance + omp_get_wtime() - t0
 
-     ST_time = ST_time + dt
+     GL_time = GL_time + dt
 
      t0 = omp_get_wtime()
      call particles_to_density_and_events(tree, pc, .false.)
@@ -158,19 +158,19 @@ program apic
      n_samples = min(n_part, 1000)
      call af_tree_max_cc(tree, i_electron, max_elec_dens)
      n_elec      = pc%get_num_real_part()
-     dt_cfl      = PM_get_max_dt(pc, ST_rng, n_samples, cfl_particles)
+     dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
      dt_drt      = dielectric_relaxation_time(max_elec_dens)
-     dt_growth   = get_new_dt(ST_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
-     ST_dt       = min(dt_cfl, dt_growth, dt_drt)
+     dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
+     GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      n_elec_prev = n_elec
 
      if (write_out) then
         t0 = omp_get_wtime()
         call set_output_variables()
 
-        write(fname, "(A,I6.6)") trim(ST_simulation_name) // "_", output_cnt
-        call af_write_silo(tree, fname, output_cnt, ST_time, &
-             vars_for_output, dir=ST_output_dir)
+        write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
+        call af_write_silo(tree, fname, output_cnt, GL_time, &
+             dir=GL_output_dir)
         call print_info()
         wtime_io = wtime_io + omp_get_wtime() - t0
      end if
@@ -200,7 +200,7 @@ contains
     coarse_grid = box_size
 
     ! Initialize tree
-    if (ST_cylindrical) then
+    if (GL_cylindrical) then
        call af_init(tree, box_size, domain_len, coarse_grid, coord=af_cyl)
     else
        call af_init(tree, box_size, domain_len, coarse_grid)
@@ -210,8 +210,8 @@ contains
 
   subroutine print_status()
     write(*, "(F7.2,A,I0,A,E10.3,A,E10.3,A,E10.3,A,E10.3,A,E10.3)") &
-         100 * ST_time / ST_end_time, "% it: ", it, &
-         " t:", ST_time, " dt:", ST_dt, " wc:", wc_time, &
+         100 * GL_time / GL_end_time, "% it: ", it, &
+         " t:", GL_time, " dt:", GL_dt, " wc:", wc_time, &
          " ncell:", real(af_num_cells_used(tree), dp), &
          " npart:", real(pc%get_num_sim_part(), dp)
   end subroutine print_status
@@ -231,7 +231,7 @@ contains
     n_part  = pc%get_num_sim_part()
     n_elec  = pc%get_num_real_part()
 
-    write(*, "(A20,E12.4)") "dt", ST_dt
+    write(*, "(A20,E12.4)") "dt", GL_dt
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
     write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
