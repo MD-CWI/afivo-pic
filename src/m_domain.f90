@@ -1,3 +1,4 @@
+!> Module for the computational domain
 module m_domain
   implicit none
   public

@@ -104,6 +104,7 @@ contains
 
   end subroutine init_particle
 
+  !> Adjust the weights of the particles
   subroutine adapt_weights(tree, pc)
     type(af_t), intent(in)   :: tree
     type(PC_t), intent(inout) :: pc
@@ -128,6 +129,7 @@ contains
     ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
   end subroutine adapt_weights
 
+  !> Sort the particles by their id
   subroutine sort_by_id(tree, pc, id_ipart)
     type(af_t), intent(in)              :: tree
     type(PC_t), intent(inout)           :: pc

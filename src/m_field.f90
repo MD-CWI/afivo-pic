@@ -1,4 +1,5 @@
 #include "../afivo/src/cpp_macros.h"
+!> Module for the electric field
 module m_field
   use m_af_all
   use m_globals
