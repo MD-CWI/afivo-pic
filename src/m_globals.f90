@@ -46,6 +46,9 @@ module m_globals
   ! Output directory
   character(len=GL_slen), protected :: GL_output_dir = "output"
 
+  ! Time between writing output
+  real(dp), protected :: GL_dt_output = 1.0e-10_dp
+
   ! Print status every this many seconds
   real(dp), protected :: GL_print_status_sec = 60.0_dp
 
@@ -104,6 +107,8 @@ contains
          "The name of the simulation")
     call CFG_add_get(cfg, "output_dir", GL_output_dir, &
          "Directory where the output should be written")
+    call CFG_add_get(cfg, "dt_output", GL_dt_output, &
+         "The timestep for writing output (s)")
     call CFG_add_get(cfg, "print_status_sec", GL_print_status_sec, &
          "Print status every this many seconds")
     call CFG_add_get(cfg, "gas%pressure", GL_gas_pressure, &

@@ -43,7 +43,6 @@ program apic
   wtime_start = omp_get_wtime()
 
   call CFG_update_from_arguments(cfg)
-  call check_path_writable(trim(GL_output_dir))
   call user_initialize(cfg)
   call domain_init(cfg)
   call refine_init(cfg, ndim)
@@ -51,6 +50,7 @@ program apic
   call GL_initialize(cfg, ndim)
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
+  call check_path_writable(trim(GL_output_dir))
 
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))

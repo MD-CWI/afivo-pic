@@ -15,9 +15,6 @@ module m_time_step
   ! Minimum allowed time step
   real(dp), protected :: GL_dt_min = 1.0e-14_dp
 
-  ! Time between writing output
-  real(dp), protected :: GL_dt_output = 1.0e-10_dp
-
   real(dp), protected :: cfl_particles = 0.5_dp
 
   ! Estimate of mobility for dielectric relaxation time
@@ -29,8 +26,6 @@ contains
     use m_config
     type(CFG_t), intent(inout) :: cfg
 
-    call CFG_add_get(cfg, "dt_output", GL_dt_output, &
-         "The timestep for writing output (s)")
     call CFG_add_get(cfg, "dt_max", GL_dt_max, &
          "The maximum timestep (s)")
     call CFG_add_get(cfg, "dt_min", GL_dt_min, &

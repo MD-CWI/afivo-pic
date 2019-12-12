@@ -252,26 +252,22 @@ contains
 
   end subroutine particles_to_density_and_events
 
-  function get_accel_pos(x) result(accel)
-    use m_units_constants
-    real(dp), intent(in) :: x(NDIM)
-    real(dp)             :: accel(3)
-    logical              :: success
-
-#if NDIM == 2
-    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey], success)
-    accel(3) = 0.0_dp
-#elif NDIM == 3
-    accel(1:NDIM) = af_interp1(tree, x, [i_Ex, i_Ey, i_Ez], success)
-#endif
-    accel(:) = accel(:) * UC_elec_q_over_m
-  end function get_accel_pos
-
   function get_accel(my_part) result(accel)
     use m_units_constants
     type(PC_part_t), intent(inout) :: my_part
     real(dp)                       :: accel(3)
-    accel = get_accel_pos(my_part%x(1:NDIM))
+    logical                        :: success
+
+#if NDIM == 2
+    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
+         success, id_guess=my_part%id)
+    accel(3) = 0.0_dp
+#elif NDIM == 3
+    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey, i_Ez], &
+         success, id_guess=my_part%id)
+#endif
+
+    accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)
