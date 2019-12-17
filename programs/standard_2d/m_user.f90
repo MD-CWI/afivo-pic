@@ -2,6 +2,8 @@
 module m_user
   use m_config
   use m_user_methods
+  use m_globals
+  use m_domain
 
   implicit none
   private
@@ -15,12 +17,11 @@ contains
     type(CFG_t), intent(inout) :: cfg
 
     user_initial_particles => init_particles
+    user_set_dielectric_eps => set_epsilon
   end subroutine user_initialize
 
   subroutine init_particles(pctest)
     use m_particle_core
-    use m_domain
-    use m_globals
     type(PC_t), intent(inout) :: pctest
     integer                   :: n
     real(dp)                  :: pos(3)
@@ -41,5 +42,23 @@ contains
        end if
     end do
   end subroutine init_particles
+
+  subroutine set_epsilon(box)
+    type(box_t), intent(inout) :: box
+    real(dp)                   :: r(2)
+    integer                    :: i, j
+
+    do j = 0, box%n_cell+1
+       do i = 0, box%n_cell+1
+          r = af_r_cc(box, [i, j])
+
+          if (r(2)/domain_len(2) < 0.125_dp) then
+             box%cc(i, j, i_eps) = 100.0_dp
+          else
+             box%cc(i, j, i_eps) = 1.0_dp
+          end if
+       end do
+    end do
+  end subroutine set_epsilon
 
 end module m_user
