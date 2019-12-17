@@ -32,10 +32,14 @@ module m_globals
   integer, protected :: i_rhs      = -1 ! Source term Poisson
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
-  integer, parameter :: name_len = 12
+  integer, protected :: i_eps      = -1 ! Dielectric permittivity
+  integer, parameter :: name_len   = 12
 
   ! Whether cylindrical coordinates are used
-  logical :: GL_cylindrical = .false.
+  logical, protected :: GL_cylindrical = .false.
+
+  ! Whether a dielectric is used
+  logical, protected :: GL_use_dielectric = .true.
 
   ! Random number generator
   type(rng_t) :: GL_rng
@@ -117,6 +121,13 @@ contains
          "The name of the gas mixture used")
     call CFG_add_get(cfg, "gas%frac_O2", GL_gas_frac_O2, &
          "Fraction of O2, used for photoionization")
+    call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
+         "Whether a dielectric is used")
+    if (GL_use_dielectric) then
+       call af_add_cc_variable(tree, "eps", ix=i_eps)
+       call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &
+            af_gc_prolong_copy, af_prolong_zeroth)
+    end if
 
     call GL_rng%set_random_seed()
 

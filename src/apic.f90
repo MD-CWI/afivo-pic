@@ -62,11 +62,20 @@ program apic
   mg%i_phi = i_phi
   mg%i_tmp = i_Ex
   mg%i_rhs = i_rhs
+  if (GL_use_dielectric) mg%i_eps = i_eps
 
   ! This automatically handles cylindrical symmetry
   mg%box_op => mg_auto_op
   mg%box_gsrb => mg_auto_gsrb
   mg%box_corr => mg_auto_corr
+  mg%box_stencil => mg_auto_stencil
+
+  ! Set the dielectric permittivity before initializing multigrid
+  if (GL_use_dielectric) then
+     if (.not. associated(user_set_dielectric_eps)) &
+          error stop "user_set_dielectric_eps not defined"
+     call af_loop_box(tree, user_set_dielectric_eps)
+  end if
 
   ! This routine always needs to be called when using multigrid
   call mg_init(tree, mg)
@@ -106,6 +115,11 @@ program apic
   time_last_print = -1e10_dp
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
+
+  call set_output_variables()
+  write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
+  call af_write_silo(tree, fname, output_cnt, GL_time, dir=GL_output_dir)
+  output_cnt = output_cnt + 1
 
   do it = 1, huge(1)-1
      if (GL_time >= GL_end_time) exit

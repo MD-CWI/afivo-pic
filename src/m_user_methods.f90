@@ -13,6 +13,9 @@ module m_user_methods
   !> If defined, call this routine after setting initial conditions
   procedure(init_part), pointer :: user_initial_particles => null()
 
+  !> If defined, call this routine to set the dielectric permittivity
+  procedure(af_subr), pointer :: user_set_dielectric_eps => null()
+
   !> To set custom boundary conditions for the electric potential
   procedure(af_subr_bc), pointer :: user_potential_bc => null()
 
