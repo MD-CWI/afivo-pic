@@ -39,7 +39,7 @@ module m_globals
   logical, protected :: GL_cylindrical = .false.
 
   ! Whether a dielectric is used
-  logical, protected :: GL_use_dielectric = .true.
+  logical, protected :: GL_use_dielectric = .false.
 
   ! Random number generator
   type(rng_t) :: GL_rng
