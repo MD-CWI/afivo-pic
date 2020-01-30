@@ -107,7 +107,10 @@ contains
     end do
     !$omp end parallel
 
-    call dielectric_charge_to_rhs(tree%boxes(id), id) !TODO
+    if (GL_use_dielectric) then
+       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_charge, &
+            i_rhs, -fac)
+    end if
 
     call field_set_voltage(GL_time)
 
@@ -124,11 +127,23 @@ contains
     ! Compute field from potential
     call af_loop_box(tree, field_from_potential)
 
+    if (GL_use_dielectric) then
+#if NDIM == 2
+       call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
+            [i_Ex, i_Ey], i_phi, UC_eps0)
+#elif NDIM == 3
+       call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
+            [i_Ex, i_Ey, i_Ez], i_phi, UC_eps0)
+#endif
+    end if
+
+    call af_loop_box(tree, compute_field_norm)
+
     ! Set the field norm also in ghost cells
 #if NDIM == 2
-    call af_gc_tree(tree, [i_Ex, i_Ey, i_E], af_gc_interp, af_bc_neumann_zero)
+    call af_gc_tree(tree, [i_Ex, i_Ey, i_E])
 #elif NDIM == 3
-    call af_gc_tree(tree, [i_Ex, i_Ey, i_Ez, i_E], af_gc_interp, af_bc_neumann_zero)
+    call af_gc_tree(tree, [i_Ex, i_Ey, i_Ez, i_E])
 #endif
 
   end subroutine field_compute
@@ -194,8 +209,6 @@ contains
          (box%cc(0:nc-1, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, i_phi))
     box%cc(1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr(2) * &
          (box%cc(1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 2:nc+1, i_phi))
-    box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
-         box%cc(1:nc, 1:nc, i_Ey)**2)
 #elif NDIM == 3
     box%cc(1:nc, 1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr(1) * &
          (box%cc(0:nc-1, 1:nc, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, 1:nc, i_phi))
@@ -203,12 +216,24 @@ contains
          (box%cc(1:nc, 0:nc-1, 1:nc, i_phi) - box%cc(1:nc, 2:nc+1, 1:nc, i_phi))
     box%cc(1:nc, 1:nc, 1:nc, i_Ez) = 0.5_dp * inv_dr(3) * &
          (box%cc(1:nc, 1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 1:nc, 2:nc+1, i_phi))
+#endif
+
+  end subroutine field_from_potential
+
+  subroutine compute_field_norm(box)
+    type(box_t), intent(inout) :: box
+    integer                    :: nc
+
+    nc = box%n_cell
+#if NDIM == 2
+    box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
+         box%cc(1:nc, 1:nc, i_Ey)**2)
+#elif NDIM == 3
     box%cc(1:nc, 1:nc, 1:nc, i_E) = sqrt(&
          box%cc(1:nc, 1:nc, 1:nc, i_Ex)**2 + &
          box%cc(1:nc, 1:nc, 1:nc, i_Ey)**2 + &
          box%cc(1:nc, 1:nc, 1:nc, i_Ez)**2)
 #endif
-
-  end subroutine field_from_potential
+  end subroutine compute_field_norm
 
 end module m_field

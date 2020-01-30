@@ -82,7 +82,17 @@ program apic
 
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_phi, mg%sides_bc, mg%sides_rb)
+  call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
+#if NDIM == 3
+  call af_set_cc_methods(tree, i_Ez, af_bc_neumann_zero)
+#endif
+
+  if (GL_use_dielectric) then
+     call af_refine_up_to_lvl(tree, 3)
+     call dielectric_initialize(tree, i_eps, diel, 1)
+  end if
 
   output_cnt      = 0         ! Number of output files written
   GL_time         = 0         ! Simulation time (all times are in s)
@@ -304,8 +314,7 @@ contains
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output
-    call af_gc_tree(tree, i_electron)
-    call af_gc_tree(tree, i_pos_ion)
+    call af_gc_tree(tree, [i_electron, i_pos_ion])
 
   end subroutine set_output_variables
 

@@ -16,6 +16,7 @@ module m_globals
   type(af_t)  :: tree ! This contains the full grid information
   type(mg_t)  :: mg   ! Multigrid option struct
   type(PC_t)  :: pc
+  type(dielectric_t) :: diel ! To store dielectric surface
 
   ! Default length of strings
   integer, parameter :: GL_slen = 200
@@ -41,6 +42,9 @@ module m_globals
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
   integer, parameter :: name_len   = 12
+
+  ! Index of surface charge on dielectric
+  integer, parameter :: i_surf_charge = 1
 
   ! Whether cylindrical coordinates are used
   logical, protected :: GL_cylindrical = .false.
@@ -133,6 +137,7 @@ contains
 
     if (GL_use_dielectric) then
        interpolation_order = 0
+
        call af_add_cc_variable(tree, "eps", ix=i_eps)
        call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &
             af_gc_prolong_copy, af_prolong_zeroth)

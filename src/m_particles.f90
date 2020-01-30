@@ -179,13 +179,13 @@ contains
 
   subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
+    use m_particle_core
     use m_domain, only: outside_check
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
 
     integer                     :: n, i, n_part
-    integer                     :: interpolation_order
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
@@ -245,7 +245,7 @@ contains
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge (and dont generate an ion)
-          call particle_to_surface_charge(tree, pc%event_list(n)%part, weights(n))
+          call particle_to_surface_charge(tree, pc%event_list(n)%part)
        end if
     end do
 
@@ -258,53 +258,26 @@ contains
 
   end subroutine particles_to_density_and_events
 
-  subroutine particle_to_surface_charge(tree_1, pc_1, weight)
-    ! Input: a particle that is found in the dielectric (after timestep, and is thus flagged for removal)
-    ! This particle will be mapped to the surface charge of the corresponding cell
+  subroutine particle_to_surface_charge(tree, my_part)
+    ! Input: a particle that is found in the dielectric (after timestep, and is
+    ! thus flagged for removal) This particle will be mapped to the surface
+    ! charge of the corresponding cell
     use m_units_constants
-    use m_dielectric
 
-    type(af_t), intent(inout) :: tree_1
-    type(PC_part_t), intent(inout) :: pc_1
-    type(af_loc_t)  :: loc ! Datatype of the cell that contains the particle (with box id and cell id (ix))
-    integer :: direction, index
-    real(dp)  :: dr, weight
+    type(af_t), intent(in)      :: tree
+    type(PC_part_t), intent(in) :: my_part
+    integer                     :: ix_surf, ix_cell(NDIM-1)
 
-    loc = af_get_loc(tree_1, pc_1%x(1:NDIM)) ! This can be improved by making a guess
-    direction = surf%box_id_to_direction(loc%id)
-    ! First lets do some checks, to make sure the particle is in the domain, and near the dielectric
-    if (loc%id < 0 .or. any(loc%ix < 0)) then
-      print *, "Particle could not be mapped to surface charge"
-      print *, "Possibly because the particle was not found in the domain"
-      error stop
+    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+         ix_surf, ix_cell)
 
-    end if
-    if (surf%box_id_to_direction(loc%id) < 0) then
-      print *, pc_1%x
-      print *, "Particle was not found in a box(!) adjacent to the dielectric"
-      print *, "This should be highly unlikely. Maybe check the initial condition?"
-      error stop
-    end if
-
+    ! Update the charge in the surface cell
 #if NDIM == 2
-    ! Determine which side is the diel is on
-    if (direction == af_neighb_lowx .or. direction == af_neighb_highx) then
-      index = loc%ix(2) ! Grab y-index
-      dr = tree_1%boxes(loc%id)%dr(2) !Del_y surface
-    else if (direction == af_neighb_lowy .or. direction == af_neighb_highy) then
-      index = loc%ix(1) ! Grab x-index
-      dr = tree_1%boxes(loc%id)%dr(1) !Del_x surface
-    else
-      index = -1
-      error stop "Direction is ill-defined"
-    end if
-
-    ! Now update the charge in that cell according to the charge carried by the particle
-    surf%box_id_to_charge(loc%id, index) = surf%box_id_to_charge(loc%id, index) + &
-    weight * UC_elec_charge / dr
-    call extend_charge_to_neighbour(loc%id) ! Note that the neighbouring cell also requires the updated surface charge
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) + &
+         my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
-   error stop
+    error stop
 #endif
   end subroutine
 

@@ -1,20 +1,23 @@
 !> Module for the computational domain
 module m_domain
   use m_globals
+  use m_particle_core
+  use m_af_all
 
   implicit none
-  public
-
-  integer, parameter, private :: dp = kind(0.0d0)
+  private
 
   ! The length of the (square) domain
-  real(dp), protected :: domain_len(NDIM) = 4e-3_dp
+  real(dp), protected, public :: domain_len(NDIM) = 4e-3_dp
 
   ! The coarse grid size (in number of cells)
-  integer, protected :: coarse_grid_size(NDIM)
+  integer, protected, public :: coarse_grid_size(NDIM)
 
   ! The size of the boxes that we use to construct our mesh
-  integer, protected :: box_size = 8
+  integer, protected, public :: box_size = 8
+
+  public :: domain_init
+  public :: outside_check
 
 contains
 
@@ -31,27 +34,31 @@ contains
 
   end subroutine domain_init
 
-  pure integer function outside_check_pos(x)
-    use m_particle_core
-    use m_dielectric, only: is_in_dielectric
-    real(dp), intent(in) :: x(NDIM)
+  integer function outside_check(my_part)
+    type(PC_part_t), intent(inout) :: my_part
+    real(dp)                       :: x(NDIM)
 
-    if (any(x(1:NDIM) < 0.0_dp .or. x(1:NDIM) > domain_len)) then
-       outside_check_pos = outside_domain
-    else if (is_in_dielectric(my_part%x(1:NDIM))) then
+    x = my_part%x(1:NDIM)
+
+    if (any(x < 0.0_dp .or. x > domain_len)) then
+       outside_check = outside_domain
+    else if (is_in_dielectric(my_part)) then
         ! The particle is IN the domain and IN the dielectric (see def of
         ! is_in_dielectric)
        outside_check = inside_dielectric
     else
-       outside_check_pos = 0
+       outside_check = 0
     end if
-  end function outside_check_pos
-
-  integer function outside_check(my_part)
-    use m_particle_core
-    type(PC_part_t), intent(inout) :: my_part
-
-    outside_check = outside_check_pos(my_part%x(1:NDIM))
   end function outside_check
+
+  logical function is_in_dielectric(my_part)
+    type(PC_part_t), intent(inout) :: my_part
+    real(dp)                       :: eps(1)
+    logical                        :: success
+
+    eps = af_interp0(tree, my_part%x(1:NDIM), [i_eps], success, my_part%id)
+    if (.not. success) error stop "unexpected particle outside domain"
+    is_in_dielectric = (eps(1) > 1)
+  end function is_in_dielectric
 
 end module m_domain
