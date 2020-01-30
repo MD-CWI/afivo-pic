@@ -1,5 +1,7 @@
 !> Module for the computational domain
 module m_domain
+  use m_globals
+
   implicit none
   public
 
@@ -31,10 +33,15 @@ contains
 
   pure integer function outside_check_pos(x)
     use m_particle_core
+    use m_dielectric, only: is_in_dielectric
     real(dp), intent(in) :: x(NDIM)
 
     if (any(x(1:NDIM) < 0.0_dp .or. x(1:NDIM) > domain_len)) then
-       outside_check_pos = 1
+       outside_check_pos = outside_domain
+    else if (is_in_dielectric(my_part%x(1:NDIM))) then
+        ! The particle is IN the domain and IN the dielectric (see def of
+        ! is_in_dielectric)
+       outside_check = inside_dielectric
     else
        outside_check_pos = 0
     end if

@@ -20,6 +20,13 @@ module m_globals
   ! Default length of strings
   integer, parameter :: GL_slen = 200
 
+  ! Named integer for outside checks
+  integer, parameter :: outside_domain = 1
+  integer, parameter :: inside_dielectric = 2
+
+  ! Which interpolation order is used
+  integer, protected :: interpolation_order = 1
+
   ! ** Indices of cell-centered variables **
   integer, protected :: n_var_cell = 0  ! Number of variables
   integer, protected :: i_electron = -1 ! Electron density
@@ -123,7 +130,9 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
+
     if (GL_use_dielectric) then
+       interpolation_order = 0
        call af_add_cc_variable(tree, "eps", ix=i_eps)
        call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &
             af_gc_prolong_copy, af_prolong_zeroth)

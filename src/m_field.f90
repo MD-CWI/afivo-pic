@@ -82,7 +82,7 @@ contains
   end subroutine field_initialize
 
   !> Compute electric field on the tree. First perform multigrid to get electric
-  !> potential, then take numerical gradient to geld field.
+  !> potential, then take numerical gradient to get field.
   subroutine field_compute(tree, mg, have_guess)
     use m_units_constants
     type(af_t), intent(inout) :: tree
@@ -106,6 +106,8 @@ contains
        !$omp end do nowait
     end do
     !$omp end parallel
+
+    call dielectric_charge_to_rhs(tree%boxes(id), id) !TODO
 
     call field_set_voltage(GL_time)
 
