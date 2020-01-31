@@ -23,6 +23,7 @@ program apic
   real(dp)               :: wc_time, inv_count_rate, time_last_print
   integer                :: it
   integer                :: n_part, n_prev_merge, n_samples
+  integer, allocatable   :: ref_links(:, :)
   character(len=GL_slen) :: fname
   logical                :: write_out
   type(ref_info_t)       :: ref_info
@@ -106,8 +107,16 @@ program apic
      call af_tree_clear_cc(tree, i_pos_ion)
      call particles_to_density_and_events(tree, pc, .true.)
      call field_compute(tree, mg, .false.)
-     call af_adjust_refinement(tree, refine_routine, ref_info, &
-          refine_buffer_width)
+
+     if (GL_use_dielectric) then
+        call dielectric_get_refinement_links(diel, ref_links)
+        call af_adjust_refinement(tree, refine_routine, ref_info, &
+             refine_buffer_width, ref_links)
+        call dielectric_update_after_refinement(tree, diel, ref_info)
+     else
+        call af_adjust_refinement(tree, refine_routine, ref_info, &
+             refine_buffer_width)
+     end if
      if (ref_info%n_add == 0) exit
   end do
 
@@ -126,13 +135,12 @@ program apic
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
 
-  call set_output_variables()
-  write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
-  call af_write_silo(tree, fname, output_cnt, GL_time, dir=GL_output_dir)
-  output_cnt = output_cnt + 1
-
   do it = 1, huge(1)-1
      if (GL_time >= GL_end_time) exit
+     if (pc%get_num_sim_part() == 0) then
+        print *, "No particles, end of simulation"
+        exit
+     end if
 
      call system_clock(t_current)
      wc_time = (t_current - t_start) * inv_count_rate
@@ -201,8 +209,15 @@ program apic
 
      if (mod(it, refine_per_steps) == 0) then
         t0 = omp_get_wtime()
-        call af_adjust_refinement(tree, refine_routine, ref_info, &
-             refine_buffer_width)
+        if (GL_use_dielectric) then
+           call dielectric_get_refinement_links(diel, ref_links)
+           call af_adjust_refinement(tree, refine_routine, ref_info, &
+                refine_buffer_width, ref_links)
+           call dielectric_update_after_refinement(tree, diel, ref_info)
+        else
+           call af_adjust_refinement(tree, refine_routine, ref_info, &
+                refine_buffer_width)
+        end if
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
            ! Compute the field on the new mesh
