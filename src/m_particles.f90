@@ -244,7 +244,7 @@ contains
           id_guess(i) = pc%event_list(n)%part%id
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
-          ! Now we map the particle to surface charge (and dont generate an ion)
+          ! Now we map the particle to surface charge
           call particle_to_surface_charge(tree, pc%event_list(n)%part)
        end if
     end do
@@ -287,14 +287,25 @@ contains
     real(dp)                       :: accel(3)
     logical                        :: success
 
+    if (interpolation_order == 1) then
 #if NDIM == 2
-    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
-         success, id_guess=my_part%id)
-    accel(3) = 0.0_dp
+       accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
+            success, id_guess=my_part%id)
+       accel(3) = 0.0_dp
 #elif NDIM == 3
-    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey, i_Ez], &
-         success, id_guess=my_part%id)
+       accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey, i_Ez], &
+            success, id_guess=my_part%id)
 #endif
+    else
+#if NDIM == 2
+       accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
+            success, id_guess=my_part%id)
+       accel(3) = 0.0_dp
+#elif NDIM == 3
+       accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey, i_Ez], &
+            success, id_guess=my_part%id)
+#endif
+    end if
 
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel
