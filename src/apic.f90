@@ -1,5 +1,5 @@
 #include "../afivo/src/cpp_macros.h"
-!> Program to perform discharge simulations in Cartesian and cylindrical coordinates
+!> Program to perform discharge simulations with particle-in-cell method
 program apic
 
   use omp_lib
@@ -38,8 +38,13 @@ program apic
 
   wtime_start = omp_get_wtime()
 
+  ! Read command line arguments and configuration files
   call CFG_update_from_arguments(cfg)
+
+  ! Initialize the user's code
   call user_initialize(cfg)
+
+  ! Initialize other modules
   call domain_init(cfg)
   call refine_init(cfg, ndim)
   call time_step_init(cfg)
@@ -48,6 +53,7 @@ program apic
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
 
+  ! Write configuration to output
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
 
@@ -86,6 +92,7 @@ program apic
 #endif
 
   if (GL_use_dielectric) then
+     ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
      call dielectric_initialize(tree, i_eps, diel, 1)
   end if
@@ -98,12 +105,14 @@ program apic
        error stop "user_initial_particles not defined"
   call user_initial_particles(pc)
 
+  ! Perform additional refinement
   do
      call af_tree_clear_cc(tree, i_pos_ion)
      call particles_to_density_and_events(tree, pc, .true.)
      call field_compute(tree, mg, .false.)
 
      if (GL_use_dielectric) then
+        ! Make sure there are no refinement jumps across the dielectric
         call dielectric_get_refinement_links(diel, ref_links)
         call af_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width, ref_links)
@@ -130,6 +139,7 @@ program apic
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
 
+  ! Start of time integration
   do it = 1, huge(1)-1
      if (GL_time >= GL_end_time) exit
      if (pc%get_num_sim_part() == 0) then
@@ -197,6 +207,7 @@ program apic
      if (mod(it, refine_per_steps) == 0) then
         t0 = omp_get_wtime()
         if (GL_use_dielectric) then
+           ! Make sure there are no refinement jumps across the dielectric
            call dielectric_get_refinement_links(diel, ref_links)
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width, ref_links)
@@ -275,15 +286,12 @@ contains
     real(dp), allocatable :: weights(:)
     real(dp), allocatable :: energy(:)
     integer, allocatable  :: id_guess(:)
-    ! integer, allocatable :: ionize_ix(:)
 
     n_part = pc%get_num_sim_part()
     allocate(coords(NDIM, n_part))
     allocate(weights(n_part))
     allocate(energy(n_part))
     allocate(id_guess(n_part))
-
-    ! call pc%get_colls_of_type(CS_ionize_t, ionize_ix)
 
     !$omp parallel do
     do n = 1, n_part
