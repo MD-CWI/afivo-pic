@@ -83,7 +83,8 @@ program apic
   call mg_init(tree, mg)
 
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
+       prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
@@ -244,7 +245,7 @@ contains
   end subroutine init_tree
 
   subroutine print_status()
-    write(*, "(F7.2,A,I0,A,E10.3,A,E10.3,A,E10.3,A,E10.3,A,E10.3)") &
+    write(*, "(F7.2,A,I0,A,E9.2,A,E9.2,A,E9.2,A,E9.2,A,E9.2)") &
          100 * GL_time / GL_end_time, "% it: ", it, &
          " t:", GL_time, " dt:", GL_dt, " wc:", wc_time, &
          " ncell:", real(af_num_cells_used(tree), dp), &
@@ -269,7 +270,8 @@ contains
     write(*, "(A20,E12.4)") "dt", GL_dt
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
-    write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
+    write(*, "(A20,3E12.4)") "sum elec/pion/diff", sum_elec, sum_pos_ion, &
+         sum_elec - sum_pos_ion
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
@@ -333,5 +335,19 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+
+  ! subroutine get_total_surface_charge(my_sum)
+  !   real(dp), intent(out) :: my_sum
+  !   integer :: ix
+
+  !   my_sum = 0.0_dp
+
+  !   do ix = 1, diel%max_ix
+  !      if (diel%surfaces(ix)%in_use) then
+  !         my_sum = my_sum + sum(diel%surfaces(ix)%sd(:, i_surf_charge)) * &
+  !              product(diel%surfaces(ix)%dr)
+  !      end if
+  !   end do
+  ! end subroutine get_total_surface_charge
 
 end program apic

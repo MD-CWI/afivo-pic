@@ -109,7 +109,7 @@ contains
 
     if (GL_use_dielectric) then
        call dielectric_surface_charge_to_rhs(tree, diel, i_surf_charge, &
-            i_rhs, -fac)
+            i_rhs, fac)
     end if
 
     call field_set_voltage(GL_time)
