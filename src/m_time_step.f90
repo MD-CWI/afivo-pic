@@ -81,13 +81,8 @@ contains
              ! Randomly select a particle
              n = floor(rng%unif_01() * pc%n_part) + 1
              pos_samples(:,i) = pc%particles(n)%x(1:NDIM)
-#if NDIM == 2
              fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey], success)
-#elif NDIM == 3
-             fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey, i_Ez], success)
-#endif
+                  i_E_all, success)
           end do
        end if
 
@@ -99,13 +94,7 @@ contains
           avg_norm = norm2(fld_samples) / sqrt(1.0_dp * n_samples)
 
           do i = 1, n_samples
-#if NDIM == 2
-             fld = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey], success)
-#elif NDIM == 3
-             fld = af_interp1(tree, pos_samples(:,i), &
-                  [i_Ex, i_Ey, i_Ez], success)
-#endif
+             fld = af_interp1(tree, pos_samples(:,i), i_E_all, success)
              this_err = norm2(fld - fld_samples(:,i)) / &
                   max(norm2(fld), norm2(fld_samples(:,i)), avg_norm)
              fld_err  = max(fld_err, this_err)

@@ -36,6 +36,7 @@ module m_globals
   integer, protected :: i_Ex       = -1 ! Electric field (x)
   integer, protected :: i_Ey       = -1 ! Electric field (y)
   integer, protected :: i_Ez       = -1 ! Electric field (z)
+  integer, protected :: i_E_all(NDIM) = -1 ! Electric field components
   integer, protected :: i_E        = -1 ! Electric field (x)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
   integer, protected :: i_ppc      = -1 ! Particles per cell
@@ -106,9 +107,14 @@ contains
     call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
     call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
     call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
-    if (ndim > 2) then
-       call af_add_cc_variable(tree, "Ez", .true., ix=i_Ez)
-    end if
+
+#if NDIM == 2
+    i_E_all = [i_Ex, i_Ey]
+#elif NDIM == 3
+    call af_add_cc_variable(tree, "Ez", .true., ix=i_Ez)
+    i_E_all = [i_Ex, i_Ey, i_Ez]
+#endif
+
     call af_add_cc_variable(tree, "E", .true., ix=i_E)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)

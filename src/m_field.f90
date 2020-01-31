@@ -128,23 +128,14 @@ contains
     call af_loop_box(tree, field_from_potential)
 
     if (GL_use_dielectric) then
-#if NDIM == 2
        call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
-            [i_Ex, i_Ey], i_phi, 1/UC_eps0)
-#elif NDIM == 3
-       call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
-            [i_Ex, i_Ey, i_Ez], i_phi, 1/UC_eps0)
-#endif
+            i_E_all, i_phi, 1/UC_eps0)
     end if
 
     call af_loop_box(tree, compute_field_norm)
 
     ! Set the field norm also in ghost cells
-#if NDIM == 2
-    call af_gc_tree(tree, [i_Ex, i_Ey, i_E])
-#elif NDIM == 3
-    call af_gc_tree(tree, [i_Ex, i_Ey, i_Ez, i_E])
-#endif
+    call af_gc_tree(tree, [i_E_all, i_E])
 
   end subroutine field_compute
 

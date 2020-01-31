@@ -287,24 +287,14 @@ contains
     real(dp)                       :: accel(3)
     logical                        :: success
 
-    if (interpolation_order == 1) then
-#if NDIM == 2
-       accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
-            success, id_guess=my_part%id)
-       accel(3) = 0.0_dp
-#elif NDIM == 3
-       accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), [i_Ex, i_Ey, i_Ez], &
-            success, id_guess=my_part%id)
-#endif
-    else
-#if NDIM == 2
+    accel(3) = 0.0_dp           ! for 2D cases
+
+    if (interpolation_order == 0) then
        accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
             success, id_guess=my_part%id)
-       accel(3) = 0.0_dp
-#elif NDIM == 3
-       accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey, i_Ez], &
+    else
+       accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), i_E_all, &
             success, id_guess=my_part%id)
-#endif
     end if
 
     accel(:) = accel(:) * UC_elec_q_over_m
