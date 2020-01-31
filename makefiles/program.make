@@ -23,6 +23,8 @@ clean:
 
 allclean: clean
 	$(MAKE) -C $(MAIN_DIR)/lib_$(NDIM)d clean
+	$(MAKE) -C $(AFIVO_DIR)/lib_$(NDIM)d clean
+	$(MAKE) -C $(PCORE_DIR) clean
 
 vpath %.f90 $(MAIN_DIR)/src
 
