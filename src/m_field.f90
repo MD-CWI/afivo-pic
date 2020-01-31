@@ -51,6 +51,7 @@ contains
 
   !> Set boundary conditions for the electric potential/field
   subroutine field_initialize(cfg, mg)
+    use m_user_methods
     type(CFG_t), intent(inout)  :: cfg !< Settings
     type(mg_t), intent(inout) :: mg  !< Multigrid option struct
 
@@ -78,7 +79,12 @@ contains
 
     call field_set_voltage(0.0_dp)
 
-    mg%sides_bc => field_bc_homogeneous
+    if (associated(user_potential_bc)) then
+       mg%sides_bc => user_potential_bc
+    else
+       mg%sides_bc => field_bc_homogeneous
+    end if
+
   end subroutine field_initialize
 
   !> Compute electric field on the tree. First perform multigrid to get electric
