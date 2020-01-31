@@ -39,15 +39,15 @@ contains
     real(dp)                       :: x(NDIM)
 
     x = my_part%x(1:NDIM)
+    outside_check = 0
 
     if (any(x < 0.0_dp .or. x > domain_len)) then
        outside_check = outside_domain
-    else if (is_in_dielectric(my_part)) then
-        ! The particle is IN the domain and IN the dielectric (see def of
-        ! is_in_dielectric)
-       outside_check = inside_dielectric
-    else
-       outside_check = 0
+    else if (GL_use_dielectric) then
+       if (is_in_dielectric(my_part)) then
+          ! The particle is IN the domain and IN the dielectric
+          outside_check = inside_dielectric
+       end if
     end if
   end function outside_check
 
