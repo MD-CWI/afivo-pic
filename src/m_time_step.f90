@@ -42,7 +42,7 @@ contains
     real(dp), intent(in) :: n_max
     real(dp)             :: drt
 
-    drt = UC_eps0 / (UC_elem_charge * n_max * drt_mobility)
+    drt = UC_eps0 / (UC_elem_charge * max(n_max, 1.0e-10_dp) * drt_mobility)
   end function dielectric_relaxation_time
 
   !> This routine can be used to estimate the error in the electric field. It
