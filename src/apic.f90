@@ -34,11 +34,6 @@ program apic
   real(dp) :: wtime_start
   real(dp) :: wtime_run = 0.0_dp
   real(dp) :: wtime_advance = 0.0_dp
-  real(dp) :: wtime_density = 0.0_dp
-  real(dp) :: wtime_merge = 0.0_dp
-  real(dp) :: wtime_field = 0.0_dp
-  real(dp) :: wtime_io = 0.0_dp
-  real(dp) :: wtime_amr = 0.0_dp
   integer :: output_cnt = 0 ! Number of output files written
 
   wtime_start = omp_get_wtime()
@@ -168,22 +163,16 @@ program apic
 
      GL_time = GL_time + dt
 
-     t0 = omp_get_wtime()
      call particles_to_density_and_events(tree, pc, .false.)
-     wtime_density = wtime_density + omp_get_wtime() - t0
 
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase) then
-        t0 = omp_get_wtime()
         call adapt_weights(tree, pc)
-        wtime_merge = wtime_merge + omp_get_wtime() - t0
         n_prev_merge = pc%get_num_sim_part()
      end if
 
      ! Compute field with new density
-     t0 = omp_get_wtime()
      call field_compute(tree, mg, .true.)
-     wtime_field = wtime_field + omp_get_wtime() - t0
 
      call pc%set_accel()
 
@@ -197,14 +186,12 @@ program apic
      n_elec_prev = n_elec
 
      if (write_out) then
-        t0 = omp_get_wtime()
         call set_output_variables()
 
         write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
         call af_write_silo(tree, fname, output_cnt, GL_time, &
              dir=GL_output_dir)
         call print_info()
-        wtime_io = wtime_io + omp_get_wtime() - t0
      end if
 
      if (mod(it, refine_per_steps) == 0) then
@@ -226,7 +213,6 @@ program apic
            call adapt_weights(tree, pc)
         end if
      end if
-     wtime_amr = wtime_amr + omp_get_wtime() - t0
   end do
 
 contains
@@ -278,14 +264,8 @@ contains
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
 
     wtime_run = omp_get_wtime() - wtime_start
-    write(*, "(A20,F10.4)") "advance", wtime_advance / wtime_run
-    write(*, "(A20,F10.4)") "field", wtime_field / wtime_run
-    write(*, "(A20,F10.4)") "merge", wtime_merge / wtime_run
-    write(*, "(A20,F10.4)") "density", wtime_density / wtime_run
-    write(*, "(A20,F10.4)") "output", wtime_io / wtime_run
-    write(*, "(A20,F10.4)") "AMR", wtime_amr / wtime_run
-    write(*, "(A20,F10.4)") "other", 1 - (wtime_advance + wtime_field + &
-         wtime_merge + wtime_density + wtime_io + wtime_amr) / wtime_run
+    write(*, "(A20,F8.2,A)") "cost of advance", &
+         1e2 * wtime_advance / wtime_run, "%"
   end subroutine print_info
 
   subroutine set_output_variables()
