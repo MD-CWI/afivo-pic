@@ -130,10 +130,10 @@ contains
     if (GL_use_dielectric) then
 #if NDIM == 2
        call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
-            [i_Ex, i_Ey], i_phi, UC_eps0)
+            [i_Ex, i_Ey], i_phi, 1/UC_eps0)
 #elif NDIM == 3
        call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
-            [i_Ex, i_Ey, i_Ez], i_phi, UC_eps0)
+            [i_Ex, i_Ey, i_Ez], i_phi, 1/UC_eps0)
 #endif
     end if
 
