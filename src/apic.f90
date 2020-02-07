@@ -20,7 +20,8 @@ program apic
   integer, parameter     :: ndim = NDIM
   integer(int8)          :: t_start, t_current, count_rate
   real(dp)               :: dt
-  real(dp)               :: wc_time, inv_count_rate, time_last_print
+  real(dp)               :: wc_time, inv_count_rate
+  real(dp)               :: time_last_print, time_last_generate
   integer                :: it
   integer                :: n_part, n_prev_merge, n_samples
   integer, allocatable   :: ref_links(:, :)
@@ -98,8 +99,9 @@ program apic
      call dielectric_initialize(tree, i_eps, diel, 1)
   end if
 
-  output_cnt      = 0         ! Number of output files written
-  GL_time         = 0         ! Simulation time (all times are in s)
+  output_cnt         = 0 ! Number of output files written
+  GL_time            = 0 ! Simulation time (all times are in s)
+  time_last_generate = GL_time
 
   ! Set up the initial conditions
   if (.not. associated(user_initial_particles)) &
@@ -143,6 +145,12 @@ program apic
   ! Start of time integration
   do it = 1, huge(1)-1
      if (GL_time >= GL_end_time) exit
+
+     if (associated(user_generate_particles)) then
+        call user_generate_particles(pc, GL_time, GL_time - time_last_generate)
+        time_last_generate = GL_time
+     end if
+
      if (pc%get_num_sim_part() == 0) then
         print *, "No particles, end of simulation"
         exit

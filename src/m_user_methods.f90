@@ -13,6 +13,9 @@ module m_user_methods
   !> If defined, call this routine after setting initial conditions
   procedure(init_part), pointer :: user_initial_particles => null()
 
+  !> Call this routine every time step to generate particles
+  procedure(gen_part), pointer :: user_generate_particles => null()
+
   !> If defined, call this routine to set the dielectric permittivity
   procedure(af_subr), pointer :: user_set_dielectric_eps => null()
 
@@ -26,6 +29,13 @@ module m_user_methods
        import
        type(PC_t), intent(inout) :: pc
      end subroutine init_part
+
+     subroutine gen_part(pc, time, time_elapsed)
+       import
+       type(PC_t), intent(inout) :: pc
+       real(dp), intent(in)      :: time         !< Current time
+       real(dp), intent(in)      :: time_elapsed !< Time since last call
+     end subroutine gen_part
 
      subroutine log_subr(tree, filename, out_cnt)
        import
