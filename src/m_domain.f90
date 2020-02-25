@@ -61,4 +61,33 @@ contains
     is_in_dielectric = (eps(1) > 1)
   end function is_in_dielectric
 
+!! =============================== !!
+! These alternatives are created for more functionality, (eventually should be merged)
+  integer function outside_check_x(x)
+    real(dp), intent(in)  :: x(NDIM)
+
+    outside_check = 0
+
+    if (any(x < 0.0_dp .or. x > domain_len)) then
+       outside_check = outside_domain
+    else if (GL_use_dielectric) then
+       if (is_in_dielectric_x(x)) then
+          ! The particle is IN the domain and IN the dielectric
+          outside_check = inside_dielectric
+       end if
+    end if
+  end function outside_check_x
+
+  logical function is_in_dielectric_x(x)
+    real(dp), intent(in)           :: x(NDIM)
+    real(dp)                       :: eps(1)
+    logical                        :: success
+
+    eps = af_interp0(tree, x(1:NDIM), [i_eps], success)
+    if (.not. success) error stop "unexpected coordinate outside domain"
+    is_in_dielectric = (eps(1) > 1)
+  end function is_in_dielectric_x
+
+!! ============================== !!
+
 end module m_domain
