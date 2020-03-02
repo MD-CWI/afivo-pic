@@ -1,18 +1,51 @@
 #include "../afivo/src/cpp_macros.h"
 !> Program to perform discharge simulations with particle-in-cell method
-program apic
+program test_photoemission
+
+  ! use omp_lib
+  ! use m_af_all
+  ! use m_globals
+  ! use m_domain
+  ! use m_refine
+  ! use m_user
+  ! use m_user_methods
 
   use omp_lib
   use m_af_all
   use m_globals
+  use m_field
+  use m_particle_core
   use m_domain
   use m_refine
+  use m_time_step
+  use m_particles
   use m_user
   use m_user_methods
 
   implicit none
 
-integer, parameter     :: ndim = NDIM
+  integer, parameter     :: int8 = selected_int_kind(18)
+  integer, parameter     :: ndim = NDIM
+  integer(int8)          :: t_start, t_current, count_rate
+  real(dp)               :: dt
+  real(dp)               :: wc_time, inv_count_rate
+  real(dp)               :: time_last_print, time_last_generate
+  integer                :: it
+  integer                :: n_part, n_prev_merge, n_samples
+  integer, allocatable   :: ref_links(:, :)
+  character(len=GL_slen) :: fname
+  logical                :: write_out
+  type(ref_info_t)       :: ref_info
+  real(dp)               :: n_elec, n_elec_prev, max_elec_dens
+  real(dp)               :: dt_cfl, dt_growth, dt_drt
+
+  real(dp) :: t0
+  real(dp) :: wtime_start
+  real(dp) :: wtime_run = 0.0_dp
+  real(dp) :: wtime_advance = 0.0_dp
+  integer :: output_cnt = 0 ! Number of output files written
+
+  wtime_start = omp_get_wtime()
 
   ! Read command line arguments and configuration files
   call CFG_update_from_arguments(cfg)
@@ -23,7 +56,28 @@ integer, parameter     :: ndim = NDIM
   ! Initialize other modules
   call domain_init(cfg)
   call refine_init(cfg, ndim)
+  call time_step_init(cfg)
   call GL_initialize(cfg, ndim)
+  call check_path_writable(trim(GL_output_dir))
+  call field_initialize(cfg, mg)
+  call init_particle(cfg, pc)
+
+  ! Write configuration to output
+  fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
+  call CFG_write(cfg, trim(fname))
+
+! integer, parameter     :: ndim = NDIM
+!
+!   ! Read command line arguments and configuration files
+!   call CFG_update_from_arguments(cfg)
+!
+!   ! Initialize the user's code
+!   call user_initialize(cfg)
+!
+!   ! Initialize other modules
+!   call domain_init(cfg)
+!   call refine_init(cfg, ndim)
+!   call GL_initialize(cfg, ndim)
 
   ! Initialize the tree (which contains all the mesh information)
   call init_tree(tree)
@@ -36,29 +90,14 @@ integer, parameter     :: ndim = NDIM
   end if
 
   if (GL_use_dielectric) then
-     ! Initialize dielectric surfaces at the fifth refinement level
-     call af_refine_up_to_lvl(tree, 5)
+     ! Initialize dielectric surfaces at the third refinement level
+     call af_refine_up_to_lvl(tree, 3)
      call dielectric_initialize(tree, i_eps, diel, 1)
   end if
 
 call random_photoemission_event()
 
 contains
-
-    !> Initialize the AMR tree
-    subroutine init_tree(tree)
-      type(af_t), intent(inout) :: tree
-
-      ! Initialize tree
-      if (GL_cylindrical) then
-         call af_init(tree, box_size, domain_len, &
-              coarse_grid_size, coord=af_cyl)
-      else
-         call af_init(tree, box_size, domain_len, &
-              coarse_grid_size)
-      end if
-
-    end subroutine init_tree
 
   subroutine random_photoemission_event()
     use m_random
@@ -95,4 +134,4 @@ contains
 
 
 
-end program apic
+end program
