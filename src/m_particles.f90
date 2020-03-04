@@ -13,7 +13,7 @@ module m_particles
 
   real(dp), protected :: steps_per_period = 30.0_dp
 
-  real(dp), parameter :: phe_coefficient = 0.01 ! Probability of electron emission
+  real(dp), parameter :: phe_coefficient = 0.001 ! Probability of electron emission
 
 contains
 
@@ -109,7 +109,7 @@ contains
 
     where (pc%colls(:)%type == CS_excite_t .and. GL_use_dielectric)
       pc%coll_is_event(:) = .true.
-    end where
+    end where !TODO add user option to discriminate between excitation reactions
 
   end subroutine init_particle
 
@@ -257,21 +257,21 @@ contains
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
         else if (pc%event_list(n)%ctype == CS_excite_t) then
+          if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
           ! Photoemission event
-          if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission (this might be redundant. CS_excite_t only an event if GL_use_dielectric is true)
           nphotons = int(pc%event_list(n)%part%w)
           do j = 1, nphotons
             if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
 
             x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
-            x_outside(1:NDIM) = x_gas(1:NDIM) + GL_rng%two_normals() * domain_len ! TODO sample absorbtion point according to gas-parameters
+            x_outside(1:NDIM) = x_gas(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! isotropic photon emission with (absorbtion-length >> domain_len)
             call dielectric_photon_absorbtion(tree, i_eps, x_gas(1:NDIM), x_outside(1:NDIM), on_surface)
 
             if (.not. on_surface) cycle ! photon not absorbed by dielectric
 
             ! Create photo-emitted electron
             new_part%x(:) = x_gas
-            new_part%v(:) = 0.0_dp !TODO add initial velocity based on photon energy
+            new_part%v(:) = 0.0_dp
             new_part%a(:) = 0.0_dp
             new_part%w    = 1.0_dp
             new_part%id   = pc%event_list(n)%part%id
@@ -322,8 +322,6 @@ contains
     ! Input: a particle that is ejected from the dielectric.
     ! The surface charge is altered by the charge leaving
     use m_units_constants
-
-    !TODO THIS CAN BE CONDENSED INTO ONE with particle_to_surface_charge?!
 
     type(af_t), intent(in)      :: tree
     type(PC_part_t), intent(in) :: my_part
