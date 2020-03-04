@@ -4,6 +4,7 @@
 [submodule "afivo"]
 	path = afivo
 	url = https://gitlab.com/MD-CWI-NL/afivo.git
+	branch = photoemission
 [submodule "config_fortran"]
 	path = src/config_fortran
 	url = https://github.com/jannisteunissen/config_fortran

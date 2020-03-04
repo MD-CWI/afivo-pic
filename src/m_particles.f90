@@ -2,6 +2,7 @@ module m_particles
   use m_particle_core
   use m_af_all
   use m_globals
+  use m_domain
 
   implicit none
   public
@@ -11,6 +12,8 @@ module m_particles
   real(dp), parameter :: array_incr_fac = 1.25_dp
 
   real(dp), protected :: steps_per_period = 30.0_dp
+
+  real(dp), parameter :: phe_coefficient = 0.01 ! Probability of electron emission
 
 contains
 
@@ -104,6 +107,10 @@ contains
        pc%coll_is_event(:) = .true.
     end where
 
+    where (pc%colls(:)%type == CS_excite_t .and. GL_use_dielectric)
+      pc%coll_is_event(:) = .true.
+    end where
+
   end subroutine init_particle
 
   !> Adjust the weights of the particles
@@ -114,6 +121,7 @@ contains
     integer, allocatable      :: id_ipart(:)
 
     call sort_by_id(tree, pc, id_ipart)
+
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
     !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
@@ -126,7 +134,6 @@ contains
        end if
     end do
     !$omp end parallel do
-
     call pc%clean_up()
     ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
   end subroutine adapt_weights
@@ -175,15 +182,22 @@ contains
        id_ix(id)            = id_ix(id) + 1
        pc%particles(new_ix) = p_copy(n)
     end do
+
   end subroutine sort_by_id
 
   subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
+    use m_random
     use m_particle_core
     use m_domain, only: outside_check
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
+
+    real(dp) :: x_gas(3) = 0.0_dp, x_outside(3) = 0.0_dp
+    integer   :: nphotons, j
+    logical  :: on_surface
+    type(PC_part_t) :: new_part
 
     integer                     :: n, i, n_part
     real(dp), allocatable, save :: coords(:, :)
@@ -242,6 +256,29 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
+        else if (pc%event_list(n)%ctype == CS_excite_t) then
+          ! Photoemission event
+          if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission (this might be redundant. CS_excite_t only an event if GL_use_dielectric is true)
+          nphotons = int(pc%event_list(n)%part%w)
+          do j = 1, nphotons
+            if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
+
+            x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
+            x_outside(1:NDIM) = x_gas(1:NDIM) + GL_rng%two_normals() * domain_len ! TODO sample absorbtion point according to gas-parameters
+            call dielectric_photon_absorbtion(tree, i_eps, x_gas(1:NDIM), x_outside(1:NDIM), on_surface)
+
+            if (.not. on_surface) cycle ! photon not absorbed by dielectric
+
+            ! Create photo-emitted electron
+            new_part%x(:) = x_gas
+            new_part%v(:) = 0.0_dp !TODO add initial velocity based on photon energy
+            new_part%a(:) = 0.0_dp
+            new_part%w    = 1.0_dp
+            new_part%id   = pc%event_list(n)%part%id
+
+            call pc%add_part(new_part)
+            call surface_charge_to_particle(tree, new_part)
+          end do
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
@@ -280,6 +317,31 @@ contains
     error stop
 #endif
   end subroutine
+
+  subroutine surface_charge_to_particle(tree, my_part)
+    ! Input: a particle that is ejected from the dielectric.
+    ! The surface charge is altered by the charge leaving
+    use m_units_constants
+
+    !TODO THIS CAN BE CONDENSED INTO ONE with particle_to_surface_charge?!
+
+    type(af_t), intent(in)      :: tree
+    type(PC_part_t), intent(in) :: my_part
+    integer                     :: ix_surf, ix_cell(NDIM-1)
+
+    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+         ix_surf, ix_cell)
+
+    ! Update the charge in the surface cell
+#if NDIM == 2
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) - &
+         my_part%w / diel%surfaces(ix_surf)%dr(1)
+#elif NDIM == 3
+    error stop
+#endif
+  end subroutine
+
 
   function get_accel(my_part) result(accel)
     use m_units_constants

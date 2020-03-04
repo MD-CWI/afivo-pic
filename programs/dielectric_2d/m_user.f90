@@ -33,10 +33,10 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 100
-       pos(1:2) = [0.5_dp, 0.75_dp] * domain_len
+       pos(1:2) = [0.25_dp, 0.3_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
+       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-4_dp
 
        if (outside_check(part) <= 0) then
           call pctest%add_part(part)
@@ -72,18 +72,30 @@ contains
     real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
     integer, intent(out)    :: bc_type
 
-    if (af_neighb_dim(nb) == NDIM) then
-       if (af_neighb_low(nb)) then
-          bc_type = af_bc_dirichlet
-          bc_val = 0.0_dp
-       else
-          bc_type = af_bc_dirichlet
-          bc_val  = coords(1, :) / domain_len(1) * 1e4_dp
-       end if
-    else
-       bc_type = af_bc_neumann
-       bc_val = 0.0_dp
-    end if
+    select case (nb)
+    case (af_neighb_lowy)
+        bc_type = af_bc_dirichlet
+        bc_val = 0.0_dp
+      case (af_neighb_highy)
+        bc_type = af_bc_dirichlet
+        bc_val = 5.0e3_dp
+      case default
+        bc_type = af_bc_neumann
+        bc_val = 0.0_dp
+    end select
+
+    ! if (af_neighb_dim(nb) == NDIM) then
+    !    if (af_neighb_low(nb)) then
+    !       bc_type = af_bc_dirichlet
+    !       bc_val = 0.0_dp
+    !    else
+    !       bc_type = af_bc_dirichlet
+    !       bc_val  = coords(1, :) / domain_len(1) * 1e4_dp
+    !    end if
+    ! else
+    !    bc_type = af_bc_neumann
+    !    bc_val = 0.0_dp
+    ! end if
   end subroutine my_potential
 
 end module m_user

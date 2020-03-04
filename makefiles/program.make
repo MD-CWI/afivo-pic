@@ -12,7 +12,7 @@ LIBDIRS := $(MAIN_DIR)/lib_$(NDIM)d $(AFIVO_DIR)/lib_$(NDIM)d	\
 $(AFIVO_DIR)/external_libraries/silo/lib $(AFIVO_DIR)/external_libraries/hypre/lib $(PCORE_DIR)
 INCDIRS := $(TARGET_DIR) $(MAIN_DIR)/lib_$(NDIM)d $(AFIVO_DIR)/lib_$(NDIM)d $(PCORE_DIR)
 LIBS := apic afivo silo HYPRE particle_core
-PROG := apic test_photoemission
+PROG := apic
 
 .PHONY: all clean allclean always_recompile
 
@@ -48,4 +48,3 @@ m_user.o: $(MAIN_DIR)/lib_$(NDIM)d/libapic.a
 
 $(MAIN_DIR)/lib_$(NDIM)d/libapic.a: always_recompile
 	$(MAKE) -C $(MAIN_DIR)/lib_$(NDIM)d
-

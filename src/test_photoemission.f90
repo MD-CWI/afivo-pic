@@ -62,7 +62,7 @@ contains
 
   subroutine random_photoemission_event()
     use m_random
-    use m_dielectric, only: bisect_line
+    ! use m_dielectric, only: bisect_line
     real(dp) :: start(2), final(2)
     real(dp) :: x_start(2), x_stop(2)
     logical  :: on_surface
