@@ -13,7 +13,7 @@ module m_particles
 
   real(dp), protected :: steps_per_period = 30.0_dp
 
-  real(dp), parameter :: phe_coefficient = 0.001 ! Probability of electron emission
+  real(dp), parameter :: phe_coefficient = 1.0e-4_dp ! Probability of electron emission
 
 contains
 
@@ -195,7 +195,7 @@ contains
     logical, intent(in)              :: init_cond
 
     real(dp) :: x_gas(3) = 0.0_dp, x_outside(3) = 0.0_dp
-    integer   :: nphotons, j
+    ! integer   :: j
     logical  :: on_surface
     type(PC_part_t) :: new_part
 
@@ -259,26 +259,24 @@ contains
         else if (pc%event_list(n)%ctype == CS_excite_t) then
           if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
           ! Photoemission event
-          nphotons = int(pc%event_list(n)%part%w)
-          do j = 1, nphotons
-            if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
+          ! nphotons = int(pc%event_list(n)%part%w)
+          if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
 
-            x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
-            x_outside(1:NDIM) = x_gas(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! isotropic photon emission with (absorbtion-length >> domain_len)
-            call dielectric_photon_absorbtion(tree, i_eps, x_gas(1:NDIM), x_outside(1:NDIM), on_surface)
+          x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
+          x_outside(1:NDIM) = x_gas(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! isotropic photon emission with (absorbtion-length >> domain_len)
+          call dielectric_photon_absorbtion(tree, i_eps, x_gas(1:NDIM), x_outside(1:NDIM), on_surface)
 
-            if (.not. on_surface) cycle ! photon not absorbed by dielectric
+          if (.not. on_surface) cycle ! photon not absorbed by dielectric
 
-            ! Create photo-emitted electron
-            new_part%x(:) = x_gas
-            new_part%v(:) = 0.0_dp
-            new_part%a(:) = 0.0_dp
-            new_part%w    = 1.0_dp
-            new_part%id   = pc%event_list(n)%part%id
+          ! Create photo-emitted electron
+          new_part%x(:) = x_gas
+          new_part%v(:) = 0.0_dp
+          new_part%a(:) = 0.0_dp
+          new_part%w    = pc%event_list(n)%part%w
+          new_part%id   = pc%event_list(n)%part%id
 
-            call pc%add_part(new_part)
-            call surface_charge_to_particle(tree, new_part)
-          end do
+          call pc%add_part(new_part)
+          call surface_charge_to_particle(tree, new_part)
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
