@@ -97,6 +97,8 @@ program apic
      ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
      call dielectric_initialize(tree, i_eps, diel, 1)
+     if (associated(user_set_dielectric_charge)) &
+          call dielectric_set_values(tree, diel, 1, user_set_dielectric_charge)
   end if
 
   output_cnt         = 0 ! Number of output files written
@@ -148,7 +150,7 @@ program apic
 
      if (associated(user_generate_particles)) then
         call user_generate_particles(pc, GL_time, GL_time - time_last_generate)
-        time_last_generate = GL_time
+        ! time_last_generate = GL_time
      end if
 
      if (pc%get_num_sim_part() == 0) then

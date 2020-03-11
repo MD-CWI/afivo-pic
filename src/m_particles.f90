@@ -259,8 +259,8 @@ contains
         else if (pc%event_list(n)%ctype == CS_excite_t) then
           if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
           ! Photoemission event
-          nphotons = int(pc%event_list(n)%part%w)
-          do j = 1, nphotons
+        !nphotons = int(pc%event_list(n)%part%w)
+        !do j = 1, nphotons/100000
             if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
 
             x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
@@ -273,12 +273,13 @@ contains
             new_part%x(:) = x_gas
             new_part%v(:) = 0.0_dp
             new_part%a(:) = 0.0_dp
-            new_part%w    = 1.0_dp
+            new_part%w    = (pc%event_list(n)%part%w)/1000
             new_part%id   = pc%event_list(n)%part%id
 
             call pc%add_part(new_part)
             call surface_charge_to_particle(tree, new_part)
-          end do
+          !end do
+
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge

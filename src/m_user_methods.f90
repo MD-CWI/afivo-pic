@@ -24,6 +24,9 @@ module m_user_methods
 
   procedure(log_subr), pointer :: user_write_log => null()
 
+  !> set the initial charge on the dielectric surface
+  procedure(value_func), pointer :: user_set_dielectric_charge => null()
+
   interface
      subroutine init_part(pc)
        import
@@ -43,6 +46,12 @@ module m_user_methods
        character(len=*), intent(in) :: filename
        integer, intent(in)          :: out_cnt
      end subroutine log_subr
+
+      function value_func(x) result(my_val)
+        import
+        real(dp), intent(in) :: x(NDIM)
+        real(dp)             :: my_val
+      end function value_func
   end interface
 
 end module m_user_methods
