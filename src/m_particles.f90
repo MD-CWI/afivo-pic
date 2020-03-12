@@ -188,6 +188,7 @@ contains
     integer                     :: n, i, n_part
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
+    real(dp), allocatable, save :: mask(:)
     integer, allocatable, save  :: id_guess(:)
 
     n_part = pc%get_num_sim_part()
@@ -198,14 +199,17 @@ contains
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       allocate(mask(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
+       deallocate(mask)
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       allocate(mask(n))
     end if
 
     !$omp parallel do
@@ -213,6 +217,7 @@ contains
        coords(:, n) = pc%particles(n)%x(1:NDIM)
        weights(n) = pc%particles(n)%w
        id_guess(n) = pc%particles(n)%id
+       mask(n) = 0.0_dp
     end do
     !$omp end parallel do
 
@@ -242,6 +247,10 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
+
+          if (pc%event_list(n)%cIx == 42) then ! Only select reaction 42 (formation of atomic oxygen)
+            mask(i) = mask(i) + 1.0_dp ! TODO CHECK THIS!!!
+          end if
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
@@ -250,8 +259,11 @@ contains
     end do
 
     if (i > 0) then ! only for the events that created an ion
-       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
+      call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order, id_guess(1:i))
+
+      ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
+      !            -mask(1:i)*weights(1:i), i, interpolation_order, id_guess(1:i))
     end if
 
     pc%n_events = 0

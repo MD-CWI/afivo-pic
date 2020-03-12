@@ -86,6 +86,8 @@ program apic
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
+  call af_set_cc_methods(tree, i_O_atom, af_bc_neumann_zero, &
+            prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
@@ -211,6 +213,7 @@ program apic
         call af_write_silo(tree, fname, output_cnt, GL_time, &
              dir=GL_output_dir)
         call print_info()
+        call write_EEDF(pc)
      end if
 
      if (mod(it, refine_per_steps) == 0) then
@@ -343,6 +346,61 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+
+  subroutine write_EEDF(pc)
+    type(PC_t), intent(in)  :: pc
+    integer                 :: i, j, num_bins=200
+    real(dp), allocatable   :: bins(:), bin_values(:)
+    real(dp)                :: max_en
+
+    allocate(bins(num_bins))
+    allocate(bin_values(num_bins))
+
+    max_en = 400.0_dp!get_max_energy(pc) ! to ensure bins of equal size
+    do i = 1, num_bins
+      bins(i) = max_en / num_bins * i
+    end do
+
+    call pc%histogram(calc_EEDF, is_alive, [0.0_dp], bins, bin_values)
+
+    write(fname, "(A,A,I6.6,A)") "output/EEDF/", trim(GL_simulation_name) // "_", output_cnt, "_EEDF.txt"
+    open(1, file = fname)
+    write(1, *) "bin ", "bin_value"
+    do j= 1,(num_bins)
+      write(1, *) bins(j), bin_values(j)
+    end do
+    close(1)
+
+  end subroutine write_EEDF
+
+  function calc_EEDF(part) result(energy)
+    use m_units_constants
+    type(PC_part_t), intent(in) :: part
+    real(dp)       :: energy
+
+    energy = PC_v_to_en(part%v, UC_elec_mass) / UC_elec_volt
+  end function calc_EEDF
+
+  logical function is_alive(part, real_args) result(alive)
+    type(PC_part_t), intent(in) :: part
+    real(dp), intent(in)        :: real_args(:) ! This basically does nothing but it seems non-optional
+
+    alive = (part%w > 0.0_dp)
+  end function is_alive
+
+  function get_max_energy(pc) result(max_en)
+    use m_units_constants
+    type(PC_t), intent(in)  :: pc
+    real(dp)                :: max_en
+    integer                 :: ll
+    max_en = 0.0_dp
+    do ll = 1, pc%n_part
+      if (pc%particles(ll)%w > 0.0_dp) then
+        max_en = max(max_en, PC_v_to_en(pc%particles(ll)%v, UC_elec_mass))
+      end if
+    end do
+    max_en = max_en / UC_elec_volt
+  end function get_max_energy
 
   ! subroutine get_total_surface_charge(my_sum)
   !   real(dp), intent(out) :: my_sum

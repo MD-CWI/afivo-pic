@@ -33,7 +33,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 100
-       pos(1:2) = [0.5_dp, 0.75_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.975_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
@@ -54,9 +54,7 @@ contains
           r = af_r_cc(box, [i, j])
 
           if (r(2)/domain_len(2) < 0.25_dp) then
-             box%cc(i, j, i_eps) = 10.0_dp
-          else if (r(2)/domain_len(2) > 0.75_dp) then
-             box%cc(i, j, i_eps) = 10.0_dp
+             box%cc(i, j, i_eps) = 4.5_dp
           else
              box%cc(i, j, i_eps) = 1.0_dp
           end if
@@ -72,18 +70,19 @@ contains
     real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
     integer, intent(out)    :: bc_type
 
-    if (af_neighb_dim(nb) == NDIM) then
-       if (af_neighb_low(nb)) then
-          bc_type = af_bc_dirichlet
-          bc_val = 0.0_dp
-       else
-          bc_type = af_bc_dirichlet
-          bc_val  = coords(1, :) / domain_len(1) * 1e4_dp
-       end if
-    else
-       bc_type = af_bc_neumann
-       bc_val = 0.0_dp
-    end if
+    select case (nb)
+    case (af_neighb_lowy)
+        bc_type = af_bc_dirichlet
+        bc_val = 0.0_dp
+      case (af_neighb_highy)
+        bc_type = af_bc_dirichlet
+        bc_val = - 2.5e4_dp
+      case default
+        bc_type = af_bc_neumann
+        bc_val = 0.0_dp
+    end select
+
   end subroutine my_potential
+
 
 end module m_user
