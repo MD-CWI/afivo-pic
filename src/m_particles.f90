@@ -13,7 +13,7 @@ module m_particles
 
   real(dp), protected :: steps_per_period = 30.0_dp
 
-  real(dp), parameter :: phe_coefficient = 0.001 ! Probability of electron emission
+  real(dp), parameter :: phe_coefficient = 1.0e-4_dp ! Probability of electron emission
 
 contains
 
@@ -195,7 +195,7 @@ contains
     logical, intent(in)              :: init_cond
 
     real(dp) :: x_gas(3) = 0.0_dp, x_outside(3) = 0.0_dp
-    integer   :: nphotons, j
+    ! integer   :: j
     logical  :: on_surface
     type(PC_part_t) :: new_part
 
@@ -259,6 +259,7 @@ contains
         else if (pc%event_list(n)%ctype == CS_excite_t) then
           if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
           ! Photoemission event
+
         !nphotons = int(pc%event_list(n)%part%w)
         !do j = 1, nphotons/100000
             if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
