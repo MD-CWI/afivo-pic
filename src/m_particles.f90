@@ -249,7 +249,7 @@ contains
           id_guess(i) = pc%event_list(n)%part%id
 
           if (pc%event_list(n)%cIx == 42) then ! Only select reaction 42 (formation of atomic oxygen)
-            mask(i) = mask(i) + 1.0_dp ! TODO CHECK THIS!!!
+            mask(i) = mask(i) + 1.0_dp
           end if
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
@@ -262,8 +262,8 @@ contains
       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order, id_guess(1:i))
 
-      ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
-      !            -mask(1:i)*weights(1:i), i, interpolation_order, id_guess(1:i))
+      call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
+            -mask(1:i)*weights(1:i), i, interpolation_order, id_guess(1:i))
     end if
 
     pc%n_events = 0
