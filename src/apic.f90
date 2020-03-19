@@ -211,9 +211,9 @@ program apic
 
         write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
         call af_write_silo(tree, fname, output_cnt, GL_time, &
-             dir=GL_output_dir)
+             dir=GL_output_dir, add_curve_names = ["EEDF"], &
+             add_curve_dat = write_EEDF_as_curve(pc))
         call print_info()
-        call write_EEDF(pc)
      end if
 
      if (mod(it, refine_per_steps) == 0) then
@@ -347,31 +347,30 @@ contains
     end if
   end subroutine check_path_writable
 
-  subroutine write_EEDF(pc)
+  function write_EEDF_as_curve(pc) result(curve_dat)
+    !> Make a histogram of electron energies and save it pass a curve-object (can be added to Silo-file)
     type(PC_t), intent(in)  :: pc
-    integer                 :: i, j, num_bins=200
+    integer                 :: i, num_bins
     real(dp), allocatable   :: bins(:), bin_values(:)
-    real(dp)                :: max_en
+    real(dp)                :: max_en, en_step=10.0
+    real(dp), allocatable   :: curve_dat(:, :, :)
+
+    max_en = get_max_energy(pc)
+    num_bins = ceiling(max_en / en_step) ! Generate bins of 10 eV each up until max energy
+    if (num_bins < 1) num_bins = 1 ! At least one bin
 
     allocate(bins(num_bins))
     allocate(bin_values(num_bins))
+    allocate(curve_dat(1, 2, num_bins))
 
-    max_en = 400.0_dp!get_max_energy(pc) ! to ensure bins of equal size
     do i = 1, num_bins
-      bins(i) = max_en / num_bins * i
+      bins(i) = en_step * i
     end do
 
     call pc%histogram(calc_EEDF, is_alive, [0.0_dp], bins, bin_values)
-
-    write(fname, "(A,A,I6.6,A)") "output/EEDF/", trim(GL_simulation_name) // "_", output_cnt, "_EEDF.txt"
-    open(1, file = fname)
-    write(1, *) "bin ", "bin_value"
-    do j= 1,(num_bins)
-      write(1, *) bins(j), bin_values(j)
-    end do
-    close(1)
-
-  end subroutine write_EEDF
+    curve_dat(1, 1, :) = bins
+    curve_dat(1, 2, :) = bin_values + 1.0_dp ! Add regularization parameter to prevent errors when converting to semilogy plots
+  end function write_EEDF_as_curve
 
   function calc_EEDF(part) result(energy)
     use m_units_constants
@@ -401,19 +400,5 @@ contains
     end do
     max_en = max_en / UC_elec_volt
   end function get_max_energy
-
-  ! subroutine get_total_surface_charge(my_sum)
-  !   real(dp), intent(out) :: my_sum
-  !   integer :: ix
-
-  !   my_sum = 0.0_dp
-
-  !   do ix = 1, diel%max_ix
-  !      if (diel%surfaces(ix)%in_use) then
-  !         my_sum = my_sum + sum(diel%surfaces(ix)%sd(:, i_surf_charge)) * &
-  !              product(diel%surfaces(ix)%dr)
-  !      end if
-  !   end do
-  ! end subroutine get_total_surface_charge
 
 end program apic

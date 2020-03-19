@@ -53,7 +53,7 @@ contains
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
-          if (r(2)/domain_len(2) < 0.5_dp) then
+          if (r(2)/domain_len(2) < 0.4_dp) then
              box%cc(i, j, i_eps) = 4.5_dp
           else
              box%cc(i, j, i_eps) = 1.0_dp
@@ -76,7 +76,7 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = - 1.5e4_dp
+        bc_val = - 2.5e4_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
