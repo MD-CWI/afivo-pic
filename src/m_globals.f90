@@ -25,8 +25,11 @@ module m_globals
   integer, parameter :: outside_domain = 1
   integer, parameter :: inside_dielectric = 2
 
-  ! Which interpolation order is used
-  integer, protected :: interpolation_order = 1
+  ! Interpolation order for the electric field
+  integer, protected :: interpolation_order_field = 1
+
+  ! Interpolation order for mapping particles to density
+  integer, protected :: interpolation_order_to_density = 1
 
   ! ** Indices of cell-centered variables **
   integer, protected :: n_var_cell = 0  ! Number of variables
@@ -37,7 +40,9 @@ module m_globals
   integer, protected :: i_Ey       = -1 ! Electric field (y)
   integer, protected :: i_Ez       = -1 ! Electric field (z)
   integer, protected :: i_E_all(NDIM) = -1 ! Electric field components
-  integer, protected :: i_E        = -1 ! Electric field (x)
+  integer, protected :: ifc_E = -1 ! Face-centered electric field
+  integer, protected :: i_E        = -1 ! norm(E) (cell-centered)
+  integer, protected :: i_E_v2 = -1     ! norm(E) (face-centered)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
@@ -117,7 +122,10 @@ contains
     i_E_all = [i_Ex, i_Ey, i_Ez]
 #endif
 
+    call af_add_fc_variable(tree, "E_fc", ix=ifc_E)
+
     call af_add_cc_variable(tree, "E", .true., ix=i_E)
+    call af_add_cc_variable(tree, "E_v2", .true., ix=i_E_v2)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
@@ -144,7 +152,8 @@ contains
          "Whether a dielectric is used")
 
     if (GL_use_dielectric) then
-       interpolation_order = 0
+       interpolation_order_field = 1
+       interpolation_order_to_density = 0
 
        call af_add_cc_variable(tree, "eps", ix=i_eps)
        call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &
