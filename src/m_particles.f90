@@ -233,13 +233,16 @@ contains
     if (init_cond) then
        call af_tree_clear_cc(tree, i_electron)
        call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order, id_guess(1:n_part))
+            weights(1:n_part), n_part, interpolation_order_to_density, &
+            id_guess(1:n_part))
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order, id_guess(1:n_part))
-    else
+            weights(1:n_part), n_part, interpolation_order_to_density, &
+            id_guess(1:n_part))
+   else
        call af_tree_clear_cc(tree, i_electron)
        call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order, id_guess(1:n_part))
+            weights(1:n_part), n_part, interpolation_order_to_density, &
+            id_guess(1:n_part))
     end if
 
     pc%particles(1:n_part)%id = id_guess(1:n_part)
@@ -290,7 +293,9 @@ contains
 
     if (i > 0) then ! only for the events that created an ion
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
-            weights(1:i), i, interpolation_order, id_guess(1:i))
+            weights(1:i), i, interpolation_order_to_density, &
+            id_guess(1:i
+
     end if
 
     pc%n_events = 0
@@ -350,14 +355,19 @@ contains
     logical                        :: success
 
     accel(3) = 0.0_dp           ! for 2D cases
+    ! Interpolation of face-centered fields
+    accel(1:NDIM) = af_interp1_fc(tree, my_part%x(1:NDIM), ifc_E, &
+         success, id_guess=my_part%id)
 
-    if (interpolation_order == 0) then
-       accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
-            success, id_guess=my_part%id)
-    else
-       accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), i_E_all, &
-            success, id_guess=my_part%id)
-    end if
+    ! Interpolation of cell-centered fields
+    ! if (interpolation_order_field == 0) then
+    !    accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
+    !         success, id_guess=my_part%id)
+    ! else
+    !    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), i_E_all, &
+    !         success, id_guess=my_part%id)
+    ! end if
+
 
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel
