@@ -98,7 +98,7 @@ program apic
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
-     call dielectric_initialize(tree, i_eps, diel, 1)
+     call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
   end if
 
   output_cnt         = 0 ! Number of output files written
@@ -268,6 +268,7 @@ contains
     real(dp) :: max_fld, max_elec, max_pion
     real(dp) :: sum_elec, sum_pos_ion
     real(dp) :: mean_en, n_elec, n_part
+    real(dp) :: surf_int
 
     call af_tree_max_cc(tree, i_E, max_fld)
     call af_tree_max_cc(tree, i_electron, max_elec)
@@ -283,6 +284,8 @@ contains
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
     write(*, "(A20,3E12.4)") "sum elec/pion/diff", sum_elec, sum_pos_ion, &
          sum_elec - sum_pos_ion
+    call dielectric_get_integral(diel, i_surf_total_charge, surf_int)
+    print *, surf_int, (sum_elec - sum_pos_ion) + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part

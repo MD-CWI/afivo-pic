@@ -51,7 +51,10 @@ module m_globals
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
-  integer, parameter :: i_surf_charge = 1
+  integer, parameter :: n_surf_vars = 3
+  integer, parameter :: i_surf_total_charge = 1
+  integer, parameter :: i_surf_temp_charge = 2
+  integer, parameter :: i_surf_fixed_charge = 3
 
   ! Whether cylindrical coordinates are used
   logical, protected :: GL_cylindrical = .false.
@@ -153,7 +156,7 @@ contains
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
-       interpolation_order_to_density = 0
+       interpolation_order_to_density = 1
 
        call af_add_cc_variable(tree, "eps", ix=i_eps)
        call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &

@@ -114,7 +114,8 @@ contains
     !$omp end parallel
 
     if (GL_use_dielectric) then
-       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_charge, &
+       ! Map surface charge to the right-hand side
+       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_total_charge, &
             i_rhs, fac)
     end if
 
@@ -137,9 +138,9 @@ contains
     call af_gc_tree(tree, [i_E_all])
 
     if (GL_use_dielectric) then
-       call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
+       call dielectric_correct_field_cc(tree, diel, i_surf_total_charge, &
             i_E_all, i_phi, 1/UC_eps0)
-       call dielectric_correct_field_fc(tree, diel, i_surf_charge, &
+       call dielectric_correct_field_fc(tree, diel, i_surf_total_charge, &
             ifc_E, i_phi, 1/UC_eps0)
     end if
 
