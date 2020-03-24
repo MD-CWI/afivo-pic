@@ -21,7 +21,7 @@ contains
     user_initial_particles => init_particles
     ! user_generate_particles => background_charge
     user_set_dielectric_eps => set_epsilon
-    ! user_set_dielectric_charge => set_initial_charge
+    user_set_dielectric_charge => set_initial_charge
     user_potential_bc => my_potential
 
   end subroutine user_initialize
@@ -37,7 +37,8 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1,10000
+
+    do n = 1,100
       pos(1:2) = [0.4_dp, 0.3_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
@@ -180,5 +181,6 @@ contains
     ! No surface charge
     ! set_initial_charge = 1.0e12_dp
   end function set_initial_charge
+
 
 end module m_user

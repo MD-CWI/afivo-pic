@@ -202,6 +202,7 @@ contains
     integer                     :: n, i, n_part
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
+    real(dp), allocatable, save :: mask(:)
     integer, allocatable, save  :: id_guess(:)
 
     n_part = pc%get_num_sim_part()
@@ -212,14 +213,17 @@ contains
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       allocate(mask(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
+       deallocate(mask)
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       allocate(mask(n))
     end if
 
     !$omp parallel do
@@ -229,6 +233,7 @@ contains
        id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
+    mask = 0.0_dp
 
     if (init_cond) then
        call af_tree_clear_cc(tree, i_electron)
@@ -238,7 +243,7 @@ contains
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
             weights(1:n_part), n_part, interpolation_order_to_density, &
             id_guess(1:n_part))
-   else
+    else
        call af_tree_clear_cc(tree, i_electron)
        call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, interpolation_order_to_density, &
@@ -259,12 +264,13 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
+
         else if (pc%event_list(n)%ctype == CS_excite_t) then
           if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
           ! Photoemission event
 
-        !nphotons = int(pc%event_list(n)%part%w)
-        !do j = 1, nphotons/100000
+          !nphotons = int(pc%event_list(n)%part%w)
+          !do j = 1, nphotons/100000
             if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
 
             x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
@@ -284,25 +290,46 @@ contains
             call surface_charge_to_particle(tree, new_part)
           !end do
 
+          ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
+          !    mask(i) = 1.0_dp
+          ! end if
+
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
-          call particle_to_surface_charge(tree, pc%event_list(n)%part)
+          call particle_to_surface_charge(tree, pc%event_list(n)%part, &
+               i_surf_elec)
        end if
     end do
 
     if (i > 0) then ! only for the events that created an ion
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order_to_density, &
-            id_guess(1:i
+            id_guess(1:i))
 
+       ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
+       !      weights(1:i), i, interpolation_order_to_density, &
+       !      id_guess(1:i))
     end if
 
     pc%n_events = 0
 
+    if (GL_use_dielectric) then
+       ! Map densities inside the first dielectric layers to surface charge.
+       ! Electrons can still move away from the dielectric.
+       call dielectric_inside_layer_to_surface(tree, diel, i_electron, &
+            i_surf_elec_close, 1.0_dp, clear_cc=.true., clear_surf=.true.)
+       call dielectric_inside_layer_to_surface(tree, diel, i_pos_ion, &
+            i_surf_pos_ion, 1.0_dp, clear_cc=.true., clear_surf=.false.)
+       ! Sum densities together
+       call dielectric_set_weighted_sum(diel, i_surf_sum_dens, &
+            [i_surf_elec, i_surf_elec_close, i_surf_pos_ion], &
+            [-1.0_dp, -1.0_dp, 1.0_dp])
+    end if
+
   end subroutine particles_to_density_and_events
 
-  subroutine particle_to_surface_charge(tree, my_part)
+  subroutine particle_to_surface_charge(tree, my_part, i_surf)
     ! Input: a particle that is found in the dielectric (after timestep, and is
     ! thus flagged for removal) This particle will be mapped to the surface
     ! charge of the corresponding cell
@@ -310,6 +337,7 @@ contains
 
     type(af_t), intent(in)      :: tree
     type(PC_part_t), intent(in) :: my_part
+    integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
@@ -317,8 +345,8 @@ contains
 
     ! Update the charge in the surface cell
 #if NDIM == 2
-    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) + &
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) + &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
     error stop
@@ -367,7 +395,6 @@ contains
     !    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), i_E_all, &
     !         success, id_guess=my_part%id)
     ! end if
-
 
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel

@@ -1,6 +1,8 @@
 #include "../afivo/src/cpp_macros.h"
 !> Program to perform discharge simulations with particle-in-cell method
-program apic
+
+program test_photoemission
+
 
   use omp_lib
   use m_af_all
@@ -36,6 +38,7 @@ integer, parameter     :: ndim = NDIM
   end if
 
   if (GL_use_dielectric) then
+
      ! Initialize dielectric surfaces at the fifth refinement level
      call af_refine_up_to_lvl(tree, 5)
      call dielectric_initialize(tree, i_eps, diel, 1)
@@ -60,21 +63,23 @@ contains
 
     end subroutine init_tree
 
+
   subroutine random_photoemission_event()
-    use m_random
-    ! use m_dielectric, only: bisect_line
+
     real(dp) :: start(2), final(2)
     real(dp) :: x_start(2), x_stop(2)
     logical  :: on_surface
 
     ! Generate two random numbers between [0.25, 0.75]
-    start(1) = GL_rng%unif_01() * 0.5 + 0.25
-    start(2) = GL_rng%unif_01() * 0.5 + 0.25
+
+    start(1) = rand(0) * 0.5 + 0.25
+    start(2) = rand(0) * 0.5 + 0.25
     x_start = start * domain_len
 
     ! Generate two random numbers between [-2, 2]
-    final(1) = GL_rng%unif_01() * 4 - 2
-    final(2) = GL_rng%unif_01() * 4 - 2
+    final(1) = rand(0) * 4 - 2
+    final(2) = rand(0) * 4 - 2
+
     x_stop = final * domain_len
 
     print *, "=========================="
@@ -82,6 +87,7 @@ contains
     print *, "start coordinates: ", start
     print *, "stop coordinates: ", final
     print *, " "
+
 
     call bisect_line(tree, x_start, x_stop, on_surface, i_eps)
 
@@ -94,5 +100,4 @@ contains
   end subroutine
 
 
-
-end program apic
+end program

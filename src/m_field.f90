@@ -94,7 +94,7 @@ contains
     type(af_t), intent(inout) :: tree
     type(mg_t), intent(inout) :: mg ! Multigrid option struct
     logical, intent(in)       :: have_guess
-    real(dp), parameter       :: fac = UC_elem_charge / UC_eps0
+    real(dp), parameter       :: fac = -UC_elem_charge / UC_eps0
     integer                   :: lvl, i, id, nc
 
     nc = tree%n_cell
@@ -106,15 +106,16 @@ contains
        do i = 1, size(tree%lvls(lvl)%leaves)
           id = tree%lvls(lvl)%leaves(i)
           tree%boxes(id)%cc(DTIMES(:), i_rhs) = fac * (&
-               tree%boxes(id)%cc(DTIMES(:), i_electron) - &
-               tree%boxes(id)%cc(DTIMES(:), i_pos_ion))
+               tree%boxes(id)%cc(DTIMES(:), i_pos_ion) - &
+               tree%boxes(id)%cc(DTIMES(:), i_electron))
        end do
        !$omp end do nowait
     end do
     !$omp end parallel
 
     if (GL_use_dielectric) then
-       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_charge, &
+       ! Map surface charge to the right-hand side
+       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_sum_dens, &
             i_rhs, fac)
     end if
 
@@ -133,22 +134,23 @@ contains
     ! Compute field from potential
      call af_loop_box(tree, field_from_potential)
 
-     ! Set ghost cells for the field components
-     call af_gc_tree(tree, [i_E_all])
-
-     if (GL_use_dielectric) then
-        call dielectric_correct_field_cc(tree, diel, i_surf_charge, &
-             i_E_all, i_phi, 1/UC_eps0)
-        call dielectric_correct_field_fc(tree, diel, i_surf_charge, &
-             ifc_E, i_phi, 1/UC_eps0)
-     end if
-
      call af_loop_box(tree, compute_field_norm)
+
+    ! Set ghost cells for the field components
+    call af_gc_tree(tree, [i_E_all])
+
+    if (GL_use_dielectric) then
+       call dielectric_correct_field_cc(tree, diel, i_surf_sum_dens, &
+            i_E_all, i_phi, -fac)
+       call dielectric_correct_field_fc(tree, diel, i_surf_sum_dens, &
+            ifc_E, i_phi, -fac)
+    end if
 
      ! Set the field norm also in ghost cells
      call af_gc_tree(tree, [i_E])
 
    end subroutine field_compute
+
 
 
   !> Compute the electric field at a given time
@@ -215,7 +217,7 @@ contains
     box%fc(1:nc+1, 1:nc, 1, ifc_E) = inv_dr(1) * &
          (box%cc(0:nc, 1:nc, i_phi) - box%cc(1:nc+1, 1:nc, i_phi))
     box%fc(1:nc, 1:nc+1, 2, ifc_E) = inv_dr(2) * &
-        (box%cc(1:nc, 0:nc, i_phi) - box%cc(1:nc, 1:nc+1, i_phi))
+         (box%cc(1:nc, 0:nc, i_phi) - box%cc(1:nc, 1:nc+1, i_phi))
 
 #elif NDIM == 3
     box%cc(1:nc, 1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr(1) * &
@@ -247,10 +249,10 @@ contains
     box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
          box%cc(1:nc, 1:nc, i_Ey)**2)
     box%cc(1:nc, 1:nc, i_E_v2) = 0.5_dp * sqrt(&
-        (box%fc(1:nc, 1:nc, 1, ifc_E) + &
-        box%fc(2:nc+1, 1:nc, 1, ifc_E))**2 + &
-        (box%fc(1:nc, 1:nc, 2, ifc_E) + &
-        box%fc(1:nc, 2:nc+1, 2, ifc_E))**2)
+         (box%fc(1:nc, 1:nc, 1, ifc_E) + &
+         box%fc(2:nc+1, 1:nc, 1, ifc_E))**2 + &
+         (box%fc(1:nc, 1:nc, 2, ifc_E) + &
+         box%fc(1:nc, 2:nc+1, 2, ifc_E))**2)
 
 #elif NDIM == 3
     box%cc(1:nc, 1:nc, 1:nc, i_E) = sqrt(&

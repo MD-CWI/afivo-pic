@@ -25,13 +25,13 @@ module m_globals
   integer, parameter :: outside_domain = 1
   integer, parameter :: inside_dielectric = 2
 
-  ! Which interpolation order is used
-  integer, protected :: interpolation_order = 1
+
  ! Interpolation order for the electric field
  integer, protected :: interpolation_order_field = 1
 
  ! Interpolation order for mapping particles to density
  integer, protected :: interpolation_order_to_density = 1
+
 
   ! ** Indices of cell-centered variables **
   integer, protected :: n_var_cell = 0  ! Number of variables
@@ -49,10 +49,15 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
+  integer, protected :: i_O_atom   = -1 ! Atomic oxygen
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
-  integer, parameter :: i_surf_charge = 1
+  integer, parameter :: n_surf_vars = 4
+  integer, parameter :: i_surf_sum_dens = 1
+  integer, parameter :: i_surf_elec_close = 2
+  integer, parameter :: i_surf_elec = 3
+  integer, parameter :: i_surf_pos_ion = 4
 
   ! Whether cylindrical coordinates are used
   logical, protected :: GL_cylindrical = .false.
@@ -82,7 +87,7 @@ module m_globals
   real(dp), protected :: GL_end_time = 10e-9_dp
 
   ! Pressure of the gas in bar
-  real(dp), protected :: GL_gas_pressure = 1.0_dp
+  real(dp), protected :: GL_gas_pressure = 0.5_dp
 
   ! Name of the gas mixture
   character(len=GL_slen) :: GL_gas_name = "AIR"
@@ -111,6 +116,7 @@ contains
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
+    call af_add_cc_variable(tree, "O_atom", .true., ix=i_O_atom)
     call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
     call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
     call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
@@ -152,8 +158,7 @@ contains
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
-       interpolation_order_to_density = 0
-
+       interpolation_order_to_density = 1
 
        call af_add_cc_variable(tree, "eps", ix=i_eps)
        call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &

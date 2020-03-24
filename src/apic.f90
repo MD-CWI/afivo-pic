@@ -86,6 +86,8 @@ program apic
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
+  call af_set_cc_methods(tree, i_O_atom, af_bc_neumann_zero, &
+            prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
@@ -96,9 +98,11 @@ program apic
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
+
      call dielectric_initialize(tree, i_eps, diel, 1)
      if (associated(user_set_dielectric_charge)) &
           call dielectric_set_values(tree, diel, 1, user_set_dielectric_charge)
+
   end if
 
   output_cnt         = 0 ! Number of output files written
@@ -211,7 +215,8 @@ program apic
 
         write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
         call af_write_silo(tree, fname, output_cnt, GL_time, &
-             dir=GL_output_dir)
+             dir=GL_output_dir, add_curve_names = ["EEDF"], &
+             add_curve_dat = write_EEDF_as_curve(pc))
         call print_info()
      end if
 
@@ -267,6 +272,7 @@ contains
     real(dp) :: max_fld, max_elec, max_pion
     real(dp) :: sum_elec, sum_pos_ion
     real(dp) :: mean_en, n_elec, n_part
+    real(dp) :: surf_int
 
     call af_tree_max_cc(tree, i_E, max_fld)
     call af_tree_max_cc(tree, i_electron, max_elec)
@@ -280,8 +286,9 @@ contains
     write(*, "(A20,E12.4)") "dt", GL_dt
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
-    write(*, "(A20,3E12.4)") "sum elec/pion/diff", sum_elec, sum_pos_ion, &
-         sum_elec - sum_pos_ion
+    write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
+    call dielectric_get_integral(diel, i_surf_sum_dens, surf_int)
+    write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
@@ -346,18 +353,58 @@ contains
     end if
   end subroutine check_path_writable
 
-  ! subroutine get_total_surface_charge(my_sum)
-  !   real(dp), intent(out) :: my_sum
-  !   integer :: ix
+  function write_EEDF_as_curve(pc) result(curve_dat)
+    !> Make a histogram of electron energies and save it pass a curve-object (can be added to Silo-file)
+    type(PC_t), intent(in)  :: pc
+    integer                 :: i, num_bins
+    real(dp), allocatable   :: bins(:), bin_values(:)
+    real(dp)                :: max_en, en_step=10.0
+    real(dp), allocatable   :: curve_dat(:, :, :)
 
-  !   my_sum = 0.0_dp
+    max_en = get_max_energy(pc)
+    num_bins = ceiling(max_en / en_step) ! Generate bins of 10 eV each up until max energy
+    if (num_bins < 1) num_bins = 1 ! At least one bin
 
-  !   do ix = 1, diel%max_ix
-  !      if (diel%surfaces(ix)%in_use) then
-  !         my_sum = my_sum + sum(diel%surfaces(ix)%sd(:, i_surf_charge)) * &
-  !              product(diel%surfaces(ix)%dr)
-  !      end if
-  !   end do
-  ! end subroutine get_total_surface_charge
+    allocate(bins(num_bins))
+    allocate(bin_values(num_bins))
+    allocate(curve_dat(1, 2, num_bins))
+
+    do i = 1, num_bins
+      bins(i) = en_step * i
+    end do
+
+    call pc%histogram(calc_EEDF, is_alive, [0.0_dp], bins, bin_values)
+    curve_dat(1, 1, :) = bins
+    curve_dat(1, 2, :) = bin_values + 1.0_dp ! Add regularization parameter to prevent errors when converting to semilogy plots
+  end function write_EEDF_as_curve
+
+  function calc_EEDF(part) result(energy)
+    use m_units_constants
+    type(PC_part_t), intent(in) :: part
+    real(dp)       :: energy
+
+    energy = PC_v_to_en(part%v, UC_elec_mass) / UC_elec_volt
+  end function calc_EEDF
+
+  logical function is_alive(part, real_args) result(alive)
+    type(PC_part_t), intent(in) :: part
+    real(dp), intent(in)        :: real_args(:) ! This basically does nothing but it seems non-optional
+
+    alive = (part%w > 0.0_dp)
+  end function is_alive
+
+  function get_max_energy(pc) result(max_en)
+    use m_units_constants
+    type(PC_t), intent(in)  :: pc
+    real(dp)                :: max_en
+    integer                 :: ll
+    max_en = 0.0_dp
+    do ll = 1, pc%n_part
+      if (pc%particles(ll)%w > 0.0_dp) then
+        max_en = max(max_en, PC_v_to_en(pc%particles(ll)%v, UC_elec_mass))
+      end if
+    end do
+    max_en = max_en / UC_elec_volt
+  end function get_max_energy
 
 end program apic
