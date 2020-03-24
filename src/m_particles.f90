@@ -190,9 +190,6 @@ contains
     real(dp), allocatable, save :: weights(:)
     real(dp), allocatable, save :: mask(:)
     integer, allocatable, save  :: id_guess(:)
-    real(dp) :: sum_bef, sum_aft, sum_surf_bef, sum_surf_aft
-    real(dp) :: isum_bef, isum_aft, isum_surf_bef, isum_surf_aft
-    real(dp) :: sum_elec, sum_pos_ion, surf_int, tmp
 
     n_part = pc%get_num_sim_part()
     n = max(n_part, pc%n_events)
@@ -260,7 +257,8 @@ contains
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
-          call particle_to_surface_charge(tree, pc%event_list(n)%part)
+          call particle_to_surface_charge(tree, pc%event_list(n)%part, &
+               i_surf_elec)
        end if
     end do
 
@@ -279,49 +277,19 @@ contains
     if (GL_use_dielectric) then
        ! Map densities inside the first dielectric layers to surface charge.
        ! Electrons can still move away from the dielectric.
-       call af_tree_sum_cc(tree, i_electron, sum_elec)
-       call af_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
-       call dielectric_get_integral(diel, i_surf_fixed_charge, surf_int)
-       print *, "before", sum_pos_ion - sum_elec - surf_int
-       tmp = sum_pos_ion - sum_elec - surf_int
-
-       call af_tree_sum_cc(tree, i_electron, sum_bef)
-       call dielectric_get_integral(diel, i_surf_temp_charge, sum_surf_bef)
-       call af_tree_sum_cc(tree, i_pos_ion, isum_bef)
-       call dielectric_get_integral(diel, i_surf_fixed_charge, isum_surf_bef)
-
        call dielectric_inside_layer_to_surface(tree, diel, i_electron, &
-            i_surf_temp_charge, 1.0_dp, clear_cc=.true., clear_surf=.true.)
-
-       ! ! Other species
+            i_surf_elec_close, 1.0_dp, clear_cc=.true., clear_surf=.true.)
        call dielectric_inside_layer_to_surface(tree, diel, i_pos_ion, &
-            i_surf_fixed_charge, -1.0_dp, clear_cc=.true., clear_surf=.false.)
-       call dielectric_set_weighted_sum(diel, i_surf_total_charge, &
-            [i_surf_temp_charge, i_surf_fixed_charge], [1.0_dp, 1.0_dp])
-
-       call af_tree_sum_cc(tree, i_electron, sum_elec)
-       call af_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
-       call dielectric_get_integral(diel, i_surf_total_charge, surf_int)
-
-       call af_tree_sum_cc(tree, i_electron, sum_aft)
-       call dielectric_get_integral(diel, i_surf_temp_charge, sum_surf_aft)
-       call af_tree_sum_cc(tree, i_pos_ion, isum_aft)
-       call dielectric_get_integral(diel, i_surf_fixed_charge, isum_surf_aft)
-
-       print *, "after", sum_pos_ion - sum_elec - surf_int
-
-       if (sum_pos_ion - sum_elec - surf_int - tmp > 1) then
-          print *, sum_bef, sum_aft, sum_surf_bef, sum_surf_aft
-          print *, sum_bef + sum_surf_bef - sum_aft - sum_surf_aft
-          print *, isum_bef, isum_aft, isum_surf_bef, isum_surf_aft
-          print *, isum_bef + isum_surf_bef - isum_aft - isum_surf_aft
-          stop
-       end if
+            i_surf_pos_ion, 1.0_dp, clear_cc=.true., clear_surf=.false.)
+       ! Sum densities together
+       call dielectric_set_weighted_sum(diel, i_surf_sum_dens, &
+            [i_surf_elec, i_surf_elec_close, i_surf_pos_ion], &
+            [-1.0_dp, -1.0_dp, 1.0_dp])
     end if
 
   end subroutine particles_to_density_and_events
 
-  subroutine particle_to_surface_charge(tree, my_part)
+  subroutine particle_to_surface_charge(tree, my_part, i_surf)
     ! Input: a particle that is found in the dielectric (after timestep, and is
     ! thus flagged for removal) This particle will be mapped to the surface
     ! charge of the corresponding cell
@@ -329,6 +297,7 @@ contains
 
     type(af_t), intent(in)      :: tree
     type(PC_part_t), intent(in) :: my_part
+    integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
@@ -336,8 +305,8 @@ contains
 
     ! Update the charge in the surface cell
 #if NDIM == 2
-    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_fixed_charge) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_fixed_charge) + &
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) + &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
     error stop

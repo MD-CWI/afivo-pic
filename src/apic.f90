@@ -282,10 +282,9 @@ contains
     write(*, "(A20,E12.4)") "dt", GL_dt
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
-    write(*, "(A20,3E12.4)") "sum elec/pion/diff", sum_elec, sum_pos_ion, &
-         sum_elec - sum_pos_ion
-    call dielectric_get_integral(diel, i_surf_total_charge, surf_int)
-    print *, surf_int, (sum_elec - sum_pos_ion) + surf_int
+    write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
+    call dielectric_get_integral(diel, i_surf_sum_dens, surf_int)
+    write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part

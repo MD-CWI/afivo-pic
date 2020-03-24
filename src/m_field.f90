@@ -94,7 +94,7 @@ contains
     type(af_t), intent(inout) :: tree
     type(mg_t), intent(inout) :: mg ! Multigrid option struct
     logical, intent(in)       :: have_guess
-    real(dp), parameter       :: fac = UC_elem_charge / UC_eps0
+    real(dp), parameter       :: fac = -UC_elem_charge / UC_eps0
     integer                   :: lvl, i, id, nc
 
     nc = tree%n_cell
@@ -106,8 +106,8 @@ contains
        do i = 1, size(tree%lvls(lvl)%leaves)
           id = tree%lvls(lvl)%leaves(i)
           tree%boxes(id)%cc(DTIMES(:), i_rhs) = fac * (&
-               tree%boxes(id)%cc(DTIMES(:), i_electron) - &
-               tree%boxes(id)%cc(DTIMES(:), i_pos_ion))
+               tree%boxes(id)%cc(DTIMES(:), i_pos_ion) - &
+               tree%boxes(id)%cc(DTIMES(:), i_electron))
        end do
        !$omp end do nowait
     end do
@@ -115,7 +115,7 @@ contains
 
     if (GL_use_dielectric) then
        ! Map surface charge to the right-hand side
-       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_total_charge, &
+       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_sum_dens, &
             i_rhs, fac)
     end if
 
@@ -138,10 +138,10 @@ contains
     call af_gc_tree(tree, [i_E_all])
 
     if (GL_use_dielectric) then
-       call dielectric_correct_field_cc(tree, diel, i_surf_total_charge, &
-            i_E_all, i_phi, 1/UC_eps0)
-       call dielectric_correct_field_fc(tree, diel, i_surf_total_charge, &
-            ifc_E, i_phi, 1/UC_eps0)
+       call dielectric_correct_field_cc(tree, diel, i_surf_sum_dens, &
+            i_E_all, i_phi, -fac)
+       call dielectric_correct_field_fc(tree, diel, i_surf_sum_dens, &
+            ifc_E, i_phi, -fac)
     end if
 
     call af_loop_box(tree, compute_field_norm)
