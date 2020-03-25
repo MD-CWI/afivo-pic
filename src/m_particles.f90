@@ -289,7 +289,7 @@ contains
             new_part%id   = pc%event_list(n)%part%id
 
             call pc%add_part(new_part)
-            call surface_charge_to_particle(tree, new_part)
+            call surface_particle_to_charge(tree, new_part,i_surf_pos_ion)
           !end do
 
           ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
@@ -356,13 +356,14 @@ contains
 #endif
   end subroutine
 
-  subroutine surface_charge_to_particle(tree, my_part)
+  subroutine surface_particle_to_charge(tree, my_part,i_surf)
     ! Input: a particle that is ejected from the dielectric.
     ! The surface charge is altered by the charge leaving
     use m_units_constants
 
     type(af_t), intent(in)      :: tree
     type(PC_part_t), intent(in) :: my_part
+    integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
@@ -370,8 +371,8 @@ contains
 
     ! Update the charge in the surface cell
 #if NDIM == 2
-    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) - &
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
     error stop
