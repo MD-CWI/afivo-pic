@@ -265,8 +265,10 @@ contains
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
 
-        else if (pc%event_list(n)%ctype == CS_excite_t) then
-          if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
+       else if (pc%event_list(n)%ctype == CS_excite_t) then
+
+          if (pc%event_list(n)%cIx ==2 .or. pc%event_list(n)%cIx ==4) then
+            if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
           ! Photoemission event
 
           !nphotons = int(pc%event_list(n)%part%w)
@@ -293,6 +295,7 @@ contains
           ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
           !    mask(i) = 1.0_dp
           ! end if
+          end if
 
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then

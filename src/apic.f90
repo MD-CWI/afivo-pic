@@ -99,9 +99,9 @@ program apic
      ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
 
-     call dielectric_initialize(tree, i_eps, diel, 1)
+     call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
      if (associated(user_set_dielectric_charge)) &
-          call dielectric_set_values(tree, diel, 1, user_set_dielectric_charge)
+          call dielectric_set_values(tree, diel, n_surf_vars, user_set_dielectric_charge)
 
   end if
 
