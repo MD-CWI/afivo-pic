@@ -188,7 +188,6 @@ contains
     integer                     :: n, i, n_part
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
-    real(dp), allocatable, save :: mask(:)
     integer, allocatable, save  :: id_guess(:)
 
     n_part = pc%get_num_sim_part()
@@ -199,17 +198,14 @@ contains
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
-       allocate(mask(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
-       deallocate(mask)
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
-       allocate(mask(n))
     end if
 
     !$omp parallel do
@@ -219,7 +215,6 @@ contains
        id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
-    mask = 0.0_dp
 
     if (init_cond) then
        call af_tree_clear_cc(tree, i_electron)
@@ -251,9 +246,6 @@ contains
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
 
-          ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
-          !    mask(i) = 1.0_dp
-          ! end if
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge

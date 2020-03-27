@@ -47,7 +47,6 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
-  integer, protected :: i_O_atom   = -1 ! Atomic oxygen
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -85,7 +84,7 @@ module m_globals
   real(dp), protected :: GL_end_time = 10e-9_dp
 
   ! Pressure of the gas in bar
-  real(dp), protected :: GL_gas_pressure = 0.5_dp
+  real(dp), protected :: GL_gas_pressure = 1.0_dp
 
   ! Name of the gas mixture
   character(len=GL_slen) :: GL_gas_name = "AIR"
