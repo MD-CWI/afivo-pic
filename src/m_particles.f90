@@ -258,10 +258,6 @@ contains
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order_to_density, &
             id_guess(1:i))
-
-       ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
-       !      weights(1:i), i, interpolation_order_to_density, &
-       !      id_guess(1:i))
     end if
 
     pc%n_events = 0
@@ -316,15 +312,6 @@ contains
     ! Interpolation of face-centered fields
     accel(1:NDIM) = af_interp1_fc(tree, my_part%x(1:NDIM), ifc_E, &
          success, id_guess=my_part%id)
-
-    ! Interpolation of cell-centered fields
-    ! if (interpolation_order_field == 0) then
-    !    accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
-    !         success, id_guess=my_part%id)
-    ! else
-    !    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), i_E_all, &
-    !         success, id_guess=my_part%id)
-    ! end if
 
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel
