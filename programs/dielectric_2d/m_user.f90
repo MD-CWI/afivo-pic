@@ -18,31 +18,66 @@ contains
 
     user_initial_particles => init_particles
     user_set_dielectric_eps => set_epsilon
-    user_potential_bc => my_potential
+    user_potential_bc => set_potential
   end subroutine user_initialize
 
-  subroutine init_particles(pctest)
+  subroutine init_particles(pc)
     use m_particle_core
-    type(PC_t), intent(inout) :: pctest
-    integer                   :: n
-    real(dp)                  :: pos(3)
-    type(PC_part_t)           :: part
+    type(PC_t), intent(inout)      :: pc
+    real(dp)                       :: background_density = 0.0_dp
+    integer                        :: n
+    real(dp)                       :: pos(3)
+    type(PC_part_t)                :: part
 
     part%v      = 0.0_dp
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
     do n = 1, 100
-       pos(1:2) = [0.5_dp, 0.85_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.6_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
 
        if (outside_check(part) <= 0) then
-          call pctest%add_part(part)
+          call pc%add_part(part)
        end if
     end do
+
+    if (background_density > 0.0_dp) then
+      call set_background_ionization(pc, background_density)
+    end if
   end subroutine init_particles
+
+  subroutine set_background_ionization(pc, background_density)
+    use m_particle_core
+    ! Generate initial particles according to a uniform background density
+      type(PC_t), intent(inout) :: pc
+      real(dp), intent(in)      :: background_density
+      real(dp)                  :: domain_volume ! For 2D this can be interpreted as domain_area
+      integer                   :: num_particles, n, n_added
+      type(PC_part_t)           :: part
+
+      n_added = 0
+      domain_volume = product(domain_len)
+      num_particles = ceiling(background_density * domain_volume)
+
+      part%v      = 0.0_dp
+      part%a      = 0.0_dp
+      part%w      = 1.0_dp
+      part%t_left = 0.0_dp
+
+      do n = 1, num_particles
+        part%x(1) = GL_rng%unif_01() * domain_len(1)
+        part%x(2) = GL_rng%unif_01() * domain_len(2)
+
+        if (outside_check(part) <= 0) then
+           call pc%add_part(part)
+           n_added = n + 1
+        end if
+      end do
+      print *, "Number of particles used for uniform background ionization: ", n_added
+  end subroutine set_background_ionization
 
   subroutine set_epsilon(box)
     type(box_t), intent(inout) :: box
@@ -62,7 +97,7 @@ contains
     end do
   end subroutine set_epsilon
 
-  subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
+  subroutine set_potential(box, nb, iv, coords, bc_val, bc_type)
     type(box_t), intent(in) :: box
     integer, intent(in)     :: nb
     integer, intent(in)     :: iv
@@ -76,13 +111,12 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = - 2.0e4_dp
+        bc_val = - 1.5e4_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
     end select
 
-  end subroutine my_potential
-
+  end subroutine set_potential
 
 end module m_user
