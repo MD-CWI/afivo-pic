@@ -53,6 +53,7 @@ program apic
   call check_path_writable(trim(GL_output_dir))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
+  call photons_initialize(cfg)
 
   ! Write configuration to output
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
@@ -86,8 +87,6 @@ program apic
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
-  call af_set_cc_methods(tree, i_O_atom, af_bc_neumann_zero, &
-            prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)

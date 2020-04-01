@@ -113,7 +113,6 @@ contains
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
-    call af_add_cc_variable(tree, "O_atom", .true., ix=i_O_atom)
     call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
     call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
     call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)

@@ -21,9 +21,9 @@ contains
     user_potential_bc => my_potential
   end subroutine user_initialize
 
-  subroutine init_particles(pctest)
+  subroutine init_particles(pc)
     use m_particle_core
-    type(PC_t), intent(inout) :: pctest
+    type(PC_t), intent(inout) :: pc
     integer                   :: n
     real(dp)                  :: pos(3)
     type(PC_part_t)           :: part
@@ -39,7 +39,7 @@ contains
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
 
        if (outside_check(part) <= 0) then
-          call pctest%add_part(part)
+          call pc%add_part(part)
        end if
     end do
   end subroutine init_particles
@@ -76,7 +76,7 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = - 2.0e4_dp
+        bc_val = - 3.0e4_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp

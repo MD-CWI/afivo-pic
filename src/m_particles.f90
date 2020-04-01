@@ -2,6 +2,7 @@ module m_particles
   use m_particle_core
   use m_af_all
   use m_globals
+  use m_photons
 
   implicit none
   public
@@ -185,10 +186,12 @@ contains
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
 
-    integer                     :: n, i, n_part
+    integer                     :: n, i, n_part, n_photons
+    ! type(PC_part_t)             :: new_part
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
+
 
     n_part = pc%get_num_sim_part()
     n = max(n_part, pc%n_events)
@@ -260,6 +263,16 @@ contains
             id_guess(1:i))
     end if
 
+    if (photoi_enabled) then
+      call photoi_Zheleznyak(tree, pc, coords, weights, n_photons)
+      call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
+           weights(1:n_photons), n_photons, interpolation_order_to_density, &
+           id_guess(1:n_photons))
+    end if
+    if (photoe_enabled) then
+      call photoe_Zheleznyak(tree, pc)
+    end if
+
     pc%n_events = 0
 
     if (GL_use_dielectric) then
@@ -301,13 +314,14 @@ contains
 #endif
   end subroutine particle_to_surface_charge
 
-  subroutine surface_charge_to_particle(tree, my_part)
+  subroutine surface_charge_to_particle(tree, my_part, i_surf)
     ! Input: a particle that is ejected from the dielectric.
     ! The surface charge is altered by the charge leaving
     use m_units_constants
 
     type(af_t), intent(in)      :: tree
     type(PC_part_t), intent(in) :: my_part
+    integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
@@ -315,8 +329,8 @@ contains
 
     ! Update the charge in the surface cell
 #if NDIM == 2
-    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf_charge) - &
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
     error stop
@@ -384,7 +398,7 @@ contains
     call pc%histogram(calc_elec_energy, is_alive, [0.0_dp], bins, bin_values)
     ! Convert histogram to density and save as curve-object
     curve_dat(1, 1, :) = bins
-    curve_dat(1, 2, :) = bin_values/(n_part * en_step) + 1e-7 ! Add regularization parameter to prevent errors when converting to semilogy plots
+    curve_dat(1, 2, :) = bin_values/(n_part * en_step) + 1e-9 ! Add regularization parameter to prevent errors when converting to semilogy plots
   end function write_EEDF_as_curve
 
   function calc_elec_energy(part) result(energy)
