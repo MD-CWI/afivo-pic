@@ -264,13 +264,13 @@ contains
     end if
 
     if (photoi_enabled) then
-      call photoi_Zheleznyak(tree, pc, coords, weights, n_photons)
+      call photoionization(tree, pc, coords, weights, n_photons)
       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
            weights(1:n_photons), n_photons, interpolation_order_to_density, &
            id_guess(1:n_photons))
     end if
     if (photoe_enabled) then
-      call photoe_Zheleznyak(tree, pc)
+      call photoemission(tree, pc)
     end if
 
     pc%n_events = 0
@@ -314,28 +314,28 @@ contains
 #endif
   end subroutine particle_to_surface_charge
 
-  subroutine surface_charge_to_particle(tree, my_part, i_surf)
-    ! Input: a particle that is ejected from the dielectric.
-    ! The surface charge is altered by the charge leaving
-    use m_units_constants
-
-    type(af_t), intent(in)      :: tree
-    type(PC_part_t), intent(in) :: my_part
-    integer, intent(in)         :: i_surf !< Surface variable
-    integer                     :: ix_surf, ix_cell(NDIM-1)
-
-    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
-         ix_surf, ix_cell)
-
-    ! Update the charge in the surface cell
-#if NDIM == 2
-    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
-         my_part%w / diel%surfaces(ix_surf)%dr(1)
-#elif NDIM == 3
-    error stop
-#endif
-  end subroutine surface_charge_to_particle
+!   subroutine surface_charge_to_particle(tree, my_part, i_surf)
+!     ! Input: a particle that is ejected from the dielectric.
+!     ! The surface charge is altered by the charge leaving
+!     use m_units_constants
+!
+!     type(af_t), intent(in)      :: tree
+!     type(PC_part_t), intent(in) :: my_part
+!     integer, intent(in)         :: i_surf !< Surface variable
+!     integer                     :: ix_surf, ix_cell(NDIM-1)
+!
+!     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+!          ix_surf, ix_cell)
+!
+!     ! Update the charge in the surface cell
+! #if NDIM == 2
+!     diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+!          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
+!          my_part%w / diel%surfaces(ix_surf)%dr(1)
+! #elif NDIM == 3
+!     error stop
+! #endif
+!   end subroutine surface_charge_to_particle
 
   function get_accel(my_part) result(accel)
     use m_units_constants

@@ -6,7 +6,6 @@ use m_af_all
 use m_particle_core
 use m_cross_sec
 use m_units_constants
-use m_particles, only: get_accel
 
 implicit none
 
@@ -14,19 +13,37 @@ private
 
 real(dp)              :: pi_quench_fac
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
-! real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
+real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
-logical, public, protected :: photoi_enabled = .true. !TODO fix this in config file
-logical, public, protected :: photoe_enabled = .false. !TODO fix this in config file
-real(dp) :: photoe_coefficient = 1.0e-2 !TODO fix this in config file
+logical, public         :: photoi_enabled
+logical, public         :: photoe_enabled
+real(dp)                :: photoe_probability = 1.0e-2_dp
+character(CFG_name_len) :: model
 
-! procedure(subr_mover), pointer :: photoionization => null()
-! procedure(subr_mover), pointer :: photoemission => null()
+procedure(photoi), pointer :: photoionization => null()
+procedure(photoe), pointer :: photoemission => null()
 
 ! Public methods
 public  :: photons_initialize
-public  :: photoi_Zheleznyak
-public  :: photoe_Zheleznyak
+public  :: photoionization
+public  :: photoemission
+
+abstract interface
+  subroutine photoi(tree, pc, photo_pos, photo_w, n_photons)
+    import
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+    real(dp), intent(inout)       :: photo_pos(:, :)
+    real(dp), intent(inout)       :: photo_w(:)
+    integer, intent(out)          :: n_photons
+  end subroutine photoi
+
+  subroutine photoe(tree, pc)
+    import
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+  end subroutine photoe
+end interface
 
 contains
 
@@ -34,24 +51,47 @@ contains
     use m_gas
     use m_config
     type(CFG_t), intent(inout) :: cfg
-    ! integer                    :: t_size, t_size_2
+
+    call CFG_add_get(cfg, "photon%model", model, &
+    "The model that is used for photon interactions")
+
+    ! Initialize parameters and pointers according to the model
+    select case (model)
+      case("Zheleznyak")
+        call Zheleznyak_initialize(cfg)
+        photoionization => photoi_Zheleznyak
+        photoemission => photoe_Zheleznyak
+      case default
+        error stop "Unrecognized photon model"
+    end select
+
+  end subroutine photons_initialize
+
+  subroutine Zheleznyak_initialize(cfg)
+    use m_gas
+    use m_config
+    type(CFG_t), intent(inout) :: cfg
+    integer                    :: t_size, t_size_2
     real(dp)                   :: frac_O2, temp_vec(2)
 
-    ! Photoemission parameters
-      ! TODO Include this here as well. Now it is always off!
+    ! Photoemission parameters for AIR
+    call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
+         "Whether photoionization is used")
+    call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
+        "Whether photoionization is used")
 
     ! Photoionization parameters for AIR
-    call CFG_add_get(cfg, "photoi%enabled", photoi_enabled, & !TODO This doesnt work
+    call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
          "Whether photoionization is used")
-    !call CFG_add(cfg, "photoi%efield_table", &
-    !     [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
-    !     "Tabulated values of the electric field (for the photo-efficiency)")
-    !call CFG_add(cfg, "photoi%efficiency_table", &
-    !     [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0], &
-    !     "The tabulated values of the the photo-efficiency")
-    !call CFG_add(cfg, "photoi%frequencies", [2.925D12, 3.059D12], &
-    !     "The lower/upper bound for the frequency of the photons, not currently used")
-    call CFG_add(cfg, "photoi%absorp_inv_lengths", &
+    call CFG_add(cfg, "photon%efield_table", &
+        [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
+        "Tabulated values of the electric field (for the photo-efficiency)")
+    call CFG_add(cfg, "photon%efficiency_table", &
+        [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0], &
+        "The tabulated values of the the photo-efficiency")
+    call CFG_add(cfg, "photon%frequencies", [2.925D12, 3.059D12], &
+        "The lower/upper bound for the frequency of the photons, not currently used")
+    call CFG_add(cfg, "photon%absorp_inv_lengths", &
          [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
          "The inverse min/max absorption length, will be scaled by pO2")
 
@@ -61,31 +101,30 @@ contains
           error stop "There is no oxygen, you should disable photoionzation"
        end if
 
-       call CFG_get(cfg, "photoi%absorp_inv_lengths", temp_vec)
+       call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
        pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
        pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
 
        pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
             (GAS_pressure + (40.0D0 * UC_torr_to_bar))
 
-       ! call CFG_get_size(cfg, "photoi%efficiency_table", t_size)
-       ! call CFG_get_size(cfg, "photoi%efield_table", t_size_2)
-       ! if (t_size_2 /= t_size) then
-       !    print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
-       !    stop
-       ! end if
+       call CFG_get_size(cfg, "photon%efficiency_table", t_size)
+       call CFG_get_size(cfg, "photon%efield_table", t_size_2)
+       if (t_size_2 /= t_size) then
+          print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
+          stop
+       end if
 
-       !allocate(pi_photo_eff_table1(t_size))
-       !allocate(pi_photo_eff_table2(t_size))
-       !call CFG_get(cfg, "photoi%efield_table", pi_photo_eff_table1)
-       !call CFG_get(cfg, "photoi%efficiency_table", pi_photo_eff_table2)
+       allocate(pi_photo_eff_table1(t_size))
+       allocate(pi_photo_eff_table2(t_size))
+       call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
+       call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
     end if
-  end subroutine photons_initialize
+  end subroutine Zheleznyak_initialize
 
   subroutine photoi_Zheleznyak(tree, pc, photo_pos, photo_w, n_photons)
     ! Perform photon generation and ionization according to the Zheleznyak model
     ! use m_domain
-    ! use m_particles, only: get_accel
 
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
@@ -93,7 +132,6 @@ contains
     real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
 
-    ! type(PC_part_t) :: new_part
     integer         :: i, n, m, n_uv
     real(dp)        :: x_start(3), x_stop(3)
 
@@ -179,21 +217,19 @@ contains
          (pi_max_inv_abs_len/pi_min_inv_abs_len)**en_frac
   end function get_photoi_lambda
 
-! =====
-
   subroutine single_photoemission_event(tree, pc, photon_w, x_gas, x_diel)
-    use m_particles, only: surface_charge_to_particle
+    ! use m_particles, only: surface_charge_to_particle
     ! Generate photo-emitted electrons on the surface of a dielectric
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     type(PC_part_t)                  :: new_part
     real(dp), intent(in)             :: photon_w, x_gas(3), x_diel(3)
 
-    if (GL_rng%unif_01() < photoe_coefficient) then
+    if (GL_rng%unif_01() < photoe_probability) then
       ! Create photo-emitted electron
       new_part%x(:) = x_gas
       new_part%v(:) = 0.0_dp
-      new_part%a(:) = get_accel(new_part)
+      new_part%a(:) = pc%accel_function(new_part)
       new_part%w    = photon_w
       new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
 
@@ -203,8 +239,31 @@ contains
     end if
   end subroutine single_photoemission_event
 
+  subroutine surface_charge_to_particle(tree, my_part, i_surf)
+    ! Input: a particle that is ejected from the dielectric.
+    ! The surface charge is altered by the charge leaving
+    use m_units_constants
+
+    type(af_t), intent(in)      :: tree
+    type(PC_part_t), intent(in) :: my_part
+    integer, intent(in)         :: i_surf !< Surface variable
+    integer                     :: ix_surf, ix_cell(NDIM-1)
+
+    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+         ix_surf, ix_cell)
+
+    ! Update the charge in the surface cell
+#if NDIM == 2
+    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
+         my_part%w / diel%surfaces(ix_surf)%dr(1)
+#elif NDIM == 3
+    error stop
+#endif
+  end subroutine surface_charge_to_particle
+
   subroutine single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
-    use m_particles, only: get_accel
+    ! use m_particles, only: get_accel
 
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
@@ -229,13 +288,12 @@ contains
     new_part%x = 0 !TODO is this neccesary?
     new_part%x(1:NDIM) = x_stop(1:NDIM)
     new_part%v = 0
-    new_part%a = get_accel(new_part)
+    new_part%a = pc%accel_function(new_part)
     new_part%w = particle_min_weight
     new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
 
     call pc%add_part(new_part)
   end subroutine single_photoionization_event
-! ==================
 
   logical function is_in_gas(tree, x_stop)
     ! Check if the photon is absorbed in the gas
