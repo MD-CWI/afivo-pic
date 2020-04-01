@@ -1,3 +1,4 @@
+#include "cpp_macros.h"
 module m_photons
 ! This module contains the functionality for
 ! photon interaction (ionization and electron emission from dielectric surface)
