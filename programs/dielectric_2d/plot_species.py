@@ -11,7 +11,7 @@ visit.Launch()
 visit.DeleteAllPlots()
 
 # Opening a virtual database representing all wave*.silo files.
-visit.OpenDatabase("/home/ddb/codes/afivo-pic/programs/dielectric_2d/output/sim_*.silo database") # <- Path your results
+visit.OpenDatabase("/home/ddb/codes/afivo-pic/programs/dielectric_2d/output/test_*.silo database") # <- Path your results
 
 # Make plots
 visit.AddPlot("Pseudocolor", "O_atom")
@@ -25,10 +25,12 @@ for states in range(visit.TimeSliderGetNStates()):
     visit.SetTimeSliderState(states)
     visit.Query("Weighted Variable Sum")
     s = np.append(s, [visit.GetQueryOutputValue()])
-    t = np.append(t, [states])
+    visit.Query("Time")
+    t = np.append(t, [visit.GetQueryOutputValue()])
+
 
 plt.figure()
-plt.plot(s)
-plt.xlabel('eV')
-plt.ylabel('Density of $O^-$')
+plt.plot(t, s)
+plt.xlabel('time (s)')
+plt.ylabel('#Reactions $m^{-2}$ (?) producing $O^-$')
 plt.show()

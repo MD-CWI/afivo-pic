@@ -53,6 +53,7 @@ program apic
   call check_path_writable(trim(GL_output_dir))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
+  call photons_initialize(cfg)
 
   ! Write configuration to output
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
@@ -86,8 +87,6 @@ program apic
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
-  call af_set_cc_methods(tree, i_O_atom, af_bc_neumann_zero, &
-            prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
@@ -352,59 +351,5 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
-
-  function write_EEDF_as_curve(pc) result(curve_dat)
-    !> Make a histogram of electron energies and save it pass a curve-object (can be added to Silo-file)
-    type(PC_t), intent(in)  :: pc
-    integer                 :: i, num_bins
-    real(dp), allocatable   :: bins(:), bin_values(:)
-    real(dp)                :: max_en, en_step=10.0
-    real(dp), allocatable   :: curve_dat(:, :, :)
-
-    max_en = get_max_energy(pc)
-    num_bins = ceiling(max_en / en_step) ! Generate bins of 10 eV each up until max energy
-    if (num_bins < 1) num_bins = 1 ! At least one bin
-
-    allocate(bins(num_bins))
-    allocate(bin_values(num_bins))
-    allocate(curve_dat(1, 2, num_bins))
-
-    do i = 1, num_bins
-      bins(i) = en_step * i
-    end do
-
-    call pc%histogram(calc_EEDF, is_alive, [0.0_dp], bins, bin_values)
-    curve_dat(1, 1, :) = bins
-    curve_dat(1, 2, :) = bin_values + 1.0_dp ! Add regularization parameter to prevent errors when converting to semilogy plots
-  end function write_EEDF_as_curve
-
-  function calc_EEDF(part) result(energy)
-    use m_units_constants
-    type(PC_part_t), intent(in) :: part
-    real(dp)       :: energy
-
-    energy = PC_v_to_en(part%v, UC_elec_mass) / UC_elec_volt
-  end function calc_EEDF
-
-  logical function is_alive(part, real_args) result(alive)
-    type(PC_part_t), intent(in) :: part
-    real(dp), intent(in)        :: real_args(:) ! This basically does nothing but it seems non-optional
-
-    alive = (part%w > 0.0_dp)
-  end function is_alive
-
-  function get_max_energy(pc) result(max_en)
-    use m_units_constants
-    type(PC_t), intent(in)  :: pc
-    real(dp)                :: max_en
-    integer                 :: ll
-    max_en = 0.0_dp
-    do ll = 1, pc%n_part
-      if (pc%particles(ll)%w > 0.0_dp) then
-        max_en = max(max_en, PC_v_to_en(pc%particles(ll)%v, UC_elec_mass))
-      end if
-    end do
-    max_en = max_en / UC_elec_volt
-  end function get_max_energy
 
 end program apic
