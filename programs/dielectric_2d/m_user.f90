@@ -34,7 +34,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 100
-       pos(1:2) = [0.5_dp, 0.6_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.85_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp

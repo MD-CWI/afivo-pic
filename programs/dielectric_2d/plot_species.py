@@ -32,5 +32,5 @@ for states in range(visit.TimeSliderGetNStates()):
 plt.figure()
 plt.plot(t, s)
 plt.xlabel('time (s)')
-plt.ylabel('#Reactions $m^{-2}$ (?) producing $O^-$')
+plt.ylabel('Total number of $O^-$ particles')
 plt.show()
