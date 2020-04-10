@@ -6,6 +6,7 @@
 module m_globals
   use m_af_all
   use m_particle_core
+  use m_units_constants
   use m_config
   use m_random
 
@@ -86,6 +87,12 @@ module m_globals
   ! Pressure of the gas in bar
   real(dp), protected :: GL_gas_pressure = 1.0_dp
 
+  ! Density of the gas
+  real(dp), protected :: GL_gas_density
+
+  ! Room temperature in Kelvin
+  real(dp), protected :: GL_room_temperature = 300.0_dp
+
   ! Name of the gas mixture
   character(len=GL_slen) :: GL_gas_name = "AIR"
 
@@ -152,6 +159,9 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
+
+    ! Conversion of pressure to density using the ideal gas law
+    GL_gas_density = GL_gas_pressure / (UC_boltzmann_const * GL_room_temperature)
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1

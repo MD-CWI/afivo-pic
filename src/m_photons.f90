@@ -1,4 +1,4 @@
-#include "cpp_macros.h"
+#include "../afivo/src/cpp_macros.h"
 module m_photons
 ! This module contains the functionality for
 ! photon interaction (ionization and electron emission from dielectric surface)
@@ -8,18 +8,30 @@ use m_particle_core
 use m_cross_sec
 use m_units_constants
 
+use m_time_step
+use m_domain
+
 implicit none
 
 private
-
-real(dp)              :: pi_quench_fac
-real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
-real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
 logical, public         :: photoi_enabled
 logical, public         :: photoe_enabled
 real(dp)                :: photoe_probability = 1.0e-2_dp
 character(CFG_name_len) :: model
+
+real(dp)              :: pi_quench_fac
+real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
+real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
+
+!Default reaction rates for excited Ar and Ar2 pools
+real(dp)  :: k_Ar_decay_rad  = 0.0_dp
+real(dp)  :: k_Ar_quench     = 0.0_dp
+real(dp)  :: k_Ar2_prod_rate = 3.0e-46_dp
+real(dp)  :: k_Ar2_decay_rad = 6.0e7_dp
+
+integer, protected, public  :: i_Ar_pool = -1 !Index of cell-centered pool of excited argon species
+integer, protected, public  :: i_Ar2_pool = -1 !Index of cell-centered Argon excimer
 
 procedure(photoi), pointer :: photoionization => null()
 procedure(photoe), pointer :: photoemission => null()
@@ -54,19 +66,188 @@ contains
     type(CFG_t), intent(inout) :: cfg
 
     call CFG_add_get(cfg, "photon%model", model, &
-    "The model that is used for photon interactions")
+         "The model that is used for photon interactions")
 
-    ! Initialize parameters and pointers according to the model
+    call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
+         "Whether photoionization is used")
+    call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
+        "Whether photoionization is used")
+        call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
+        "Whether photoionization is used")
+
+    ! Initialize parameters and pointers according to the selected model
     select case (model)
       case("Zheleznyak")
         call Zheleznyak_initialize(cfg)
         photoionization => photoi_Zheleznyak
         photoemission => photoe_Zheleznyak
+      case("Argon")
+        call Argon_initialize(cfg)
+        photoionization => null() ! No photoionization is considered
+        photoemission => photoe_Argon
       case default
         error stop "Unrecognized photon model"
     end select
 
   end subroutine photons_initialize
+
+! ===== Model photon interactions in argon
+
+  subroutine Argon_initialize(cfg)
+    use m_config
+    type(CFG_t), intent(inout) :: cfg
+
+    call CFG_add_get(cfg, "photon%k_Ar_decay_rad", k_Ar_decay_rad, &
+         "Rate of radiative decay of excited Ar")
+    call CFG_add_get(cfg, "photon%k_Ar_quench", k_Ar_quench, &
+         "Rate of quenching of excited Ar")
+    call CFG_add_get(cfg, "photon%k_Ar2_prod_rate", k_Ar2_prod_rate, &
+         "Rate of production of excited Argon2")
+    call CFG_add_get(cfg, "photon%k_Ar2_decay_rad", k_Ar2_decay_rad, &
+         "Rate of radiative decay of excited Ar2")
+
+    if (GL_use_dielectric .and. photoe_enabled) then
+      where(pc%colls(:)%type == CS_excite_t)
+        pc%coll_is_event(:) = .true.
+      end where
+
+      !Create empty argon pool and excimer
+      call af_add_cc_variable(tree, "Ar_pool", .true., ix=i_Ar_pool)
+      call af_set_cc_methods(tree, i_Ar_pool, af_bc_neumann_zero, &
+           prolong=af_prolong_limit)
+
+      call af_add_cc_variable(tree, "Ar2_pool", .true., ix=i_Ar2_pool)
+      call af_set_cc_methods(tree, i_Ar2_pool, af_bc_neumann_zero, &
+                prolong=af_prolong_limit)
+    end if
+
+  end subroutine Argon_initialize
+
+  subroutine photoe_Argon(tree, pc)
+    ! Perform photoemission due to pool of excited argon species
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+
+    real(dp), allocatable, save :: coords(:, :)
+    real(dp), allocatable, save :: weights(:)
+    integer, allocatable, save  :: id_guess(:)
+
+    integer       :: n, jj
+
+    if (.not. allocated(weights)) then
+       allocate(coords(NDIM, pc%n_events))
+       allocate(weights(pc%n_events))
+       allocate(id_guess(pc%n_events))
+    else if (size(weights) < pc%n_events) then
+       deallocate(coords)
+       deallocate(weights)
+       deallocate(id_guess)
+       allocate(coords(NDIM, pc%n_events))
+       allocate(weights(pc%n_events))
+       allocate(id_guess(pc%n_events))
+    end if
+
+    call Ar2_radiative_decay(tree, pc) ! Do photoemission events (updates the Ar2 pool)
+    call af_loop_box(tree, perform_argon_reactions, .true.)
+
+    ! Calculate production to the pool of excited Argon species
+    jj = 0
+    do n = 1, pc%n_events
+       if (pc%event_list(n)%ctype == CS_excite_t) then
+         ! if (pc%event_list(n)%cIx == 2) then ! TODO do this more generally
+         jj = jj + 1
+         coords(:, jj) = pc%event_list(n)%part%x(1:NDIM)
+         weights(jj) = pc%event_list(n)%part%w
+         id_guess(jj) = pc%event_list(n)%part%id
+         ! end if
+       end if
+     end do
+     call af_particles_to_grid(tree, i_Ar_pool, coords(:, 1:jj), &
+          weights(1:jj), jj, 0, id_guess(1:jj)) ! Use zeroth order interpolation for simplicity
+end subroutine photoe_Argon
+
+subroutine Ar2_radiative_decay(tree, pc)
+  ! Routine that performs Ar2_exc radiative decay for every cell in a box
+  ! This routine also performs photoemission
+
+  ! TODO Code from af_loop_box is copied (because of particle creation and non-local effects). Thats why this code is nasty
+  type(af_t), intent(inout)  :: tree
+  type(PC_t), intent(inout)  :: pc
+
+  integer    :: ii, jj, nn
+  integer    :: lvl, i, id
+  integer    :: n_uv
+  real(dp)   :: mean_ph
+  real(dp)   :: cell_size
+  real(dp)   :: x_start(3), x_cc(3), x_stop(3)
+  logical    :: on_surface
+
+  if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
+
+  !TODO Find out how to work with this omp stuff
+  !!$omp parallel private(lvl, i, id, ii, jj, nn)
+  do lvl = 1, tree%highest_lvl
+    !!$omp do
+    do i = 1, size(tree%lvls(lvl)%leaves)
+      id = tree%lvls(lvl)%leaves(i)
+      cell_size = product(tree%boxes(id)%dr)
+      do ii = 1, tree%boxes(id)%n_cell
+        do jj = 1, tree%boxes(id)%n_cell
+          mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
+            * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
+          n_uv = GL_rng%poisson(mean_ph)
+
+          x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
+          do nn = 1, n_uv
+            x_start = x_cc
+            x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
+            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
+            if (on_surface) then
+              ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+              call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
+              ! print *, "photoemission event has occurred"
+              print *, n_uv
+            end if
+          end do
+
+          tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = tree%boxes(id)%cc(ii, jj, i_Ar2_pool) - &
+          ! n_uv * particle_min_weight / cell_size !Update Ar2 density due to radiative decay
+          n_uv * 1.0_dp / cell_size !Update Ar2 density due to radiative decay
+          if (tree%boxes(id)%cc(ii, jj, i_Ar2_pool) < 0.0_dp) then
+            print *, "WARNING: NEGATIVE DENSITIES OCCURED"
+            tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar2_pool))
+            ! error stop "Negative density for excited states of Argon2 found after radiative decay."
+          end if
+        end do
+      end do
+    end do
+    !!$omp end do
+  end do
+  !!$omp end parallel
+  end subroutine Ar2_radiative_decay
+
+  subroutine perform_argon_reactions(box)
+    ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
+    ! type(af_t), intent(inout) :: tree
+    type(box_t), intent(inout)  :: box
+    integer    :: ii, jj
+
+    do ii = 1, box%n_cell
+      do jj = 1, box%n_cell
+        ! Production of Ar2
+        box%cc(ii, jj, i_Ar2_pool) = box%cc(ii, jj, i_Ar2_pool) + &
+          GL_dt * k_Ar2_prod_rate * GL_gas_density**2 * box%cc(ii, jj, i_Ar_pool)
+        ! decay, quenching and Ar2-prod for Ar
+        box%cc(ii, jj, i_Ar_pool) = box%cc(ii, jj, i_Ar_pool) - GL_dt * &
+          (k_Ar_decay_rad + k_Ar_quench * GL_gas_density + k_Ar2_prod_rate * GL_gas_density**2) * box%cc(ii, jj, i_Ar_pool)
+        if (box%cc(ii, jj, i_Ar2_pool) < 0.0_dp .or. box%cc(ii, jj, i_Ar_pool) < 0.0_dp) then
+          error stop "Negative density for excited states of Argon or Argon2 found after performing chemical reactions."
+        end if
+      end do
+    end do
+  end subroutine perform_argon_reactions
+
+  ! ==== Now the modules for Zheleznyak air model
 
   subroutine Zheleznyak_initialize(cfg)
     use m_gas
@@ -75,15 +256,7 @@ contains
     integer                    :: t_size, t_size_2
     real(dp)                   :: frac_O2, temp_vec(2)
 
-    ! Photoemission parameters for AIR
-    call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
-         "Whether photoionization is used")
-    call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
-        "Whether photoionization is used")
-
     ! Photoionization parameters for AIR
-    call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
-         "Whether photoionization is used")
     call CFG_add(cfg, "photon%efield_table", &
         [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
         "Tabulated values of the electric field (for the photo-efficiency)")
@@ -218,6 +391,8 @@ contains
          (pi_max_inv_abs_len/pi_min_inv_abs_len)**en_frac
   end function get_photoi_lambda
 
+  ! ==== General modules
+
   subroutine single_photoemission_event(tree, pc, photon_w, x_gas, x_diel)
     ! use m_particles, only: surface_charge_to_particle
     ! Generate photo-emitted electrons on the surface of a dielectric
@@ -286,7 +461,7 @@ contains
     photo_w(i_cpy)      = particle_min_weight
 
     ! Create new particle
-    new_part%x = 0 !TODO is this neccesary?
+    new_part%x = 0
     new_part%x(1:NDIM) = x_stop(1:NDIM)
     new_part%v = 0
     new_part%a = pc%accel_function(new_part)
