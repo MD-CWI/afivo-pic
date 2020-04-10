@@ -3,6 +3,7 @@ module m_particles
   use m_af_all
   use m_globals
   use m_domain
+  use m_photons
 
   implicit none
   public
@@ -194,16 +195,12 @@ contains
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
 
-    real(dp) :: x_gas(3) = 0.0_dp, x_outside(3) = 0.0_dp
-    ! integer   :: j
-    logical  :: on_surface
-    type(PC_part_t) :: new_part
-
-    integer                     :: n, i, n_part
+    integer                     :: n, i, n_part, n_photons
+    ! type(PC_part_t)             :: new_part
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
-    real(dp), allocatable, save :: mask(:)
     integer, allocatable, save  :: id_guess(:)
+
 
     n_part = pc%get_num_sim_part()
     n = max(n_part, pc%n_events)
@@ -213,17 +210,14 @@ contains
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
-       allocate(mask(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
-       deallocate(mask)
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
-       allocate(mask(n))
     end if
 
     !$omp parallel do
@@ -233,7 +227,6 @@ contains
        id_guess(n) = pc%particles(n)%id
     end do
     !$omp end parallel do
-    mask = 0.0_dp
 
     if (init_cond) then
        call af_tree_clear_cc(tree, i_electron)
@@ -265,38 +258,6 @@ contains
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
 
-       else if (pc%event_list(n)%ctype == CS_excite_t) then
-
-          if (pc%event_list(n)%cIx ==2 .or. pc%event_list(n)%cIx ==4) then
-            if (.not. GL_use_dielectric) cycle ! No dielectric -> no photoemission
-          ! Photoemission event
-
-          !nphotons = int(pc%event_list(n)%part%w)
-          !do j = 1, nphotons/100000
-            if (GL_rng%unif_01() > phe_coefficient) cycle ! chance of creating electron
-
-            x_gas(1:NDIM) = pc%event_list(n)%part%x(1:NDIM)
-            x_outside(1:NDIM) = x_gas(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! isotropic photon emission with (absorbtion-length >> domain_len)
-            call dielectric_photon_absorbtion(tree, i_eps, x_gas(1:NDIM), x_outside(1:NDIM), on_surface)
-
-            if (.not. on_surface) cycle ! photon not absorbed by dielectric
-
-            ! Create photo-emitted electron
-            new_part%x(:) = x_gas
-            new_part%v(:) = 0.0_dp
-            new_part%a(:) = 0.0_dp
-            new_part%w    = (pc%event_list(n)%part%w)/1000
-            new_part%id   = pc%event_list(n)%part%id
-
-            call pc%add_part(new_part)
-            call surface_particle_to_charge(tree, new_part,i_surf_pos_ion)
-          !end do
-
-          ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
-          !    mask(i) = 1.0_dp
-          ! end if
-          end if
-
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
@@ -309,10 +270,16 @@ contains
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order_to_density, &
             id_guess(1:i))
+    end if
 
-       ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
-       !      weights(1:i), i, interpolation_order_to_density, &
-       !      id_guess(1:i))
+    if (photoi_enabled) then
+      call photoionization(tree, pc, coords, weights, n_photons)
+      call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
+           weights(1:n_photons), n_photons, interpolation_order_to_density, &
+           id_guess(1:n_photons))
+    end if
+    if (photoe_enabled) then
+      call photoemission(tree, pc)
     end if
 
     pc%n_events = 0
@@ -354,7 +321,30 @@ contains
 #elif NDIM == 3
     error stop
 #endif
-  end subroutine
+  end subroutine particle_to_surface_charge
+
+!   subroutine surface_charge_to_particle(tree, my_part, i_surf)
+!     ! Input: a particle that is ejected from the dielectric.
+!     ! The surface charge is altered by the charge leaving
+!     use m_units_constants
+!
+!     type(af_t), intent(in)      :: tree
+!     type(PC_part_t), intent(in) :: my_part
+!     integer, intent(in)         :: i_surf !< Surface variable
+!     integer                     :: ix_surf, ix_cell(NDIM-1)
+!
+!     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+!          ix_surf, ix_cell)
+!
+!     ! Update the charge in the surface cell
+! #if NDIM == 2
+!     diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+!          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
+!          my_part%w / diel%surfaces(ix_surf)%dr(1)
+! #elif NDIM == 3
+!     error stop
+! #endif
+!   end subroutine surface_charge_to_particle
 
   subroutine surface_particle_to_charge(tree, my_part,i_surf)
     ! Input: a particle that is ejected from the dielectric.
@@ -391,15 +381,6 @@ contains
     accel(1:NDIM) = af_interp1_fc(tree, my_part%x(1:NDIM), ifc_E, &
          success, id_guess=my_part%id)
 
-    ! Interpolation of cell-centered fields
-    ! if (interpolation_order_field == 0) then
-    !    accel(1:NDIM) = af_interp0(tree, my_part%x(1:NDIM), [i_Ex, i_Ey], &
-    !         success, id_guess=my_part%id)
-    ! else
-    !    accel(1:NDIM) = af_interp1(tree, my_part%x(1:NDIM), i_E_all, &
-    !         success, id_guess=my_part%id)
-    ! end if
-
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel
 
@@ -424,5 +405,61 @@ contains
     weight = n_elec / particle_per_cell
     weight = max(particle_min_weight, min(particle_max_weight, weight))
   end function get_desired_weight
+
+  function write_EEDF_as_curve(pc) result(curve_dat)
+    !> Make a histogram of electron energies and save it pass a curve-object (can be added to Silo-file)
+    type(PC_t), intent(in)  :: pc
+    integer                 :: i, num_bins
+    real(dp), allocatable   :: bins(:), bin_values(:)
+    real(dp)                :: n_part, max_en, en_step = 0.75
+    real(dp), allocatable   :: curve_dat(:, :, :)
+
+    n_part = pc%get_num_real_part()
+    max_en = get_max_energy(pc)
+    num_bins = ceiling(max_en / en_step) ! Generate bins of en_step (eV) each up until max energy
+    if (num_bins < 1) num_bins = 1 ! At least one bin
+
+    allocate(bins(num_bins))
+    allocate(bin_values(num_bins))
+    allocate(curve_dat(1, 2, num_bins))
+
+    do i = 1, num_bins
+      bins(i) = en_step * (i-1)
+    end do
+
+    call pc%histogram(calc_elec_energy, is_alive, [0.0_dp], bins, bin_values)
+    ! Convert histogram to density and save as curve-object
+    curve_dat(1, 1, :) = bins
+    curve_dat(1, 2, :) = bin_values/(n_part * en_step) + 1e-9 ! Add regularization parameter to prevent errors when converting to semilogy plots
+  end function write_EEDF_as_curve
+
+  function calc_elec_energy(part) result(energy)
+    use m_units_constants
+    type(PC_part_t), intent(in) :: part
+    real(dp)       :: energy
+
+    energy = PC_v_to_en(part%v, UC_elec_mass) / UC_elec_volt
+  end function calc_elec_energy
+
+  logical function is_alive(part, real_args) result(alive)
+    type(PC_part_t), intent(in) :: part
+    real(dp), intent(in)        :: real_args(:) ! This basically does nothing but it seems non-optional
+
+    alive = (part%w > 0.0_dp)
+  end function is_alive
+
+  function get_max_energy(pc) result(max_en)
+    use m_units_constants
+    type(PC_t), intent(in)  :: pc
+    real(dp)                :: max_en
+    integer                 :: ll
+    max_en = 0.0_dp
+    do ll = 1, pc%n_part
+      if (pc%particles(ll)%w > 0.0_dp) then
+        max_en = max(max_en, PC_v_to_en(pc%particles(ll)%v, UC_elec_mass))
+      end if
+    end do
+    max_en = max_en / UC_elec_volt
+  end function get_max_energy
 
 end module m_particles

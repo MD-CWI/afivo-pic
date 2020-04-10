@@ -26,9 +26,9 @@ contains
 
   end subroutine user_initialize
 
-  subroutine init_particles(pctest)
+  subroutine init_particles(pc)
     use m_particle_core
-    type(PC_t), intent(inout) :: pctest
+    type(PC_t), intent(inout) :: pc
     integer                   :: n
     real(dp)                  :: pos(3)
     type(PC_part_t)           :: part
@@ -37,15 +37,14 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-
     do n = 1,100
-      pos(1:2) = [0.4_dp, 0.3_dp] * domain_len
+       pos(1:2) = [0.4_dp, 0.3_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
 
        if (outside_check(part) <= 0) then
-          call pctest%add_part(part)
+          call pc%add_part(part)
        end if
     end do
   end subroutine init_particles
@@ -140,18 +139,18 @@ contains
     real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
     integer, intent(out)    :: bc_type
 
-    if (af_neighb_dim(nb) == NDIM) then
-       if (af_neighb_low(nb)) then
-          bc_type = af_bc_dirichlet
-          bc_val = 0.0_dp
-       else
-          bc_type = af_bc_dirichlet
-          bc_val  = 6e3_dp!coords(1, :) / domain_len(1) * (-3e3_dp)
-       end if
-    else
-       bc_type = af_bc_neumann
-       bc_val = 0.0_dp
-    end if
+    select case (nb)
+    case (af_neighb_lowy)
+        bc_type = af_bc_dirichlet
+        bc_val = 0.0_dp
+      case (af_neighb_highy)
+        bc_type = af_bc_dirichlet
+        bc_val = - 1.5e4_dp
+      case default
+        bc_type = af_bc_neumann
+        bc_val = 0.0_dp
+    end select
+
   end subroutine my_potential
 
   real(dp) function set_initial_charge(r)

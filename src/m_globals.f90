@@ -6,6 +6,7 @@
 module m_globals
   use m_af_all
   use m_particle_core
+  use m_units_constants
   use m_config
   use m_random
 
@@ -49,7 +50,6 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
-  integer, protected :: i_O_atom   = -1 ! Atomic oxygen
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -87,7 +87,13 @@ module m_globals
   real(dp), protected :: GL_end_time = 10e-9_dp
 
   ! Pressure of the gas in bar
-  real(dp), protected :: GL_gas_pressure = 0.5_dp
+  real(dp), protected :: GL_gas_pressure = 1.0_dp
+
+  ! Density of the gas
+  real(dp), protected :: GL_gas_density
+
+  ! Room temperature in Kelvin
+  real(dp), protected :: GL_room_temperature = 300.0_dp
 
   ! Name of the gas mixture
   character(len=GL_slen) :: GL_gas_name = "AIR"
@@ -116,7 +122,6 @@ contains
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
-    call af_add_cc_variable(tree, "O_atom", .true., ix=i_O_atom)
     call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
     call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
     call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
@@ -155,6 +160,9 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
+
+    ! Conversion of pressure to density using the ideal gas law
+    GL_gas_density = GL_gas_pressure / (UC_boltzmann_const * GL_room_temperature)
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
