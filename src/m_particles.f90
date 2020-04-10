@@ -196,7 +196,7 @@ contains
     logical, intent(in)              :: init_cond
 
     integer                     :: n, i, n_part, n_photons
-    ! type(PC_part_t)             :: new_part
+
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)

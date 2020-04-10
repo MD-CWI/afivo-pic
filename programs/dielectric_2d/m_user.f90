@@ -150,7 +150,6 @@ contains
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
     end select
-
   end subroutine my_potential
 
   real(dp) function set_initial_charge(r)
