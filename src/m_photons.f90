@@ -206,10 +206,11 @@ subroutine Ar2_radiative_decay(tree, pc)
               ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
               call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
               ! print *, "photoemission event has occurred"
-              print *, n_uv
             end if
           end do
-
+          ! if (n_uv > 0.0_dp) then
+          !   print *, n_uv
+          ! end if
           tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = tree%boxes(id)%cc(ii, jj, i_Ar2_pool) - &
           ! n_uv * particle_min_weight / cell_size !Update Ar2 density due to radiative decay
           n_uv * 1.0_dp / cell_size !Update Ar2 density due to radiative decay
@@ -227,6 +228,7 @@ subroutine Ar2_radiative_decay(tree, pc)
   end subroutine Ar2_radiative_decay
 
   subroutine perform_argon_reactions(box)
+    use m_gas
     ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
     ! type(af_t), intent(inout) :: tree
     type(box_t), intent(inout)  :: box
@@ -236,10 +238,10 @@ subroutine Ar2_radiative_decay(tree, pc)
       do jj = 1, box%n_cell
         ! Production of Ar2
         box%cc(ii, jj, i_Ar2_pool) = box%cc(ii, jj, i_Ar2_pool) + &
-          GL_dt * k_Ar2_prod_rate * GL_gas_density**2 * box%cc(ii, jj, i_Ar_pool)
+          GL_dt * k_Ar2_prod_rate * GAS_number_dens**2 * box%cc(ii, jj, i_Ar_pool)
         ! decay, quenching and Ar2-prod for Ar
         box%cc(ii, jj, i_Ar_pool) = box%cc(ii, jj, i_Ar_pool) - GL_dt * &
-          (k_Ar_decay_rad + k_Ar_quench * GL_gas_density + k_Ar2_prod_rate * GL_gas_density**2) * box%cc(ii, jj, i_Ar_pool)
+          (k_Ar_decay_rad + k_Ar_quench * GAS_number_dens + k_Ar2_prod_rate * GAS_number_dens**2) * box%cc(ii, jj, i_Ar_pool)
         if (box%cc(ii, jj, i_Ar2_pool) < 0.0_dp .or. box%cc(ii, jj, i_Ar_pool) < 0.0_dp) then
           error stop "Negative density for excited states of Argon or Argon2 found after performing chemical reactions."
         end if
