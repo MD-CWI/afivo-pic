@@ -13,6 +13,8 @@ program apic
   use m_particles
   use m_user
   use m_user_methods
+  use m_dielectric
+
 
   implicit none
 
@@ -30,6 +32,10 @@ program apic
   type(ref_info_t)       :: ref_info
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
+
+  ! > test debug
+  real(dp) :: max_surf_density,min_surf_density, max_potential
+  ! < test debug
 
   real(dp) :: t0
   real(dp) :: wtime_start
@@ -94,15 +100,17 @@ program apic
   call af_set_cc_methods(tree, i_Ez, af_bc_neumann_zero)
 #endif
 
-  if (GL_use_dielectric) then
-     ! Initialize dielectric surfaces at the third refinement level
-     call af_refine_up_to_lvl(tree, 3)
+if (GL_use_dielectric) then
+   ! Initialize dielectric surfaces at the third refinement level
+   call af_refine_up_to_lvl(tree, 3)
+   call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
 
-     call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
-     if (associated(user_set_dielectric_charge)) &
-          call dielectric_set_values(tree, diel, n_surf_vars, user_set_dielectric_charge)
+   ! Initialize the dielectric surface charge
+   if (associated(user_set_dielectric_charge)) &
+      call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_dielectric_charge)
 
-  end if
+end if
+
 
   output_cnt         = 0 ! Number of output files written
   GL_time            = 0 ! Simulation time (all times are in s)
@@ -131,6 +139,7 @@ program apic
      end if
      if (ref_info%n_add == 0) exit
   end do
+
 
   call pc%set_accel()
 
@@ -239,6 +248,18 @@ program apic
           !  call adapt_weights(tree, pc)
         end if
      end if
+
+     ! ! >test debug
+     ! ! call af_tree_max_cc(tree, i_phi, max_potential)
+     ! call get_max_value(tree, diel, i_surf_sum_dens, max_surf_density)
+     ! ! if (max_potential > 1e20_dp) then
+     !
+     !   ! write(*, "(A20,E9.2)") "dt", GL_dt
+     !   ! write(*, "(A20,E9.2)") "the max potential is", max_potential
+     !   write(*, "(A20,E9.2)") "the max surf density is", max_surf_density
+     ! ! end if
+     ! ! < end test debug
+
   end do
 
 contains
