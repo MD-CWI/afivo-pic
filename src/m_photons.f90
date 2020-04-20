@@ -184,7 +184,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
   if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
 
-  !TODO Find out how to work with this omp stuff
+  !TODO Find out how to work with this omp stuff and think about photon weight
   !!$omp parallel private(lvl, i, id, ii, jj, nn)
   do lvl = 1, tree%highest_lvl
     !!$omp do

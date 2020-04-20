@@ -16,6 +16,9 @@ module m_refine
   ! The grid spacing will always be larger than this value
   real(dp), protected :: refine_min_dx = 1.0e-6_dp
 
+  ! The grid spacing on the surface will always be smaller than this value
+  real(dp), protected :: refine_surface_max_dx = 1.0e-3_dp
+
   ! The grid spacing will always be smaller than this value
   real(dp), protected :: refine_max_dx = 1.0e-3_dp
 
@@ -64,6 +67,11 @@ contains
          "The grid spacing will always be larger than this value")
     call CFG_add_get(cfg, "refine%max_dx", refine_max_dx, &
          "The grid spacing will always be smaller than this value")
+    call CFG_add_get(cfg, "refine%surface_max_dx", refine_surface_max_dx, &
+         "The grid spacing for boxes on a dielectric surface will always be smaller than this value")
+
+    if (refine_min_dx > refine_surface_max_dx) &
+     error stop "Cannot have refine_min_dx < refine_surface_max_dx"
 
     if (refine_min_dx > refine_max_dx) &
          error stop "Cannot have refine_min_dx < refine_max_dx"
@@ -73,7 +81,7 @@ contains
     call CFG_add_get(cfg, "refine%elec_dens", refine_elec_dens, &
          "Only refine if electron density is above this value")
     call CFG_add_get(cfg, "refine%derefine_dx", derefine_dx, &
-         "Only derefine if grid spacing if smaller than this value")
+         "Only derefine if grid spacing is smaller than this value")
 
     call CFG_add(cfg, "refine%regions_dr", [1.0e99_dp], &
          "Refine regions up to this grid spacing", .true.)
@@ -148,6 +156,15 @@ contains
           cell_flags(DTIMES(nc/2)) = af_do_ref
        end if
     end do
+
+    ! Ensure that the minimum refinement for boxes on the surface are satisfied
+    if (GL_use_dielectric) then
+      if (is_box_on_surface(tree, diel, box)) then
+        if (max_dx > refine_surface_max_dx) then
+          cell_flags = af_do_ref
+        end if
+      end if
+    end if
 
     ! Make sure we don't have or get a too fine or too coarse grid
     if (max_dx > refine_max_dx) then

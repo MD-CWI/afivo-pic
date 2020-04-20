@@ -303,7 +303,6 @@ contains
 
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
          ix_surf, ix_cell)
-
     ! Update the charge in the surface cell
 #if NDIM == 2
     diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
