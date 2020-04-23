@@ -9,3 +9,4 @@
 /programs/*/output/*
 /programs/*/apic
 /programs/*/visitlog.py
+/programs/*/apic.dSYM

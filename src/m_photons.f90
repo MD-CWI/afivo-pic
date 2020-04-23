@@ -153,8 +153,8 @@ contains
     ! Calculate production to the pool of excited Argon species
     jj = 0
     do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_excite_t) then
-         ! if (pc%event_list(n)%cIx == 2) then ! TODO do this more generally
+       ! if (pc%event_list(n)%ctype == CS_excite_t) then
+         if (pc%event_list(n)%cIx == 2 .or. pc%event_list(n)%cIx == 4  ) then ! TODO do this more generally
          jj = jj + 1
          coords(:, jj) = pc%event_list(n)%part%x(1:NDIM)
          weights(jj) = pc%event_list(n)%part%w
@@ -195,7 +195,15 @@ subroutine Ar2_radiative_decay(tree, pc)
         do jj = 1, tree%boxes(id)%n_cell
           mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
             * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
-          n_uv = GL_rng%poisson(mean_ph)
+
+            if (mean_ph > 1_dp) then
+              ! print *, "the mean_ph is",mean_ph
+              n_uv = GL_rng%poisson(mean_ph)   !*(GL_dt/(4*1e-9_dp))
+            else
+              n_uv = 0
+            end if
+
+
 
           x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
           do nn = 1, n_uv
@@ -208,14 +216,13 @@ subroutine Ar2_radiative_decay(tree, pc)
               ! print *, "photoemission event has occurred"
             end if
           end do
-          ! if (n_uv > 0.0_dp) then
-          !   print *, n_uv
-          ! end if
+
           tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = tree%boxes(id)%cc(ii, jj, i_Ar2_pool) - &
           ! n_uv * particle_min_weight / cell_size !Update Ar2 density due to radiative decay
           n_uv * 1.0_dp / cell_size !Update Ar2 density due to radiative decay
           if (tree%boxes(id)%cc(ii, jj, i_Ar2_pool) < 0.0_dp) then
-            print *, "WARNING: NEGATIVE DENSITIES OCCURED"
+            print *, "WARNING: NEGATIVE DENSITIES OCCURED", &
+            tree%boxes(id)%cc(ii, jj, i_Ar2_pool)
             tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar2_pool))
             ! error stop "Negative density for excited states of Argon2 found after radiative decay."
           end if
