@@ -48,6 +48,7 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
+  integer, protected :: i_P_dep    = -1 ! Density of deposited power
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -132,6 +133,7 @@ contains
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
+    call af_add_cc_variable(tree, "power_deposition", .true., ix=i_P_dep)
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")

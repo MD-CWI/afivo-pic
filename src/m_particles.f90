@@ -178,20 +178,21 @@ contains
     end do
   end subroutine sort_by_id
 
-  subroutine particles_to_density_and_events(tree, pc, init_cond)
+  subroutine particles_to_density_and_events(tree, pc, init_cond, dt)
     use m_cross_sec
     use m_particle_core
     use m_domain, only: outside_check
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
+    real(dp), intent(in)             :: dt
 
     integer                     :: n, i, n_part, n_photons
-    ! type(PC_part_t)             :: new_part
+
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
-
+    real(dp), allocatable, save :: energy_lost(:)
 
     n_part = pc%get_num_sim_part()
     n = max(n_part, pc%n_events)
@@ -201,21 +202,26 @@ contains
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       allocate(energy_lost(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
+       deallocate(energy_lost)
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       allocate(energy_lost(n))
     end if
 
     !$omp parallel do
     do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:NDIM)
-       weights(n) = pc%particles(n)%w
-       id_guess(n) = pc%particles(n)%id
+       coords(:, n)   = pc%particles(n)%x(1:NDIM)
+       weights(n)     = pc%particles(n)%w
+       id_guess(n)    = pc%particles(n)%id
+       energy_lost(n) = pc%particles(n)%en_loss
+       pc%particles(n)%en_loss = 0.0_dp ! Reset the energy_loss of all particles
     end do
     !$omp end parallel do
 
@@ -229,8 +235,12 @@ contains
             id_guess(1:n_part))
     else
        call af_tree_clear_cc(tree, i_electron)
+       call af_tree_clear_cc(tree, i_P_dep)
        call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, interpolation_order_to_density, &
+            id_guess(1:n_part))
+       call af_particles_to_grid(tree, i_P_dep, coords(:, 1:n_part), &
+            weights(1:n_part)*energy_lost(1:n_part)/dt, n_part, 1, &
             id_guess(1:n_part))
     end if
 
@@ -243,16 +253,18 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
+          energy_lost(i) = 0.0_dp ! Energy loss for this collision is stored in the particles
        else if (pc%event_list(n)%ctype == CS_attach_t) then
           i = i + 1
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
+          energy_lost(i) = PC_v_to_en(pc%event_list(n)%part%v, UC_elec_mass) + pc%event_list(n)%part%en_loss! All of the particles energy is deposited in the gass
 
-
-          if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
-             mask(i) = 1.0_dp
-          end if
+          ! TODO these lines are deprecated due to Git shit -> Jannis touched it I think...
+          ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
+          !    mask(i) = 1.0_dp
+          ! end if
 
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
@@ -266,12 +278,15 @@ contains
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order_to_density, &
             id_guess(1:i))
+       call af_particles_to_grid(tree, i_P_dep, coords(:, 1:i), &
+           abs(weights(1:i)*energy_lost(1:i))/dt, i, 1, &
+           id_guess(1:i))
     end if
 
-
-   call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
-        weights(1:i), i, interpolation_order_to_density, &
-        id_guess(1:i))
+   ! TODO these lines are deprecated due to Git shit -> Jannis touched it I think...
+   ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
+   !      weights(1:i), i, interpolation_order_to_density, &
+   !      id_guess(1:i))
 
     if (photoi_enabled) then
       call photoionization(tree, pc, coords, weights, n_photons)

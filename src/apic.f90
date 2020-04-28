@@ -93,6 +93,7 @@ program apic
 #if NDIM == 3
   call af_set_cc_methods(tree, i_Ez, af_bc_neumann_zero)
 #endif
+  call af_set_cc_methods(tree, i_P_dep, af_bc_neumann_zero)
 
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
@@ -112,7 +113,7 @@ program apic
   ! Perform additional refinement
   do
      call af_tree_clear_cc(tree, i_pos_ion)
-     call particles_to_density_and_events(tree, pc, .true.)
+     call particles_to_density_and_events(tree, pc, .true., dt)
      call field_compute(tree, mg, .false.)
 
      if (GL_use_dielectric) then
@@ -183,7 +184,7 @@ program apic
 
      GL_time = GL_time + dt
 
-     call particles_to_density_and_events(tree, pc, .false.)
+     call particles_to_density_and_events(tree, pc, .false., dt)
 
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase) then
@@ -230,7 +231,7 @@ program apic
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
            ! Compute the field on the new mesh
-           call particles_to_density_and_events(tree, pc, .false.)
+           call particles_to_density_and_events(tree, pc, .false., dt)
            call field_compute(tree, mg, .true.)
            call adapt_weights(tree, pc)
         end if

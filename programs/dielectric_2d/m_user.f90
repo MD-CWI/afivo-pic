@@ -114,5 +114,4 @@ contains
     end select
 
   end subroutine set_potential
-
 end module m_user
