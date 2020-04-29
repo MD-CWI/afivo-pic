@@ -146,7 +146,7 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = 4e3_dp
+        bc_val = 4e3_dp !1.5e3_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
@@ -158,9 +158,9 @@ contains
 
     if (r(1)/domain_len(1) <= 0.3_dp) then
         if (r(2)/domain_len(2) <= 0.5_dp)  then
-          set_surface_charge = (1-r(1)/domain_len(1) )*(3.0e15_dp)
+          set_surface_charge = (1-r(1)/domain_len(1) )*(3.1e15_dp) ! !2.50e15_dp
         else
-          set_surface_charge = (1-r(1)/domain_len(1) )*(-3.0e15_dp)
+          set_surface_charge = (1-r(1)/domain_len(1) )*(-3.1e15_dp)
         end if
     else
         set_surface_charge = 0.0_dp

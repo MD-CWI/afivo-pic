@@ -53,9 +53,9 @@ program apic
 
   ! Initialize other modules
   call domain_init(cfg)
+  call GL_initialize(cfg, ndim)
   call refine_init(cfg, ndim)
   call time_step_init(cfg)
-  call GL_initialize(cfg, ndim)
   call check_path_writable(trim(GL_output_dir))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
