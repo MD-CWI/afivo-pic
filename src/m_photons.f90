@@ -58,8 +58,6 @@ integer, protected, public  :: i_Ar_4d_pool = -1 !Index of cell-centered Argon e
 integer, protected, public  :: i_Ar2_pool = -1 !Index of cell-centered Argon excimer
 integer, protected, public  :: i_Ar2_1_pool = -1 !Index of cell-centered Argon excimer
 
-
-
 procedure(photoi), pointer :: photoionization => null()
 procedure(photoe), pointer :: photoemission => null()
 
@@ -236,16 +234,11 @@ contains
      call af_particles_to_grid(tree, i_Ar_pool, coords(:, 1:jj), &
               filter(5,1:jj) * weights(1:jj), jj, 0, id_guess(1:jj)) ! Use zeroth order interpolation for simplicity
 
-
-
      call af_loop_box(tree, perform_argon_reaction3, .true.)
      call af_loop_box(tree, perform_argon_reaction2, .true.)
      call af_loop_box(tree, perform_argon_reaction1, .true.)
 
-
-
      call Ar2_radiative_decay(tree, pc) ! Do photoemission events (updates the Ar2 pool)
-
 end subroutine photoe_Argon
 
 !TODO reorganize with more generic methods
@@ -525,7 +518,6 @@ subroutine Ar2_radiative_decay(tree, pc)
   !   end do
   ! end subroutine perform_argon_reactions
 
-
   ! ==== Now the modules for Zheleznyak air model
 
   subroutine Zheleznyak_initialize(cfg)
@@ -680,7 +672,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     type(PC_part_t)                  :: new_part
     real(dp), intent(in)             :: photon_w, x_gas(3), x_diel(3)
 
-    if (GL_rng%unif_01() < photoe_probability) then
+    if (GL_rng%unif_01() < photoe_probability) then !TODO Can this be improved?
       ! Create photo-emitted electron
       new_part%x(:) = x_gas
       new_part%v(:) = 0.0_dp

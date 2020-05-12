@@ -8,5 +8,6 @@
 /programs/*/m_user.mod
 /programs/*/output/*
 /programs/*/apic
+/programs/*/apic_ions
 /programs/*/visitlog.py
 /programs/*/apic.dSYM

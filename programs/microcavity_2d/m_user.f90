@@ -18,12 +18,12 @@ contains
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
-    user_initial_particles => init_particles
+    ! user_initial_particles => init_particles
+    user_initial_particles_and_ions => init_particles_and_ions
     ! user_generate_particles => background_charge
     user_set_dielectric_eps => set_epsilon
     user_set_dielectric_charge => set_surface_charge
     user_potential_bc => my_potential
-
   end subroutine user_initialize
 
   subroutine init_particles(pc)
@@ -38,7 +38,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1,100
-       pos(1:2) = [0.45_dp, 0.3_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.5_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
@@ -49,6 +49,31 @@ contains
     end do
 
   end subroutine init_particles
+
+  subroutine init_particles_and_ions(pc_elec, pc_ions)
+    use m_particle_core
+    type(PC_t), intent(inout) :: pc_elec, pc_ions
+    integer                   :: n
+    real(dp)                  :: pos(3)
+    type(PC_part_t)           :: part
+
+    part%v      = 0.0_dp
+    part%a      = 0.0_dp
+    part%t_left = 0.0_dp
+
+    do n = 1,100
+       pos(1:2) = [0.5_dp, 0.5_dp] * domain_len
+       pos(3)   = 0.0_dp
+       part%w   = 1.0_dp
+       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
+
+       if (outside_check(part) <= 0) then
+          call pc_elec%add_part(part)
+          call pc_ions%add_part(part)
+       end if
+    end do
+
+  end subroutine init_particles_and_ions
 
   subroutine background_charge(particle, current_time, elaps_time)
     use m_particle_core
@@ -146,7 +171,7 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = 4e3_dp !1.5e3_dp
+        bc_val = 2.5e2_dp !1.5e3_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
@@ -156,7 +181,7 @@ contains
   real(dp) function set_surface_charge(r)
     real(dp), intent(in)    :: r(NDIM)  !< the corrdinates of the cell in dielectric surface
 
-    if (r(1)/domain_len(1) <= 0.3_dp) then
+    if (r(1)/domain_len(1) <= 0.1_dp) then
         if (r(2)/domain_len(2) <= 0.5_dp)  then
           set_surface_charge = (1-r(1)/domain_len(1) )*(3.1e15_dp) ! !2.50e15_dp
         else
@@ -165,8 +190,6 @@ contains
     else
         set_surface_charge = 0.0_dp
     end if
-
-
 
     ! Screen electric field outside dielectric
     ! sigma_function = -epsilon_high/interface_location

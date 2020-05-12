@@ -1,0 +1,52 @@
+LXCat, www.lxcat.net
+Generated on 12 May 2020. All rights reserved.
+
+RECOMMENDED REFERENCE FORMAT
+- Phelps database, www.lxcat.net, retrieved on May 12, 2020.
+Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
+Please check below in the headers of databases.
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE:         Phelps database
+PERMLINK:         www.lxcat.net/Phelps
+DESCRIPTION:      A compilation of atomic and molecular data, assembled and evaluated by A.V. Phelps and collaborators.
+                  Please refer to these data using the sources cited for each gas. 
+                  
+                  We make no claims for these cross sections beyond those stated in the papers where they are published
+                  or cited.  In most cases these cross sections were assembled in the 1970's and 1980's. In only a few
+                  cases have they been modified or tested since that time. I do not plan any updates.  Additions have
+                  been made when cross sections have been assembled for other purposes. Since the JILA information
+                  center was closed by NIST, there is no one there to help you.  Opinions expressed are those of AV
+                  Phelps and do not imply JILA, CU, or NIST approval.
+CONTACT:          A.V. Phelps, Fellow Adjoint of JILA
+                  University of Colorado
+                  Boulder, CO 80309-0440
+                  e-mail: avp@@jila.colorado.edu
+HOW TO REFERENCE: http://jilawww.colorado.edu/~avp/
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+************************************************************************************************************************
+
+
+********************************************************** Ar **********************************************************
+
+SPECIES: Ar^+ / Ar
+PROCESS: Mobility (Ko)
+PARAM.:  Tgas = 300 K
+COMMENT: The following Ar+ + Ar data are taken from A. V. Phelps, J. Phys. Chem. Ref. Data 20, 557
+COMMENT: (1991). Table 8: Calculated drift velocities, steady-state energies and reaction
+COMMENT: coefficients for Ar+ in Ar.
+UPDATED: 2010-09-13 10:42:59
+COLUMNS: Reduced electric field (Td) | Mobility (cm2/Vs)
+-----------------------------
+ 1.000000e+3	6.100372e-1
+ 2.000000e+3	4.423792e-1
+ 3.000000e+3	3.692689e-1
+ 5.000000e+3	2.944238e-1
+ 1.000000e+4	2.148699e-1
+ 2.000000e+4	1.589219e-1
+ 3.000000e+4	1.329616e-1
+ 5.000000e+4	1.070632e-1
+ 1.000000e+5	8.029740e-2
+-----------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

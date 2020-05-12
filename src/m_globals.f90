@@ -17,6 +17,7 @@ module m_globals
   type(af_t)  :: tree ! This contains the full grid information
   type(mg_t)  :: mg   ! Multigrid option struct
   type(PC_t)  :: pc
+  type(PC_t)  :: pc_ions ! A seperate class of PC for ion-particles
   type(dielectric_t) :: diel ! To store dielectric surface
 
   ! Default length of strings

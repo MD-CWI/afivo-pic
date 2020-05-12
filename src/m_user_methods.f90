@@ -13,6 +13,9 @@ module m_user_methods
   !> If defined, call this routine after setting initial conditions
   procedure(init_part), pointer :: user_initial_particles => null()
 
+  !> If defined, call this routine after setting initial conditions
+  procedure(init_part_and_ions), pointer :: user_initial_particles_and_ions => null()
+
   !> Call this routine every time step to generate particles
   procedure(gen_part), pointer :: user_generate_particles => null()
 
@@ -33,6 +36,11 @@ module m_user_methods
        type(PC_t), intent(inout) :: pc
      end subroutine init_part
 
+    subroutine init_part_and_ions(pc_elec, pc_ions)
+      import
+      type(PC_t), intent(inout) :: pc_elec, pc_ions
+    end subroutine init_part_and_ions
+
      subroutine gen_part(pc, time, time_elapsed)
        import
        type(PC_t), intent(inout) :: pc
@@ -52,6 +60,7 @@ module m_user_methods
         real(dp), intent(in) :: x(NDIM)
         real(dp)             :: my_val
       end function value_func
+
   end interface
 
 end module m_user_methods
