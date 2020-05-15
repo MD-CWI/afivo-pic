@@ -66,10 +66,6 @@ contains
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
 
-    if (init_cond) then
-      ! Here we will the particles from pc as ions to pc_ions
-    end if
-
     n = pc%n_events
     if (.not. allocated(weights)) then
        n = nint(n * array_incr_fac)
@@ -96,7 +92,7 @@ contains
        else if (pc%event_list(n)%ctype == CS_attach_t) then
           i = i + 1
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
-          weights(i) = -pc%event_list(n)%part%w
+          weights(i) = -pc%event_list(n)%part%w !TODO negative weights are not allowed for tracer particles!!!
           id_guess(i) = pc%event_list(n)%part%id
 
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
@@ -116,8 +112,8 @@ contains
     if (photoi_enabled) then
       call photoionization(tree, pc, coords, weights, n_photons)
       call generate_ions_as_particles(pc_ions, i_pos_ion, coords(:, 1:n_photons), &
-          weights(1:n_photons), i, interpolation_order_to_density, &
-          id_guess(1:n_photons))
+          weights(1:n_photons), n_photons, interpolation_order_to_density)!, &
+          !id_guess(1:n_photons))
     end if
 
     if (photoe_enabled) then
@@ -209,7 +205,7 @@ contains
 
     integer :: i
     type(PC_part_t)         :: new_part
-    do i = 1, n_new_ions !TODO do in parallel
+    do i = 1, n_new_ions !TODO do it with buffer!
       new_part%x(1:NDIM) = coords(1:NDIM, i)
       new_part%v = drift_velocity(new_part)
       new_part%w = weights(i)
@@ -262,7 +258,7 @@ contains
     new_electron%a(:) = pc%accel_function(new_electron)
     new_electron%w    = se_coefficient * ion%w
 
-    call pc%add_part(new_electron)
+    call pc%add_part(new_electron) !TODO do it with buffer!
 
   end subroutine secondary_electron_emission
 
@@ -274,9 +270,9 @@ contains
     real(dp)        :: mu
     logical         :: success
     ! Get mu from the lookuptable
-    E        = af_interp1_fc(tree, ion%x(1:NDIM), ifc_E, success, id_guess=ion%id)
+    E  = af_interp1_fc(tree, ion%x(1:NDIM), ifc_E, success, id_guess=ion%id)
     if (.not. success) error stop "Can not find E for the calculation of ion drift velocity."
-    mu       = LT_get_col(td_tbl_mu, i_td_mu, norm2(E))
+    mu = LT_get_col(td_tbl_mu, i_td_mu, norm2(E))
 
     drift_velocity = 0
     drift_velocity(1:NDIM) = mu * E
@@ -284,7 +280,7 @@ contains
 
   subroutine load_ion_mobility_data(cfg)
     ! Initialize the ion mobility data and write to a lookup table from a datafile
-    ! Assumptions on data file: x-axis in V m^2 and y-axis in m^2/(V s).
+    ! Assumptions on data file: x-axis in V and y-axis in m^2/(V s).
     use m_transport_data
     use m_config
     use m_gas
@@ -292,7 +288,7 @@ contains
 
     character(len=GL_slen)     :: td_file_ions = "../../input/transport_data_Ar_ion.txt"
     integer                    :: table_size_ions           = 500
-    real(dp)                   :: max_red_electric_fld = 1e-16_dp
+    real(dp)                   :: max_electric_fld = 3.5e7_dp
     real(dp), allocatable      :: x_data(:), y_data(:)
     character(len=GL_slen)     :: data_name
 
@@ -300,20 +296,20 @@ contains
          "Input file with ion transport data")
     call CFG_add_get(cfg, "ions%lookup_table_size", table_size_ions, &
          "The ion transport data table size")
-    call CFG_add_get(cfg, "ions%lookup_table_max_red_efield", max_red_electric_fld, &
+    call CFG_add_get(cfg, "ions%lookup_table_max_red_efield", max_electric_fld, &
          "The maximum reduced electric field for the ion mobility")
 
     ! Create a lookup table for the model coefficients
-    td_tbl_mu = LT_create(0.0_dp, max_red_electric_fld, table_size_ions, 1)
+    td_tbl_mu = LT_create(0.0_dp, max_electric_fld, table_size_ions, 1)
 
     ! Fill table with data
-    data_name = "red_efield[V m2]_vs_mu[m2/(Vs)]"
+    data_name = "efield[V]_vs_mu[m2/(Vs)]"
     call CFG_add_get(cfg, "td_mu_name", data_name, &
          "The name of the ion mobility coefficient.")
     call TD_get_from_file(td_file_ions, GL_gas_name, &
          trim(data_name), x_data, y_data)
-    ! Convert the x-axis to Efield [V/m] through multiplication with gas density
-    call LT_set_col(td_tbl_mu, i_td_mu, (x_data * GAS_number_dens), y_data)
+    ! Scale the y-axis according to pressure
+    call LT_set_col(td_tbl_mu, i_td_mu, x_data, (y_data * 1.0_dp / GAS_pressure))
   end subroutine load_ion_mobility_data
 
 end module m_ions
