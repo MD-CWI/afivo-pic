@@ -171,7 +171,7 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = 2.5e2_dp !1.5e3_dp
+        bc_val = 5.0e2_dp !1.5e3_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp

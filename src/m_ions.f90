@@ -205,7 +205,7 @@ contains
 
     integer :: i
     type(PC_part_t)         :: new_part
-    do i = 1, n_new_ions !TODO do it with buffer!
+    do i = 1, n_new_ions !TODO do it with buffer!  or in parallel idk
       new_part%x(1:NDIM) = coords(1:NDIM, i)
       new_part%v = drift_velocity(new_part)
       new_part%w = weights(i)
@@ -258,7 +258,7 @@ contains
     new_electron%a(:) = pc%accel_function(new_electron)
     new_electron%w    = se_coefficient * ion%w
 
-    call pc%add_part(new_electron) !TODO do it with buffer!
+    call pc%add_part(new_electron) !TODO do it with buffer! or in parallel idk
 
   end subroutine secondary_electron_emission
 
@@ -309,7 +309,7 @@ contains
     call TD_get_from_file(td_file_ions, GL_gas_name, &
          trim(data_name), x_data, y_data)
     ! Scale the y-axis according to pressure
-    call LT_set_col(td_tbl_mu, i_td_mu, x_data, (y_data * 1.0_dp / GAS_pressure))
+    call LT_set_col(td_tbl_mu, i_td_mu, x_data, (y_data / GAS_pressure))
   end subroutine load_ion_mobility_data
 
 end module m_ions
