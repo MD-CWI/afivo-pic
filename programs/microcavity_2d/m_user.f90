@@ -21,8 +21,8 @@ contains
     ! user_initial_particles => init_particles
     user_initial_particles_and_ions => init_particles_and_ions
     ! user_generate_particles => background_charge
-    user_set_dielectric_eps => set_epsilon
-    user_set_dielectric_charge => set_surface_charge
+    user_set_dielectric_eps => set_epsilon!set_epsilon_boxwise!
+    ! user_set_dielectric_charge => set_surface_charge
     user_potential_bc => my_potential
   end subroutine user_initialize
 
@@ -38,7 +38,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1,100
-       pos(1:2) = [0.5_dp, 0.5_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.3_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
@@ -62,7 +62,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1,100
-       pos(1:2) = [0.5_dp, 0.5_dp] * domain_len
+       pos(1:2) = [0.2_dp, 0.35_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
@@ -146,9 +146,9 @@ contains
     do j = 0, box%n_cell+1
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
-          if (r(2)/domain_len(2) <= 0.25_dp) then
+          if (r(2)/domain_len(2) < 0.3_dp) then
              box%cc(i, j, i_eps) = 10.0_dp
-          else if (r(2)/domain_len(2) >= 0.75_dp) then
+          else if (r(2)/domain_len(2) > 0.7_dp) then
              box%cc(i, j, i_eps) = 10.0_dp
           else
              box%cc(i, j, i_eps) = 1.0_dp
@@ -156,6 +156,39 @@ contains
        end do
     end do
   end subroutine set_epsilon
+
+  subroutine set_epsilon_boxwise(box)
+    type(box_t), intent(inout) :: box
+    real(dp)                   :: r(2)
+    integer                    :: i, j
+    real(dp)  :: die_pos_l, die_pos_h, temp
+
+    temp = box%dr(2) * box%n_cell
+
+    die_pos_l = domain_len(2) * 0.2_dp
+    die_pos_h = domain_len(2) * 0.8_dp
+
+    if (die_pos_l > box%r_min(2) .and. die_pos_l < box%r_min(2) + temp) &
+      die_pos_l = box%r_min(2)
+    if (die_pos_h > box%r_min(2) .and. die_pos_h < box%r_min(2) + temp) &
+      die_pos_h = box%r_min(2)
+
+      ! print *, "the low dielectric position", die_pos_l
+      ! print *, "the high dielectric position", die_pos_h
+    do j = 0, box%n_cell+1
+       do i = 0, box%n_cell+1
+          r = af_r_cc(box, [i, j])
+          if (r(2) < die_pos_l) then
+             box%cc(i, j, i_eps) = 10.0_dp
+          else if (r(2) > die_pos_h) then
+             box%cc(i, j, i_eps) = 10.0_dp
+          else
+             box%cc(i, j, i_eps) = 1.0_dp
+          end if
+       end do
+    end do
+  end subroutine set_epsilon_boxwise
+
 
   subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
     type(box_t), intent(in) :: box
@@ -172,6 +205,7 @@ contains
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
         bc_val = 5.0e2_dp !1.5e3_dp
+        bc_val = 2e3_dp !1.5e3_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp

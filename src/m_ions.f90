@@ -112,8 +112,7 @@ contains
     if (photoi_enabled) then
       call photoionization(tree, pc, coords, weights, n_photons)
       call generate_ions_as_particles(pc_ions, i_pos_ion, coords(:, 1:n_photons), &
-          weights(1:n_photons), n_photons, interpolation_order_to_density)!, &
-          !id_guess(1:n_photons))
+          weights(1:n_photons), n_photons, interpolation_order_to_density)!id_guess(1:n_photons)
     end if
 
     if (photoe_enabled) then
@@ -122,7 +121,7 @@ contains
 
     pc%n_events = 0
 
-    !Do the events (i.e. secondary emission) for ions
+    !Do the events (i.e. secondary emission) for outside ions
     do n = 1, pc_ions%n_events
       if (pc_ions%event_list(n)%ctype == PC_particle_went_out .and. &
           pc_ions%event_list(n)%cIx == inside_dielectric) then
@@ -144,11 +143,11 @@ contains
        call dielectric_inside_layer_to_surface(tree, diel, i_electron, &
             i_surf_elec_close, 1.0_dp, clear_cc=.true., clear_surf=.true.)
        call dielectric_inside_layer_to_surface(tree, diel, i_pos_ion, &
-            i_surf_pos_ion, 1.0_dp, clear_cc=.true., clear_surf=.true.)
+            i_surf_pos_ion_close, 1.0_dp, clear_cc=.true., clear_surf=.true.)
        ! Sum densities together
        call dielectric_set_weighted_sum(diel, i_surf_sum_dens, &
-            [i_surf_elec, i_surf_elec_close, i_surf_pos_ion], &
-            [-1.0_dp, -1.0_dp, 1.0_dp])
+            [i_surf_elec, i_surf_elec_close, i_surf_pos_ion,i_surf_pos_ion_close], &
+            [-1.0_dp, -1.0_dp, 1.0_dp, 1.0_dp])
     end if
   end subroutine particles_and_ions_to_density_and_events
 
@@ -276,6 +275,11 @@ contains
 
     drift_velocity = 0
     drift_velocity(1:NDIM) = mu * E
+
+    ! ! > test debug
+    ! if (norm2(drift_velocity) >= 1000) &
+    ! write(*, "(A20,E12.4)") "the ion velocity is", norm2(drift_velocity
+    ! ! < end test debug_flag
   end function drift_velocity
 
   subroutine load_ion_mobility_data(cfg)
@@ -286,7 +290,7 @@ contains
     use m_gas
     type(CFG_t), intent(inout) :: cfg
 
-    character(len=GL_slen)     :: td_file_ions = "../../input/transport_data_Ar_ion.txt"
+    character(len=GL_slen)     :: td_file_ions = "../../input/transport_data_ar0.txt"
     integer                    :: table_size_ions           = 500
     real(dp)                   :: max_electric_fld = 3.5e7_dp
     real(dp), allocatable      :: x_data(:), y_data(:)
@@ -296,20 +300,21 @@ contains
          "Input file with ion transport data")
     call CFG_add_get(cfg, "ions%lookup_table_size", table_size_ions, &
          "The ion transport data table size")
-    call CFG_add_get(cfg, "ions%lookup_table_max_red_efield", max_electric_fld, &
+    call CFG_add_get(cfg, "ions%lookup_table_max_efield", max_electric_fld, &
          "The maximum reduced electric field for the ion mobility")
 
     ! Create a lookup table for the model coefficients
     td_tbl_mu = LT_create(0.0_dp, max_electric_fld, table_size_ions, 1)
 
     ! Fill table with data
-    data_name = "efield[V]_vs_mu[m2/(Vs)]"
+    data_name = "efield[V/m]_vs_ion_mu[m2/Vs]"
     call CFG_add_get(cfg, "td_mu_name", data_name, &
          "The name of the ion mobility coefficient.")
     call TD_get_from_file(td_file_ions, GL_gas_name, &
          trim(data_name), x_data, y_data)
-    ! Scale the y-axis according to pressure
-    call LT_set_col(td_tbl_mu, i_td_mu, x_data, (y_data / GAS_pressure))
+
+    ! Convert mobility in 1 atm to the low pressure mobility with propotional relation
+    call LT_set_col(td_tbl_mu, i_td_mu, x_data, y_data * (1.0_dp/GL_gas_pressure))
   end subroutine load_ion_mobility_data
 
 end module m_ions
