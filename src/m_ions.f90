@@ -66,10 +66,6 @@ contains
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
 
-    if (init_cond) then
-      ! Here we will the particles from pc as ions to pc_ions
-    end if
-
     n = pc%n_events
     if (.not. allocated(weights)) then
        n = nint(n * array_incr_fac)
@@ -96,7 +92,7 @@ contains
        else if (pc%event_list(n)%ctype == CS_attach_t) then
           i = i + 1
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
-          weights(i) = -pc%event_list(n)%part%w
+          weights(i) = -pc%event_list(n)%part%w !TODO negative weights are not allowed for tracer particles!!!
           id_guess(i) = pc%event_list(n)%part%id
 
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
@@ -208,7 +204,7 @@ contains
 
     integer :: i
     type(PC_part_t)         :: new_part
-    do i = 1, n_new_ions !TODO do in parallel
+    do i = 1, n_new_ions !TODO do it with buffer!
       new_part%x(1:NDIM) = coords(1:NDIM, i)
       new_part%v = drift_velocity(new_part)
       new_part%w = weights(i)
@@ -261,7 +257,7 @@ contains
     new_electron%a(:) = pc%accel_function(new_electron)
     new_electron%w    = se_coefficient * ion%w
 
-    call pc%add_part(new_electron)
+    call pc%add_part(new_electron) !TODO do it with buffer!
 
   end subroutine secondary_electron_emission
 
@@ -273,9 +269,9 @@ contains
     real(dp)        :: mu
     logical         :: success
     ! Get mu from the lookuptable
-    E        = af_interp1_fc(tree, ion%x(1:NDIM), ifc_E, success, id_guess=ion%id)
+    E  = af_interp1_fc(tree, ion%x(1:NDIM), ifc_E, success, id_guess=ion%id)
     if (.not. success) error stop "Can not find E for the calculation of ion drift velocity."
-    mu       = LT_get_col(td_tbl_mu, i_td_mu, norm2(E))
+    mu = LT_get_col(td_tbl_mu, i_td_mu, norm2(E))
 
     drift_velocity = 0
     drift_velocity(1:NDIM) = mu * E
@@ -288,7 +284,7 @@ contains
 
   subroutine load_ion_mobility_data(cfg)
     ! Initialize the ion mobility data and write to a lookup table from a datafile
-    ! Assumptions on data file: x-axis in V m^2 and y-axis in m^2/(V s).
+    ! Assumptions on data file: x-axis in V and y-axis in m^2/(V s).
     use m_transport_data
     use m_config
     use m_gas
@@ -296,7 +292,7 @@ contains
 
     character(len=GL_slen)     :: td_file_ions = "../../input/transport_data_ar0.txt"
     integer                    :: table_size_ions           = 500
-    real(dp)                   :: max_electric_fld = 1e8_dp
+    real(dp)                   :: max_electric_fld = 3.5e7_dp
     real(dp), allocatable      :: x_data(:), y_data(:)
     character(len=GL_slen)     :: data_name
 
