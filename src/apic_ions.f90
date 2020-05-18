@@ -107,8 +107,8 @@ if (GL_use_dielectric) then
    call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
 
    ! Initialize the dielectric surface charge
-   ! if (associated(user_set_dielectric_charge)) &
-   !    call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_dielectric_charge)
+   if (associated(user_set_dielectric_charge)) &
+      call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_dielectric_charge)
 
 end if
 

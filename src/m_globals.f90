@@ -54,11 +54,12 @@ module m_globals
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
-  integer, parameter :: n_surf_vars = 4
+  integer, parameter :: n_surf_vars = 5
   integer, parameter :: i_surf_sum_dens = 1
   integer, parameter :: i_surf_elec_close = 2
   integer, parameter :: i_surf_elec = 3
   integer, parameter :: i_surf_pos_ion = 4
+  integer, parameter :: i_surf_pos_ion_close = 5
 
   ! Whether cylindrical coordinates are used
   logical, protected :: GL_cylindrical = .false.
