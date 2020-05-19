@@ -403,18 +403,15 @@ subroutine Ar2_radiative_decay(tree, pc)
     type(PC_part_t)                  :: new_part
     real(dp), intent(in)             :: photon_w, x_gas(3), x_diel(3)
 
-    if (GL_rng%unif_01() < photoe_probability) then
-      ! Create photo-emitted electron
-      new_part%x(:) = x_gas
-      new_part%v(:) = 0.0_dp
-      new_part%a(:) = pc%accel_function(new_part)
-      new_part%w    = photon_w
-      new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
+    new_part%x(:) = x_gas
+    new_part%v(:) = 0.0_dp
+    new_part%a(:) = pc%accel_function(new_part)
+    new_part%w    = photon_w * photoe_probability
+    new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
 
-      call pc%add_part(new_part)
-      ! Update charge density on the dielectric
-      call surface_charge_to_particle(tree, new_part, i_surf_elec)
-    end if
+    call pc%add_part(new_part)
+    ! Update charge density on the dielectric
+    call surface_charge_to_particle(tree, new_part, i_surf_elec)
   end subroutine single_photoemission_event
 
   subroutine surface_charge_to_particle(tree, my_part, i_surf)
