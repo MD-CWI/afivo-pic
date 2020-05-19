@@ -21,6 +21,7 @@ real(dp)                :: photoe_probability = 1.0e-2_dp
 character(CFG_name_len) :: model
 
 real(dp)              :: pi_quench_fac
+real(dp)              :: cs_O2(2), cs_CH4, frac_O2, frac_CH4
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
 real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
@@ -77,7 +78,7 @@ contains
 
     ! Initialize parameters and pointers according to the selected model
     select case (model)
-      case("Zheleznyak")
+    case("Zheleznyak")
         call Zheleznyak_initialize(cfg)
         photoionization => photoi_Zheleznyak
         photoemission => photoe_Zheleznyak
@@ -154,7 +155,6 @@ contains
     jj = 0
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_excite_t) then
-         ! if (pc%event_list(n)%cIx == 2) then ! TODO do this more generally
          jj = jj + 1
          coords(:, jj) = pc%event_list(n)%part%x(1:NDIM)
          weights(jj) = pc%event_list(n)%part%w
@@ -164,68 +164,66 @@ contains
      end do
      call af_particles_to_grid(tree, i_Ar_pool, coords(:, 1:jj), &
           weights(1:jj), jj, 0, id_guess(1:jj)) ! Use zeroth order interpolation for simplicity
-end subroutine photoe_Argon
+  end subroutine photoe_Argon
 
-subroutine Ar2_radiative_decay(tree, pc)
-  ! Routine that performs Ar2_exc radiative decay for every cell in a box
-  ! This routine also performs photoemission
+    subroutine Ar2_radiative_decay(tree, pc)
+    ! Routine that performs Ar2_exc radiative decay for every cell in a box
+    ! This routine also performs photoemission
 
-  ! TODO Code from af_loop_box is copied (because of particle creation and non-local effects). Thats why this code is nasty
-  type(af_t), intent(inout)  :: tree
-  type(PC_t), intent(inout)  :: pc
+    type(af_t), intent(inout)  :: tree
+    type(PC_t), intent(inout)  :: pc
 
-  integer    :: ii, jj, nn
-  integer    :: lvl, i, id
-  integer    :: n_uv
-  real(dp)   :: mean_ph
-  real(dp)   :: cell_size
-  real(dp)   :: x_start(3), x_cc(3), x_stop(3)
-  logical    :: on_surface
+    integer    :: ii, jj, nn
+    integer    :: lvl, i, id
+    integer    :: n_uv
+    real(dp)   :: mean_ph
+    real(dp)   :: cell_size
+    real(dp)   :: x_start(3), x_cc(3), x_stop(3)
+    logical    :: on_surface
 
-  if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
+    if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
 
-  !TODO Find out how to work with this omp stuff and think about photon weight
-  !!$omp parallel private(lvl, i, id, ii, jj, nn)
-  do lvl = 1, tree%highest_lvl
-    !!$omp do
-    do i = 1, size(tree%lvls(lvl)%leaves)
-      id = tree%lvls(lvl)%leaves(i)
-      cell_size = product(tree%boxes(id)%dr)
-      do ii = 1, tree%boxes(id)%n_cell
-        do jj = 1, tree%boxes(id)%n_cell
-          mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
-            * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
-          n_uv = GL_rng%poisson(mean_ph)
+    !!$omp parallel private(lvl, i, id, ii, jj, nn)
+    do lvl = 1, tree%highest_lvl
+      !!$omp do
+      do i = 1, size(tree%lvls(lvl)%leaves)
+        id = tree%lvls(lvl)%leaves(i)
+        cell_size = product(tree%boxes(id)%dr)
+        do ii = 1, tree%boxes(id)%n_cell
+          do jj = 1, tree%boxes(id)%n_cell
+            mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
+              * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
+            n_uv = GL_rng%poisson(mean_ph)
 
-          x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
-          do nn = 1, n_uv
-            x_start = x_cc
-            x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
-            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
-            if (on_surface) then
-              ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
-              call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
-              ! print *, "photoemission event has occurred"
+            x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
+            do nn = 1, n_uv
+              x_start = x_cc
+              x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
+              call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
+              if (on_surface) then
+                ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+                call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
+                ! print *, "photoemission event has occurred"
+              end if
+            end do
+            ! if (n_uv > 0.0_dp) then
+            !   print *, n_uv
+            ! end if
+            tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = tree%boxes(id)%cc(ii, jj, i_Ar2_pool) - &
+            ! n_uv * particle_min_weight / cell_size !Update Ar2 density due to radiative decay
+            n_uv * 1.0_dp / cell_size !Update Ar2 density due to radiative decay
+            if (tree%boxes(id)%cc(ii, jj, i_Ar2_pool) < 0.0_dp) then
+              print *, "WARNING: NEGATIVE DENSITIES OCCURED"
+              tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar2_pool))
+              ! error stop "Negative density for excited states of Argon2 found after radiative decay."
             end if
           end do
-          ! if (n_uv > 0.0_dp) then
-          !   print *, n_uv
-          ! end if
-          tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = tree%boxes(id)%cc(ii, jj, i_Ar2_pool) - &
-          ! n_uv * particle_min_weight / cell_size !Update Ar2 density due to radiative decay
-          n_uv * 1.0_dp / cell_size !Update Ar2 density due to radiative decay
-          if (tree%boxes(id)%cc(ii, jj, i_Ar2_pool) < 0.0_dp) then
-            print *, "WARNING: NEGATIVE DENSITIES OCCURED"
-            tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar2_pool))
-            ! error stop "Negative density for excited states of Argon2 found after radiative decay."
-          end if
         end do
       end do
+      !!$omp end do
     end do
-    !!$omp end do
-  end do
-  !!$omp end parallel
-  end subroutine Ar2_radiative_decay
+    !!$omp end parallel
+    end subroutine Ar2_radiative_decay
 
   subroutine perform_argon_reactions(box)
     use m_gas
@@ -249,16 +247,16 @@ subroutine Ar2_radiative_decay(tree, pc)
     end do
   end subroutine perform_argon_reactions
 
-  ! ==== Now the modules for Zheleznyak air model
+  ! ==== Now the modules for Zheleznyak model
 
   subroutine Zheleznyak_initialize(cfg)
     use m_gas
     use m_config
     type(CFG_t), intent(inout) :: cfg
     integer                    :: t_size, t_size_2
-    real(dp)                   :: frac_O2, temp_vec(2)
+    real(dp)                   :: temp_vec(2)
 
-    ! Photoionization parameters for AIR
+    ! Photoionization parameters for AIR (possible mixed with CH4)
     call CFG_add(cfg, "photon%efield_table", &
         [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
         "Tabulated values of the electric field (for the photo-efficiency)")
@@ -271,15 +269,26 @@ subroutine Ar2_radiative_decay(tree, pc)
          [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
          "The inverse min/max absorption length, will be scaled by pO2")
 
+    cs_O2 = [1.05e-22_dp, 5.9e-21_dp] ! Min/max radiative cross sections for oxygen [m^2]
+    cs_CH4 = 3.0e-21_dp ! units of m^2
+
     if (photoi_enabled .or. photoe_enabled) then
        frac_O2 = GAS_get_fraction("O2")
        if (frac_O2 <= epsilon(1.0_dp)) then
           error stop "There is no oxygen, you should disable photoionzation"
        end if
 
-       call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
-       pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
-       pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
+       frac_CH4 = GAS_get_fraction("CH4")
+       if (frac_CH4 <= epsilon(1.0_dp)) then
+         call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
+         pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
+         pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
+       else
+         ! CH4 is present and can absorbs photons
+         !TODO check if these are the right way around
+         pi_max_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(1) + frac_CH4 * cs_CH4)
+         pi_min_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(2) + frac_CH4 * cs_CH4)
+       end if
 
        pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
             (GAS_pressure + (40.0D0 * UC_torr_to_bar))
@@ -310,15 +319,18 @@ subroutine Ar2_radiative_decay(tree, pc)
 
     integer         :: i, n, m, n_uv
     real(dp)        :: x_start(3), x_stop(3)
+    real(dp)        :: en_frac
+
 
     i = 0
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           n_uv = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
-
           do m = 1, n_uv
+             en_frac = GL_rng%unif_01()
+             if (frac_CH4 > epsilon(1.0_dp) .and. is_absorbed_by_CH4(en_frac)) cycle
              x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start)
+             x_stop  = get_x_stop(x_start, en_frac)
              if (is_in_gas(tree, x_stop)) then
                call single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
              end if
@@ -330,12 +342,14 @@ subroutine Ar2_radiative_decay(tree, pc)
   end subroutine photoi_Zheleznyak
 
   subroutine photoe_Zheleznyak(tree, pc)
-    ! Perform photoemission based on the Zheleznyak model for air
+    ! Perform photoemission based on the Zheleznyak model
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
     logical       :: on_surface
     integer       :: n, m, n_uv, n_low_en, n_high_en
     real(dp)      :: x_start(3), x_stop(3)
+    real(dp)      :: en_frac
+
 
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
@@ -343,9 +357,10 @@ subroutine Ar2_radiative_decay(tree, pc)
          n_high_en = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
          n_uv = n_low_en + n_high_en ! low-energy photons come from O2 and are generated at the same rate as high energy photons from N2
 
-          do m = 1, n_uv
+          do m = 1, n_uv ! High&low en photons are handled equally
+            en_frac = GL_rng%unif_01()
             x_start = pc%event_list(n)%part%x
-            x_stop  = get_x_stop(x_start)
+            x_stop  = get_x_stop(x_start, en_frac)
 
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
@@ -365,13 +380,13 @@ subroutine Ar2_radiative_decay(tree, pc)
          part%w / particle_min_weight
   end function
 
-  function get_x_stop(x_start) result(x_stop)
+  function get_x_stop(x_start, en_frac) result(x_stop)
     ! Calculate the coordinates of photon absorption according to Zheleznyak model
-    real(dp)  :: en_frac, fly_len
+    real(dp), intent(in)  :: en_frac
+    real(dp)              :: fly_len
     real(dp), intent(in)  :: x_start(3)
     real(dp)              :: x_stop(3)
 
-    en_frac = GL_rng%unif_01()
     fly_len = -log(1.0_dp - GL_rng%unif_01()) / get_photoi_lambda(en_frac)
     x_stop  = x_start + GL_rng%sphere(fly_len)
   end function
@@ -392,6 +407,19 @@ subroutine Ar2_radiative_decay(tree, pc)
     get_photoi_lambda = pi_min_inv_abs_len * &
          (pi_max_inv_abs_len/pi_min_inv_abs_len)**en_frac
   end function get_photoi_lambda
+
+  real(dp) function get_cs_O2(en_frac)
+    ! Returns the radiative cross section of O2 based on a power-law approximation
+    real(dp), intent(in)  ::  en_frac
+    get_cs_O2 = (cs_O2(1)**en_frac) * (cs_O2(2) **(1-en_frac))
+  end function
+
+  logical function is_absorbed_by_CH4(en_frac)
+    ! Determine if a photon is absorbed by CH4
+    real(dp), intent(in)  ::  en_frac
+    is_absorbed_by_CH4 = (GL_rng%unif_01() < &
+      get_cs_O2(en_frac) * frac_O2 / (get_cs_O2(en_frac) * frac_O2 + cs_CH4 * frac_CH4))
+  end function
 
   ! ==== General modules
 
