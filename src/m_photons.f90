@@ -21,7 +21,7 @@ real(dp)                :: photoe_probability = 1.0e-2_dp
 character(CFG_name_len) :: model
 
 real(dp)              :: pi_quench_fac
-real(dp)              :: cs_O2(2), cs_CH4, frac_O2, frac_CH4
+real(dp)              :: cs_O2(2), cs_CH4, frac_O2, frac_CH4, frac_N2
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
 real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
@@ -255,6 +255,7 @@ contains
     type(CFG_t), intent(inout) :: cfg
     integer                    :: t_size, t_size_2
     real(dp)                   :: temp_vec(2)
+    real(dp)                   :: pi_quench_effective
 
     ! Photoionization parameters for AIR (possible mixed with CH4)
     call CFG_add(cfg, "photon%efield_table", &
@@ -274,6 +275,7 @@ contains
 
     if (photoi_enabled .or. photoe_enabled) then
        frac_O2 = GAS_get_fraction("O2")
+       frac_N2 = GAS_get_fraction("N2")
        if (frac_O2 <= epsilon(1.0_dp)) then
           error stop "There is no oxygen, you should disable photoionzation"
        end if
@@ -283,15 +285,17 @@ contains
          call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
          pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
          pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
+
+         pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
+             (GAS_pressure + (40.0D0 * UC_torr_to_bar))
        else
          ! CH4 is present and can absorbs photons
-         !TODO check if these are the right way around
-         pi_max_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(1) + frac_CH4 * cs_CH4)
-         pi_min_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(2) + frac_CH4 * cs_CH4)
-       end if
+         pi_min_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(1) + frac_CH4 * cs_CH4)
+         pi_max_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(2) + frac_CH4 * cs_CH4)
 
-       pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
-            (GAS_pressure + (40.0D0 * UC_torr_to_bar))
+         pi_quench_effective = (frac_N2 / 40.0_dp + frac_O2 / 3.5_dp + frac_CH4 / 1.8_dp) ** (-1) * UC_torr_to_bar
+         pi_quench_fac = pi_quench_effective / (GAS_pressure + pi_quench_effective)
+       end if
 
        call CFG_get_size(cfg, "photon%efficiency_table", t_size)
        call CFG_get_size(cfg, "photon%efield_table", t_size_2)
@@ -411,7 +415,7 @@ contains
   real(dp) function get_cs_O2(en_frac)
     ! Returns the radiative cross section of O2 based on a power-law approximation
     real(dp), intent(in)  ::  en_frac
-    get_cs_O2 = (cs_O2(1)**en_frac) * (cs_O2(2) **(1-en_frac))
+    get_cs_O2 = (cs_O2(1)**(1-en_frac)) * (cs_O2(2) **en_frac)
   end function
 
   logical function is_absorbed_by_CH4(en_frac)
