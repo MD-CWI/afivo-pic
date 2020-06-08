@@ -18,8 +18,8 @@ contains
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
-    ! user_initial_particles => init_particles
-    user_initial_particles_and_ions => init_particles_and_ions
+    user_initial_particles => init_particles
+    ! user_initial_particles_and_ions => init_particles_and_ions
     ! user_generate_particles => background_charge
     user_set_dielectric_eps => set_epsilon!set_epsilon_boxwise!
     ! user_set_dielectric_charge => set_surface_charge
@@ -38,7 +38,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1,100
-       pos(1:2) = [0.5_dp, 0.3_dp] * domain_len
+       pos(1:2) = [0.2_dp, 0.35_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
