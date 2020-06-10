@@ -21,17 +21,19 @@ program apic
   integer, parameter     :: int8 = selected_int_kind(18)
   integer, parameter     :: ndim = NDIM
   integer(int8)          :: t_start, t_current, count_rate
-  real(dp)               :: dt
+  real(dp)               :: dt, dt_ions
   real(dp)               :: wc_time, inv_count_rate
   real(dp)               :: time_last_print, time_last_generate
   integer                :: it
   integer                :: n_part, n_prev_merge, n_ion_prev_merge, n_samples
   integer, allocatable   :: ref_links(:, :)
   character(len=GL_slen) :: fname
-  logical                :: write_out
+  logical                :: write_out, update_ions
   type(ref_info_t)       :: ref_info
-  real(dp)               :: n_elec, n_ion, n_elec_prev, n_ion_prev, max_elec_dens
+  real(dp)               :: n_elec, n_ion, n_elec_prev, n_ion_prev, max_elec_dens, max_ion_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
+  real(dp)               :: dt_ions_cfl, dt_ions_drt
+  real(dp)               :: time_ions = 0.0_dp
 
   ! > test debug
   real(dp) :: max_surf_density,min_surf_density, max_potential
@@ -189,27 +191,38 @@ end if
 
      ! Every GL_dt_output, write output
      if (output_cnt * GL_dt_output <= GL_time + GL_dt) then
-        write_out  = .true.
+        write_out   = .true.
+        update_ions = .true.
         dt         = output_cnt * GL_dt_output - GL_time
+        dt_ions    = output_cnt * GL_dt_output - time_ions
         output_cnt = output_cnt + 1
+        if (abs((GL_time + dt) - (time_ions + dt_ions)) > 1.0e-20_dp) then
+          print *, "Ion and electron times are not correctly synchronized within allowed tolerance"
+          print *, "The difference equals: ", abs((GL_time + dt) - (time_ions + dt_ions))
+          error stop
+        end if
      else
         write_out = .false.
         dt        = GL_dt
+        if (time_ions + dt_ions < GL_time + GL_dt) then
+          update_ions = .true.
+        end if
      end if
 
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt)
      call pc%after_mover(dt)
-     call pc_ions%advance_openmp(dt)
+     if (update_ions) call pc_ions%advance_openmp(dt)
      wtime_advance = wtime_advance + omp_get_wtime() - t0
 
      GL_time = GL_time + dt
+     if (update_ions) time_ions = time_ions + dt_ions
 
      call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false.)
 
      n_part = pc_ions%get_num_sim_part()
      if (n_part > n_ion_prev_merge * ion_min_merge_increase) then
-        call adapt_weights(tree, pc_ions)
+        call adapt_weights_ions(tree, pc_ions)
         n_ion_prev_merge = pc_ions%get_num_sim_part()
      end if
 
@@ -224,13 +237,25 @@ end if
 
      call pc%set_accel()
 
-     n_samples = min(n_part, 1000)
+     ! Time step for the ions
+     n_samples = min(pc_ions%get_num_sim_part(), 1000)
+     call af_tree_max_cc(tree, i_pos_ion, max_ion_dens)
+     dt_ions_cfl = PM_get_max_dt(pc_ions, GL_rng, n_samples, 0.9_dp)
+     dt_ions_drt = dielectric_relaxation_time(max_ion_dens, 1.5e-4_dp / GL_gas_pressure) ! max ion mobility
+     dt_ions     = min(dt_ions_cfl, dt_ions_drt, GL_dt_output)
+
+     ! Time step for the electrons
+     n_samples = min(pc%get_num_sim_part(), 1000)
      call af_tree_max_cc(tree, i_electron, max_elec_dens)
      n_elec      = pc%get_num_real_part()
-     dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
-     dt_drt      = dielectric_relaxation_time(max_elec_dens)
-     dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
-     GL_dt       = min(dt_cfl, dt_growth, dt_drt)
+     if (n_elec > 0.0_dp) then
+       dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
+       dt_drt      = dielectric_relaxation_time(max_elec_dens)
+       dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
+       GL_dt       = min(dt_cfl, dt_growth, dt_drt)
+     else
+       GL_dt = dt_ions !if no electrons are present, relax dt to the ion time scale
+     end if
      n_elec_prev = n_elec
 
      if (write_out) then
@@ -322,6 +347,10 @@ contains
     n_ions  = pc_ions%get_num_real_part()
 
     write(*, "(A20,E12.4)") "dt", GL_dt
+    write(*, "(A20,E12.4)") "dt_cfl", dt_cfl
+    write(*, "(A20,E12.4)") "dt_drt", dt_drt
+    write(*, "(A20,E12.4)") "dt_growth", dt_growth
+    write(*, "(A20,E12.4)") "dt_ions", dt_ions
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
     write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion

@@ -261,6 +261,55 @@ contains
 
   end subroutine secondary_electron_emission
 
+  !> Adjust the weights of the ions
+  subroutine adapt_weights_ions(tree, pc)
+    ! This is redundant when i_pos_ion / i_elec can be given as an argument
+    type(af_t), intent(in)   :: tree
+    type(PC_t), intent(inout) :: pc
+    integer                   :: id, n_part_id
+    integer, allocatable      :: id_ipart(:)
+
+    call sort_by_id(tree, pc, id_ipart)
+
+    ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
+    !$omp parallel do private(id, n_part_id) schedule(dynamic)
+    do id = 1, tree%highest_id
+       n_part_id = id_ipart(id+1) - id_ipart(id)
+       if (n_part_id > 0) then
+          call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
+               [.true., .true., .false.], 1e-12_dp, &
+               .true., get_desired_weight_ions, 1.0e10_dp, &
+               PC_merge_part_rxv, PC_split_part)
+       end if
+    end do
+    !$omp end parallel do
+    call pc%clean_up()
+    ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
+  end subroutine adapt_weights_ions
+
+  function get_desired_weight_ions(my_part) result(weight)
+    ! This is redundant when i_pos_ion / i_elec can be given as an argument
+    type(PC_part_t), intent(in) :: my_part
+    real(dp)                    :: weight, n_pos_ion
+    type(af_loc_t)              :: loc
+    integer                     :: id, ix(NDIM)
+
+    loc = af_get_loc(tree, my_part%x(1:NDIM), my_part%id)
+    id = loc%id
+    ix = loc%ix
+
+#if NDIM == 2
+    n_pos_ion = tree%boxes(id)%cc(ix(1), ix(2), i_pos_ion) * &
+         product(tree%boxes(id)%dr)
+#elif NDIM == 3
+    n_pos_ion = tree%boxes(id)%cc(ix(1), ix(2), ix(3), i_pos_ion) * &
+         product(tree%boxes(id)%dr)
+#endif
+
+    weight = n_pos_ion / particle_per_cell
+    weight = max(particle_min_weight, min(particle_max_weight, weight))
+  end function get_desired_weight_ions
+
   function drift_velocity(ion)
     !> Calculate the drift velocity for a particle treated as a tracer
     type(PC_part_t), intent(inout) :: ion

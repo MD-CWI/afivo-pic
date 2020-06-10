@@ -37,12 +37,17 @@ contains
 
   end subroutine time_step_init
 
-  function dielectric_relaxation_time(n_max) result(drt)
+  function dielectric_relaxation_time(n_max, ion_mobility) result(drt)
     use m_units_constants
-    real(dp), intent(in) :: n_max
-    real(dp)             :: drt
+    real(dp), intent(in)             :: n_max
+    real(dp), optional, intent(in)   :: ion_mobility ! non-default mobility
+    real(dp)                         :: drt
 
-    drt = UC_eps0 / (UC_elem_charge * max(n_max, 1.0e-10_dp) * drt_mobility)
+    if (present(ion_mobility)) then
+      drt = UC_eps0 / (UC_elem_charge * max(n_max, 1.0e-10_dp) * ion_mobility)
+    else
+      drt = UC_eps0 / (UC_elem_charge * max(n_max, 1.0e-10_dp) * drt_mobility)
+    end if
   end function dielectric_relaxation_time
 
   !> This routine can be used to estimate the error in the electric field. It
