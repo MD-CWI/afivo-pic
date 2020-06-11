@@ -30,14 +30,12 @@ program apic
   character(len=GL_slen) :: fname
   logical                :: write_out, update_ions
   type(ref_info_t)       :: ref_info
-  real(dp)               :: n_elec, n_ion, n_elec_prev, n_ion_prev, max_elec_dens, max_ion_dens
+  real(dp)               :: n_elec, n_elec_prev, max_elec_dens, max_ion_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
   real(dp)               :: dt_ions_cfl, dt_ions_drt
   real(dp)               :: time_ions = 0.0_dp
+  ! real(dp) :: max_surf_density,min_surf_density, max_potential
 
-  ! > test debug
-  real(dp) :: max_surf_density,min_surf_density, max_potential
-  ! < test debug
 
   real(dp) :: t0
   real(dp) :: wtime_start
@@ -164,7 +162,6 @@ end if
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
   n_ion_prev_merge = pc_ions%get_num_sim_part()
-  ! n_ion_prev = pc_ions%get_num_real_part()
 
   ! Start of time integration
   do it = 1, huge(1)-1
@@ -238,14 +235,14 @@ end if
      call pc%set_accel()
 
      ! Time step for the ions
-     n_samples = min(pc_ions%get_num_sim_part(), 1000)
+     n_samples = min(pc_ions%get_num_sim_part(), 10000)
      call af_tree_max_cc(tree, i_pos_ion, max_ion_dens)
-     dt_ions_cfl = PM_get_max_dt(pc_ions, GL_rng, n_samples, 0.9_dp)
+     dt_ions_cfl = PM_get_max_dt(pc_ions, GL_rng, n_samples, 0.75_dp)
      dt_ions_drt = dielectric_relaxation_time(max_ion_dens, 1.5e-4_dp / GL_gas_pressure) ! max ion mobility
      dt_ions     = min(dt_ions_cfl, dt_ions_drt, GL_dt_output)
 
      ! Time step for the electrons
-     n_samples = min(pc%get_num_sim_part(), 1000)
+     n_samples = min(pc%get_num_sim_part(), 10000)
      call af_tree_max_cc(tree, i_electron, max_elec_dens)
      n_elec      = pc%get_num_real_part()
      if (n_elec > 0.0_dp) then
@@ -285,7 +282,8 @@ end if
            ! Compute the field on the new mesh
            call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false.)
            call field_compute(tree, mg, .true.)
-          !  call adapt_weights(tree, pc)
+           call adapt_weights(tree, pc)
+           call adapt_weights_ions(tree, pc_ions)
         end if
      end if
 

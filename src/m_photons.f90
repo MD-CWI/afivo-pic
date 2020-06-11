@@ -25,13 +25,14 @@ real(dp)              :: pi_quench_fac
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
 real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
-!Default reaction rates for excited Ar and Ar2 pools
-real(dp)  :: k_Ar_decay_rad  = 0.0_dp
-real(dp)  :: k_Ar_quench     = 0.0_dp
-real(dp)  :: k_Ar2_prod_rate = 3.0e-46_dp
-real(dp)  :: k_Ar2_decay_rad = 6.0e7_dp
+! !Default reaction rates for excited Ar and Ar2 pools
+! real(dp)  :: k_Ar_decay_rad  = 0.0_dp
+! real(dp)  :: k_Ar_quench     = 0.0_dp
+! real(dp)  :: k_Ar2_prod_rate = 3.0e-46_dp
+! real(dp)  :: k_Ar2_decay_rad = 6.0e7_dp
 
-
+! =======================================
+! Reaction rates for Excimer UV-photon model
 real(dp)   :: k_Ar4p_Ar4s = 1.0e7_dp
 real(dp)   :: k_Ar4d_Ar4s = 1.6e5_dp
 real(dp)   :: k_Ar_e_que  = 4.5e-16_dp
@@ -42,13 +43,12 @@ real(dp)   :: k_Ar1s4_Ar2 = 3.0e-46_dp
 real(dp)   :: k_Ar2_Ar2_1 = 5.0e-14_dp
 real(dp)   :: k_Ar2_Ar    = 1.0e-14_dp
 real(dp)   :: k_Ar2_Ar2_p = 1.0e-12_dp
-real(dp)   :: k_Ar2_3_hv  = 3.5e5_dp
+! real(dp)   :: k_Ar2_3_hv  = 3.5e5_dp
 real(dp)   :: k_Ar2_1_hv  = 2.14e8_dp
 real(dp)   :: k_Ar1s4_hv  = 1.2e8_dp
+! =======================================
 
-
-
-integer :: ground_gas = -3 !< make sure can not be reached by other variable
+! integer :: ground_gas = -3 !< make sure can not be reached by other variable
 integer, protected, public  :: i_Ar_pool = -1 !Index of cell-centered pool of excited argon species
 integer, protected, public  :: i_Ar_s5_pool = -1 !Index of cell-centered Argon excimer
 integer, protected, public  :: i_Ar_s4_pool = -1 !Index of cell-centered Argon excimer
@@ -122,14 +122,14 @@ contains
     use m_config
     type(CFG_t), intent(inout) :: cfg
 
-    call CFG_add_get(cfg, "photon%k_Ar_decay_rad", k_Ar_decay_rad, &
-         "Rate of radiative decay of excited Ar")
-    call CFG_add_get(cfg, "photon%k_Ar_quench", k_Ar_quench, &
-         "Rate of quenching of excited Ar")
-    call CFG_add_get(cfg, "photon%k_Ar2_prod_rate", k_Ar2_prod_rate, &
-         "Rate of production of excited Argon2")
-    call CFG_add_get(cfg, "photon%k_Ar2_decay_rad", k_Ar2_decay_rad, &
-         "Rate of radiative decay of excited Ar2")
+    ! call CFG_add_get(cfg, "photon%k_Ar_decay_rad", k_Ar_decay_rad, &
+    !      "Rate of radiative decay of excited Ar")
+    ! call CFG_add_get(cfg, "photon%k_Ar_quench", k_Ar_quench, &
+    !      "Rate of quenching of excited Ar")
+    ! call CFG_add_get(cfg, "photon%k_Ar2_prod_rate", k_Ar2_prod_rate, &
+    !      "Rate of production of excited Argon2")
+    ! call CFG_add_get(cfg, "photon%k_Ar2_decay_rad", k_Ar2_decay_rad, &
+    !      "Rate of radiative decay of excited Ar2")
 
     if (GL_use_dielectric .and. photoe_enabled) then
       where(pc%colls(:)%type == CS_excite_t)
@@ -173,8 +173,8 @@ contains
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
     real, allocatable,save :: filter(:,:)
-    integer :: species = 5
-    integer       :: n, jj
+    integer                :: species = 5
+    integer                :: n, jj
 
     if (.not. allocated(weights)) then
        allocate(coords(NDIM, pc%n_events))
@@ -190,7 +190,6 @@ contains
        allocate(weights(pc%n_events))
        allocate(id_guess(pc%n_events))
        allocate(filter(species,pc%n_events))
-
     end if
 
     ! Calculate production to the pool of excited Argon species
@@ -204,7 +203,7 @@ contains
          weights(jj) = pc%event_list(n)%part%w
          id_guess(jj) = pc%event_list(n)%part%id
          !> filter the 1s5
-         if (pc%event_list(n)%cIx == 2) then ! TODO do this more generally
+         if (pc%event_list(n)%cIx == 2) then
            filter(1,jj) = 1.0_dp
          !> filter the 1s4
          else if (pc%event_list(n)%cIx == 3) then
@@ -294,10 +293,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
   if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
 
-  !TODO Find out how to work with this omp stuff
-  !!$omp parallel private(lvl, i, id, ii, jj, nn)
   do lvl = 1, tree%highest_lvl
-    !!$omp do
     do i = 1, size(tree%lvls(lvl)%leaves)
       id = tree%lvls(lvl)%leaves(i)
       cell_size = product(tree%boxes(id)%dr)
@@ -322,18 +318,13 @@ subroutine Ar2_radiative_decay(tree, pc)
 
             n_uv = n_uv1
 
-            ! if (n_uv > 0) &
-            !   print *, "the number photon is",n_uv
-
           x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
           do nn = 1, n_uv
             x_start = x_cc
             x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
-              ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
               call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
-              ! print *, "photoemission event has occurred"
             end if
           end do
 
@@ -350,10 +341,6 @@ subroutine Ar2_radiative_decay(tree, pc)
             tree%boxes(id)%cc(ii, jj, i_Ar2_1_pool)
             write(*, "(A20,E12.4)") "ar atomic density : ", &
             tree%boxes(id)%cc(ii, jj, i_Ar_s4_pool)
-            ! print *, "photons from excimer : ", n_uv1
-            ! print *, "photons from atom : ", n_uv2
-            ! print *, "mean photons from excimer: ",mean_ph1
-            ! print *, "mean photons from atom: ",mean_ph2
 
             tree%boxes(id)%cc(ii, jj, i_Ar2_1_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar2_1_pool))
             tree%boxes(id)%cc(ii, jj, i_Ar2_1_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar_s4_pool))
@@ -363,20 +350,15 @@ subroutine Ar2_radiative_decay(tree, pc)
         end do
       end do
     end do
-    !!$omp end do
   end do
-  !!$omp end parallel
   end subroutine Ar2_radiative_decay
-!
+
   subroutine perform_argon_reaction1(box)
     use m_gas
     ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
-    ! type(af_t), intent(inout) :: tree
     type(box_t), intent(inout)  :: box
-    integer   :: nc
-    !> test debug
-    real(dp) :: min1_den , min2_den
-    !< test debug
+    integer                     :: nc
+    real(dp)                    :: min1_den , min2_den
 
     nc = box%n_cell
 
@@ -399,29 +381,23 @@ subroutine Ar2_radiative_decay(tree, pc)
       !> Ar2_siglet -> Ar* and Ar2+
       GL_dt * (k_Ar2_Ar + k_Ar2_Ar2_p) * box%cc(1:nc, 1:nc, i_electron) * box%cc(1:nc, 1:nc, i_Ar2_1_pool)
 
-      !> test debug
       call af_tree_min_cc(tree, i_Ar_s4_pool, min1_den)
       call af_tree_min_cc(tree, i_Ar2_1_pool, min2_den)
       if (min1_den < 0 .or. min2_den < 0) then
-      ! print *, "WARNING: the density of 1s4 is : ", min1_den
-      ! print *, "WARNING: the density of Ar2 singlet is : ", min2_den
-      box%cc(1:nc, 1:nc, i_Ar_s4_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_s4_pool))
-      box%cc(1:nc, 1:nc, i_Ar2_1_pool) = max(00.0_dp, box%cc(1:nc, 1:nc, i_Ar2_1_pool))
-      ! error stop "negative density"
+        print *, "WARNING: the density of 1s4 is : ", min1_den
+        print *, "WARNING: the density of Ar2 singlet is : ", min2_den
+        box%cc(1:nc, 1:nc, i_Ar_s4_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_s4_pool))
+        box%cc(1:nc, 1:nc, i_Ar2_1_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar2_1_pool))
+        ! error stop "negative density"
       end if
-      !< test debug
   end subroutine perform_argon_reaction1
 
   subroutine perform_argon_reaction2(box)
     use m_gas
     ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
-    ! type(af_t), intent(inout) :: tree
     type(box_t), intent(inout)  :: box
-    integer   :: nc
-
-    !> test debug
-    real(dp) :: min1_den , min2_den
-    !< test debug
+    integer                     :: nc
+    real(dp)                    :: min1_den , min2_den
 
     nc = box%n_cell
 
@@ -444,28 +420,23 @@ subroutine Ar2_radiative_decay(tree, pc)
       !> Ar2_triplet -> Ar* and Ar2+
       GL_dt * (k_Ar2_Ar + k_Ar2_Ar2_p) * box%cc(1:nc, 1:nc, i_electron) * box%cc(1:nc, 1:nc, i_Ar2_pool)
 
-      !> test debug
       call af_tree_min_cc(tree, i_Ar_s5_pool, min1_den)
       call af_tree_min_cc(tree, i_Ar2_pool, min2_den)
       if (min1_den < 0 .or. min2_den < 0) then
-        ! print *, "WARNING: the density of 1s5 is : ", min1_den
-        ! print *, "WARNING: the density of Ar2 triplet is : ", min2_den
+        print *, "WARNING: the density of 1s5 is : ", min1_den
+        print *, "WARNING: the density of Ar2 triplet is : ", min2_den
         box%cc(1:nc, 1:nc, i_Ar_s5_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_s5_pool))
         box%cc(1:nc, 1:nc, i_Ar2_pool) = max(00.0_dp, box%cc(1:nc, 1:nc, i_Ar2_pool))
         ! error stop "negative density"
       end if
-      !< test debug
   end subroutine perform_argon_reaction2
 
   subroutine perform_argon_reaction3(box)
     use m_gas
     ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
-    ! type(af_t), intent(inout) :: tree
     type(box_t), intent(inout)  :: box
-    integer   :: nc
-    !> test debug
-    real(dp) :: min1_den , min2_den
-    !< test debug
+    integer                     :: nc
+    real(dp)                    :: min1_den , min2_den
 
     ! the density of high energy atomic state Ar* (4p , 4d)
     nc = box%n_cell
@@ -486,37 +457,14 @@ subroutine Ar2_radiative_decay(tree, pc)
           call af_tree_min_cc(tree, i_Ar_4p_pool, min1_den)
           call af_tree_min_cc(tree, i_Ar_4d_pool, min2_den)
           if (min1_den < 0 .or. min2_den < 0) then
-          ! print *, "WARNING: the density of 1s5 is : ", min1_den
-          ! print *, "WARNING: the density of Ar2 triplet is : ", min2_den
-          box%cc(1:nc, 1:nc, i_Ar_4p_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_4p_pool))
-          box%cc(1:nc, 1:nc, i_Ar_4d_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_4d_pool))
-          ! error stop "negative density"
+            print *, "WARNING: the density of 1s5 is : ", min1_den
+            print *, "WARNING: the density of Ar2 triplet is : ", min2_den
+            box%cc(1:nc, 1:nc, i_Ar_4p_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_4p_pool))
+            box%cc(1:nc, 1:nc, i_Ar_4d_pool) = max(0.0_dp, box%cc(1:nc, 1:nc, i_Ar_4d_pool))
+            ! error stop "negative density"
           end if
-          !< test debug
 
   end subroutine perform_argon_reaction3
-
-  ! subroutine perform_argon_reactions(box)
-  !   use m_gas
-  !   ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
-  !   ! type(af_t), intent(inout) :: tree
-  !   type(box_t), intent(inout)  :: box
-  !   integer   :: nc
-  !   integer    :: ii, jj
-  !
-  !   nc = box%n_cell
-  !       ! Production of Ar2
-  !       box%cc(1:nc, 1:nc, i_Ar2_pool) = box%cc(1:nc, 1:nc, i_Ar2_pool)  + &
-  !         GL_dt * k_Ar2_prod_rate * GAS_number_dens**2 * box%cc(ii, jj, i_Ar_pool)
-  !       ! decay, quenching and Ar2-prod for Ar
-  !       box%cc(ii, jj, i_Ar_pool) = box%cc(ii, jj, i_Ar_pool) - GL_dt * &
-  !         (k_Ar_decay_rad + k_Ar_quench * GAS_number_dens + k_Ar2_prod_rate * GAS_number_dens**2) * box%cc(ii, jj, i_Ar_pool)
-  !       if (box%cc(ii, jj, i_Ar2_pool) < 0.0_dp .or. box%cc(ii, jj, i_Ar_pool) < 0.0_dp) then
-  !         error stop "Negative density for excited states of Argon or Argon2 found after performing chemical reactions."
-  !       end if
-  !     end do
-  !   end do
-  ! end subroutine perform_argon_reactions
 
   ! ==== Now the modules for Zheleznyak air model
 
