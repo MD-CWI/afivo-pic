@@ -134,8 +134,6 @@ contains
     ! Compute field from potential
      call af_loop_box(tree, field_from_potential)
 
-     call af_loop_box(tree, compute_field_norm)
-
     ! Set ghost cells for the field components
     call af_gc_tree(tree, [i_E_all])
 
@@ -148,6 +146,8 @@ contains
 
      ! Set the field norm also in ghost cells
      call af_gc_tree(tree, [i_E])
+
+     call af_loop_box(tree, compute_field_norm)
 
    end subroutine field_compute
 
