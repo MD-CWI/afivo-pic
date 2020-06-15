@@ -114,6 +114,7 @@ end if
 
   output_cnt         = 0 ! Number of output files written
   GL_time            = 0 ! Simulation time (all times are in s)
+  time_ions          = 0
   time_last_generate = GL_time
 
   ! Set up the initial conditions
@@ -130,7 +131,7 @@ end if
   ! Perform additional refinement
   do
      call af_tree_clear_cc(tree, i_pos_ion)
-     call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .true.)
+     call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false., .true.)
      call field_compute(tree, mg, .false.)
 
      if (GL_use_dielectric) then
@@ -154,6 +155,7 @@ end if
 
   ! Start from small time step
   GL_dt   = GL_dt_min
+  dt_ions = 2*GL_dt_min
 
   ! Initial wall clock time
   call system_clock(t_start, count_rate)
@@ -203,22 +205,27 @@ end if
         dt        = GL_dt
         if (time_ions + dt_ions < GL_time + GL_dt) then
           update_ions = .true.
+        else
+          update_ions = .false.
         end if
      end if
 
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt)
      call pc%after_mover(dt)
-     if (update_ions) call pc_ions%advance_openmp(dt)
+     if (update_ions) then
+       call pc_ions%advance_openmp(dt_ions)
+     end if
      wtime_advance = wtime_advance + omp_get_wtime() - t0
 
      GL_time = GL_time + dt
      if (update_ions) time_ions = time_ions + dt_ions
 
-     call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false.)
+     call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false., update_ions)
 
      n_part = pc_ions%get_num_sim_part()
-     if (n_part > n_ion_prev_merge * ion_min_merge_increase) then
+     ! if (n_part > n_ion_prev_merge * ion_min_merge_increase .and. update_ions) then
+     if (update_ions) then ! Only when ions have moved do we need to reconsider weights
         call adapt_weights_ions(tree, pc_ions)
         n_ion_prev_merge = pc_ions%get_num_sim_part()
      end if
@@ -231,24 +238,23 @@ end if
 
      ! Compute field with new density
      call field_compute(tree, mg, .true.)
-
      call pc%set_accel()
 
      ! Time step for the ions
-     n_samples = min(pc_ions%get_num_sim_part(), 10000)
+     n_samples = min(pc_ions%get_num_sim_part(), 1000)
      call af_tree_max_cc(tree, i_pos_ion, max_ion_dens)
-     dt_ions_cfl = PM_get_max_dt(pc_ions, GL_rng, n_samples, 0.75_dp)
+     dt_ions_cfl = PM_get_max_dt(pc_ions, GL_rng, n_samples, 0.5_dp)
      dt_ions_drt = dielectric_relaxation_time(max_ion_dens, 1.5e-4_dp / GL_gas_pressure) ! max ion mobility
      dt_ions     = min(dt_ions_cfl, dt_ions_drt, GL_dt_output)
 
      ! Time step for the electrons
-     n_samples = min(pc%get_num_sim_part(), 10000)
+     n_samples = min(pc%get_num_sim_part(), 1000)
      call af_tree_max_cc(tree, i_electron, max_elec_dens)
      n_elec      = pc%get_num_real_part()
      if (n_elec > 0.0_dp) then
        dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
-       dt_drt      = dielectric_relaxation_time(max_elec_dens)
-       dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
+       dt_drt      = dielectric_relaxation_time(max_elec_dens, 0.75_dp) ! max elec mobility
+       dt_growth   = 1.0_dp!get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
        GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      else
        GL_dt = dt_ions !if no electrons are present, relax dt to the ion time scale
@@ -280,24 +286,12 @@ end if
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
            ! Compute the field on the new mesh
-           call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false.)
+           call particles_and_ions_to_density_and_events(tree, pc, pc_ions, .false., .false.)
            call field_compute(tree, mg, .true.)
            call adapt_weights(tree, pc)
-           call adapt_weights_ions(tree, pc_ions)
+           ! if (update_ions) call adapt_weights_ions(tree, pc_ions)
         end if
      end if
-
-     ! ! >test debug
-     ! ! call af_tree_max_cc(tree, i_phi, max_potential)
-     ! call get_max_value(tree, diel, i_surf_sum_dens, max_surf_density)
-     ! ! if (max_potential > 1e20_dp) then
-     !
-     !   ! write(*, "(A20,E9.2)") "dt", GL_dt
-     !   ! write(*, "(A20,E9.2)") "the max potential is", max_potential
-     !   write(*, "(A20,E9.2)") "the max surf density is", max_surf_density
-     ! ! end if
-     ! ! < end test debug
-
   end do
 
 contains

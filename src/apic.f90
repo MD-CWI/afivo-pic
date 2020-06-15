@@ -245,7 +245,7 @@ end if
            ! Compute the field on the new mesh
            call particles_to_density_and_events(tree, pc, .false.)
            call field_compute(tree, mg, .true.)
-          !  call adapt_weights(tree, pc)
+           call adapt_weights(tree, pc)
         end if
      end if
 

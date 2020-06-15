@@ -19,19 +19,14 @@ module m_ions
 contains
 
   subroutine init_pc_ion(cfg, pc_ions)
+    ! use m_cross_sec
     !> initialize a PC instance for (Argon) ions.
     type(CFG_t), intent(inout)  :: cfg
     type(PC_t), intent(inout)   :: pc_ions
 
     integer   :: max_num_ions
 
-    ! TODO Different settings for the ions?
-    ! Particle model related parameters for ions
-    ! call CFG_add_get(cfg, "ions%min_weight", ions_min_weight, &
-    !      "Minimum weight for simulation particles")
-    ! call CFG_add_get(cfg, "ions%max_weight", ions_max_weight, &
-    !      "Maximum weight for simulation particles")
-
+    ! TODO are these really neccessary?
     call CFG_add(cfg, "ions%max_number", 15*1000*1000, &
          "Maximum number of particles")
     call CFG_add_get(cfg, "ions%min_merge_increase", ion_min_merge_increase, &
@@ -46,10 +41,9 @@ contains
 
     call pc_ions%initialize(UC_Ar_mass, max_num_ions)
     pc_ions%outside_check => outside_check
-
   end subroutine init_pc_ion
 
-  subroutine particles_and_ions_to_density_and_events(tree, pc, pc_ions, init_cond)
+  subroutine particles_and_ions_to_density_and_events(tree, pc, pc_ions, init_cond, update_ion_dens)
     use m_cross_sec
     use m_random
     use m_particle_core
@@ -58,6 +52,7 @@ contains
     type(PC_t), intent(inout)        :: pc
     type(PC_t), intent(inout)        :: pc_ions
     logical, intent(in)              :: init_cond
+    logical, intent(in)              :: update_ion_dens
 
     integer                     :: n, i, n_photons
     integer                     :: ix_surf, ix_cell
@@ -94,7 +89,6 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w !TODO negative weights are not allowed for tracer particles!!!
           id_guess(i) = pc%event_list(n)%part%id
-
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
@@ -107,12 +101,18 @@ contains
       call generate_ions_as_particles(pc_ions, i_pos_ion, coords(:, 1:i), &
           weights(1:i), i, interpolation_order_to_density, &
           id_guess(1:i))
+      if (.not. update_ion_dens) call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
+           weights(1:i), i, interpolation_order_to_density, &
+           id_guess(1:i))
     end if
 
     if (photoi_enabled) then
       call photoionization(tree, pc, coords, weights, n_photons)
       call generate_ions_as_particles(pc_ions, i_pos_ion, coords(:, 1:n_photons), &
           weights(1:n_photons), n_photons, interpolation_order_to_density)!id_guess(1:n_photons)
+      if (.not. update_ion_dens) call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
+           weights(1:n_photons), n_photons, interpolation_order_to_density, &
+           id_guess(1:n_photons))
     end if
 
     if (photoe_enabled) then
@@ -134,7 +134,7 @@ contains
     pc_ions%n_events = 0
 
     ! update densities (as electrons and ions might have been created or destroyed)
-    call update_density(tree, pc_ions, i_pos_ion)
+    if (update_ion_dens) call update_density(tree, pc_ions, i_pos_ion)
     call update_density(tree, pc, i_electron)
 
     if (GL_use_dielectric) then
@@ -209,7 +209,10 @@ contains
       new_part%v = drift_velocity(new_part)
       new_part%w = weights(i)
       if (present(id_guess)) then
+        if (id_guess(i) .eq. 0) error stop "invalid id (id=0) passed to new ion-particle"
         new_part%id = id_guess(i)
+      else
+        error stop "No id passed to new ion-particle"
       end if
 
       call pc_ions%add_part(new_part)
@@ -223,7 +226,7 @@ contains
     type(PC_part_t)                   :: ion, new_electron
 
     type(af_loc_t)  :: loc
-    integer         :: ix_surf, nb, id
+    integer         :: ix_surf, nb, id, id_out
 
     ! Find location
     loc = af_get_loc(tree, ion%x(1:NDIM))
@@ -235,6 +238,8 @@ contains
     if (ix_surf == -1) error stop "No surface found for secondary electron emission"
     ! Get the direction of the surface
     nb = diel%surfaces(ix_surf)%direction
+    ! Get the id of the box in the gas
+    id_out = diel%surfaces(ix_surf)%id_out
 
     ! The new electron will be created at the cell-center of the closest
     ! gas-phase surface cell (i.e. one of the ghost cells)
@@ -256,35 +261,33 @@ contains
     new_electron%v(:) = 0
     new_electron%a(:) = pc%accel_function(new_electron)
     new_electron%w    = se_coefficient * ion%w
+    new_electron%id   = id_out
 
     call pc%add_part(new_electron) !TODO do it with buffer! or in parallel idk
 
   end subroutine secondary_electron_emission
 
   !> Adjust the weights of the ions
-  subroutine adapt_weights_ions(tree, pc)
+  subroutine adapt_weights_ions(tree, pc_ions)
     ! This is redundant when i_pos_ion / i_elec can be given as an argument
     type(af_t), intent(in)   :: tree
-    type(PC_t), intent(inout) :: pc
+    type(PC_t), intent(inout) :: pc_ions
     integer                   :: id, n_part_id
     integer, allocatable      :: id_ipart(:)
 
-    call sort_by_id(tree, pc, id_ipart)
-
-    ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
+    call sort_by_id(tree, pc_ions, id_ipart)
     !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
        n_part_id = id_ipart(id+1) - id_ipart(id)
        if (n_part_id > 0) then
-          call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
+          call pc_ions%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
                [.true., .true., .false.], 1e-12_dp, &
                .true., get_desired_weight_ions, 1.0e10_dp, &
                PC_merge_part_rxv, PC_split_part)
        end if
     end do
     !$omp end parallel do
-    call pc%clean_up()
-    ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
+    call pc_ions%clean_up()
   end subroutine adapt_weights_ions
 
   function get_desired_weight_ions(my_part) result(weight)
@@ -324,11 +327,6 @@ contains
 
     drift_velocity = 0
     drift_velocity(1:NDIM) = mu * E
-
-    ! ! > test debug
-    ! if (norm2(drift_velocity) >= 1000) &
-    ! write(*, "(A20,E12.4)") "the ion velocity is", norm2(drift_velocity
-    ! ! < end test debug_flag
   end function drift_velocity
 
   subroutine load_ion_mobility_data(cfg)
