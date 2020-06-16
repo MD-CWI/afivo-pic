@@ -253,7 +253,7 @@ end if
      n_elec      = pc%get_num_real_part()
      if (n_elec > 0.0_dp) then
        dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
-       dt_drt      = dielectric_relaxation_time(max_elec_dens, 0.75_dp) ! max elec mobility
+       dt_drt      = dielectric_relaxation_time(max_elec_dens, 0.67_dp / GL_gas_pressure) 
        dt_growth   = 1.0_dp!get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
        GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      else
