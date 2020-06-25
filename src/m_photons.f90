@@ -184,7 +184,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
   if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
 
-  !TODO Find out how to work with this omp stuff and think about photon weight
+#if NDIM == 2
   !!$omp parallel private(lvl, i, id, ii, jj, nn)
   do lvl = 1, tree%highest_lvl
     !!$omp do
@@ -225,6 +225,9 @@ subroutine Ar2_radiative_decay(tree, pc)
     !!$omp end do
   end do
   !!$omp end parallel
+#elif NDIM == 3
+    error stop
+#endif
   end subroutine Ar2_radiative_decay
 
   subroutine perform_argon_reactions(box)
@@ -234,6 +237,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     type(box_t), intent(inout)  :: box
     integer    :: ii, jj
 
+#if NDIM == 2
     do ii = 1, box%n_cell
       do jj = 1, box%n_cell
         ! Production of Ar2
@@ -247,6 +251,9 @@ subroutine Ar2_radiative_decay(tree, pc)
         end if
       end do
     end do
+#elif NDIM == 3
+      error stop
+#endif
   end subroutine perform_argon_reactions
 
   ! ==== Now the modules for Zheleznyak air model
