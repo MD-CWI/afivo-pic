@@ -85,9 +85,11 @@ contains
           weights(i) = pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
        else if (pc%event_list(n)%ctype == CS_attach_t) then
+         error stop "Cannot calculate the drift velocity of negative ions. &
+                      Consider multiplying vd with the sign of the weights"
           i = i + 1
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
-          weights(i) = -pc%event_list(n)%part%w !TODO negative weights are not allowed for tracer particles!!!
+          weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
