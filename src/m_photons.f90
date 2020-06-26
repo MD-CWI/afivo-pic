@@ -319,20 +319,25 @@ subroutine Ar2_radiative_decay(tree, pc)
     real(dp)        :: x_start(3), x_stop(3)
 
     i = 0
+    !$omp parallel do private(n_uv, x_start, x_stop, m)
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
+         !TODO Implement random number generator in parallel
           n_uv = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv
              x_start = pc%event_list(n)%part%x
+             !TODO Implement random number generator in parallel
              x_stop  = get_x_stop(x_start)
              if (is_in_gas(tree, x_stop)) then
+               !$omp critical
                call single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
+               !$omp end critical
              end if
           end do
        end if
     end do
-
+    !$omp end parallel do
     n_photons = i
   end subroutine photoi_Zheleznyak
 
@@ -343,12 +348,14 @@ subroutine Ar2_radiative_decay(tree, pc)
     logical       :: on_surface
     integer       :: n, m, n_uv, n_low_en, n_high_en
     real(dp)      :: x_start(3), x_stop(3)
-
+    ! TODO same todos as for photoi
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
-         n_low_en = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
-         n_high_en = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
-         n_uv = n_low_en + n_high_en ! low-energy photons come from O2 and are generated at the same rate as high energy photons from N2
+         ! n_low_en  = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
+         ! n_high_en = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
+         ! n_uv = n_low_en + n_high_en ! low-energy photons come from O2 and are generated at the same rate as high energy photons from N2
+
+         n_uv = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv
             x_start = pc%event_list(n)%part%x
@@ -413,6 +420,8 @@ subroutine Ar2_radiative_decay(tree, pc)
     new_part%x(:) = x_gas
     new_part%v(:) = 0.0_dp
     new_part%a(:) = pc%accel_function(new_part)
+
+    ! TODO Consider weights of liberated electron ...
     new_part%w    = photon_w * photoe_probability
     new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
 
@@ -506,11 +515,13 @@ subroutine Ar2_radiative_decay(tree, pc)
     if (m_eps(1) > 1.0_dp .or. .not. success) then
       call bisect_line(tree, x_start, x_stop, i_eps)
       m_eps = af_interp0(tree, x_stop, [i_eps], success)
-      if (.not. success) then ! Photon travelled outside the domain
-         on_surface = .false.
-      else ! Photon is absorbed by the dielectric
-         on_surface = .true.
-      end if
+      !TODO CHECK
+      on_surface = success
+      ! if (.not. success) then ! Photon travelled outside the domain
+      !    on_surface = .false.
+      ! else ! Photon is absorbed by the dielectric
+      !    on_surface = .true.
+      ! end if
     else ! The photon is absorbed by the gas
       on_surface = .false.
     end if
@@ -528,8 +539,9 @@ subroutine Ar2_radiative_decay(tree, pc)
     logical                 :: success
 
     distance = norm2(x_start - x_stop)
+    ! Determine the number of steps to ensure a minimum error smaller than the cell size
     n_steps = -ceiling(log(af_min_dr(tree)/distance) / log(2.0_dp))
-
+!TODO Constrict x_stop to avoid unnecessary number of steps steps
     do n = 1, n_steps
       x_mid = 0.5_dp * (x_start + x_stop)
       m_eps = af_interp0(tree, x_mid, [i_eps], success)
@@ -539,7 +551,6 @@ subroutine Ar2_radiative_decay(tree, pc)
         x_start = x_mid ! Move the start to the middle
       end if
     end do
-
   end subroutine bisect_line
 
 end module m_photons
