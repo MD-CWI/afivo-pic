@@ -18,7 +18,7 @@ contains
 
     user_initial_particles => init_particles
     user_set_dielectric_eps => set_epsilon
-    user_potential_bc => my_potential
+    ! user_potential_bc => null() !my_potential
   end subroutine user_initialize
 
   subroutine init_particles(pc)
@@ -46,7 +46,7 @@ contains
 
   subroutine set_epsilon(box)
     type(box_t), intent(inout) :: box
-    real(dp)                   :: r(2)
+    real(dp)                   :: r(3)
     integer                    :: i, j, k
 
     do j = 0, box%n_cell+1
