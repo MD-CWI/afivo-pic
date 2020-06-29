@@ -334,32 +334,12 @@ contains
          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) + &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
-    error stop
+!FLAG
+    diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) + &
+         my_part%w / product(diel%surfaces(ix_surf)%dr)
 #endif
   end subroutine particle_to_surface_charge
-
-!   subroutine surface_charge_to_particle(tree, my_part, i_surf)
-!     ! Input: a particle that is ejected from the dielectric.
-!     ! The surface charge is altered by the charge leaving
-!     use m_units_constants
-!
-!     type(af_t), intent(in)      :: tree
-!     type(PC_part_t), intent(in) :: my_part
-!     integer, intent(in)         :: i_surf !< Surface variable
-!     integer                     :: ix_surf, ix_cell(NDIM-1)
-!
-!     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
-!          ix_surf, ix_cell)
-!
-!     ! Update the charge in the surface cell
-! #if NDIM == 2
-!     diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
-!          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
-!          my_part%w / diel%surfaces(ix_surf)%dr(1)
-! #elif NDIM == 3
-!     error stop
-! #endif
-!   end subroutine surface_charge_to_particle
 
   function get_accel(my_part) result(accel)
     use m_units_constants

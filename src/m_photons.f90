@@ -164,66 +164,61 @@ contains
      end do
      call af_particles_to_grid(tree, i_Ar_pool, coords(:, 1:jj), &
           weights(1:jj), jj, 0, id_guess(1:jj)) ! Use zeroth order interpolation for simplicity
-  end subroutine photoe_Argon
+end subroutine photoe_Argon
 
-    subroutine Ar2_radiative_decay(tree, pc)
-    ! Routine that performs Ar2_exc radiative decay for every cell in a box
-    ! This routine also performs photoemission
+subroutine Ar2_radiative_decay(tree, pc)
+  ! Routine that performs Ar2_exc radiative decay for every cell in a box
+  ! This routine also performs photoemission
 
-    type(af_t), intent(inout)  :: tree
-    type(PC_t), intent(inout)  :: pc
+  ! TODO Code from af_loop_box is copied (because of particle creation and non-local effects). Thats why this code is nasty
+  type(af_t), intent(inout)  :: tree
+  type(PC_t), intent(inout)  :: pc
 
-    integer    :: ii, jj, nn
-    integer    :: lvl, i, id
-    integer    :: n_uv
-    real(dp)   :: mean_ph
-    real(dp)   :: cell_size
-    real(dp)   :: x_start(3), x_cc(3), x_stop(3)
-    logical    :: on_surface
+  integer    :: ii, jj, nn
+  integer    :: lvl, i, id
+  integer    :: n_uv
+  real(dp)   :: mean_ph
+  real(dp)   :: cell_size
+  real(dp)   :: x_start(3), x_cc(3), x_stop(3)
+  logical    :: on_surface
 
-    if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
+  if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
 
-    !!$omp parallel private(lvl, i, id, ii, jj, nn)
-    do lvl = 1, tree%highest_lvl
-      !!$omp do
-      do i = 1, size(tree%lvls(lvl)%leaves)
-        id = tree%lvls(lvl)%leaves(i)
-        cell_size = product(tree%boxes(id)%dr)
-        do ii = 1, tree%boxes(id)%n_cell
-          do jj = 1, tree%boxes(id)%n_cell
-            mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
-              * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
-            n_uv = GL_rng%poisson(mean_ph)
+#if NDIM == 2
+  !!$omp parallel private(lvl, i, id, ii, jj, nn)
+  do lvl = 1, tree%highest_lvl
+    !!$omp do
+    do i = 1, size(tree%lvls(lvl)%leaves)
+      id = tree%lvls(lvl)%leaves(i)
+      cell_size = product(tree%boxes(id)%dr)
+      do ii = 1, tree%boxes(id)%n_cell
+        do jj = 1, tree%boxes(id)%n_cell
+          mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
+            * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
+          n_uv = GL_rng%poisson(mean_ph)
 
-            x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
-            do nn = 1, n_uv
-              x_start = x_cc
-              x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
-              call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
-              if (on_surface) then
-                ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
-                call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
-                ! print *, "photoemission event has occurred"
-              end if
-            end do
-            ! if (n_uv > 0.0_dp) then
-            !   print *, n_uv
-            ! end if
-            tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = tree%boxes(id)%cc(ii, jj, i_Ar2_pool) - &
-            ! n_uv * particle_min_weight / cell_size !Update Ar2 density due to radiative decay
-            n_uv * 1.0_dp / cell_size !Update Ar2 density due to radiative decay
-            if (tree%boxes(id)%cc(ii, jj, i_Ar2_pool) < 0.0_dp) then
-              print *, "WARNING: NEGATIVE DENSITIES OCCURED"
-              tree%boxes(id)%cc(ii, jj, i_Ar2_pool) = max(0.0_dp, tree%boxes(id)%cc(ii, jj, i_Ar2_pool))
-              ! error stop "Negative density for excited states of Argon2 found after radiative decay."
+          x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
+          do nn = 1, n_uv
+            x_start = x_cc
+            x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
+            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
+            if (on_surface) then
+              ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+              call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
+              ! print *, "photoemission event has occurred"
             end if
           end do
         end do
       end do
       !!$omp end do
     end do
-    !!$omp end parallel
-    end subroutine Ar2_radiative_decay
+    !!$omp end do
+  end do
+  !!$omp end parallel
+#elif NDIM == 3
+    error stop
+#endif
+  end subroutine Ar2_radiative_decay
 
   subroutine perform_argon_reactions(box)
     use m_gas
@@ -232,6 +227,7 @@ contains
     type(box_t), intent(inout)  :: box
     integer    :: ii, jj
 
+#if NDIM == 2
     do ii = 1, box%n_cell
       do jj = 1, box%n_cell
         ! Production of Ar2
@@ -245,6 +241,9 @@ contains
         end if
       end do
     end do
+#elif NDIM == 3
+      error stop
+#endif
   end subroutine perform_argon_reactions
 
   ! ==== Now the modules for Zheleznyak model
@@ -311,93 +310,117 @@ contains
     end if
   end subroutine Zheleznyak_initialize
 
+  ! Perform photon generation and ionization according to the Zheleznyak model
   subroutine photoi_Zheleznyak(tree, pc, photo_pos, photo_w, n_photons)
-    ! Perform photon generation and ionization according to the Zheleznyak model
-    ! use m_domain
-
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
     real(dp), intent(inout)       :: photo_pos(:, :)
     real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
+    type(prng_t)                  :: prng
 
-    integer         :: i, n, m, n_uv
+    integer         :: i, n, m, n_uv, tid
     real(dp)        :: x_start(3), x_stop(3)
     real(dp)        :: en_frac
 
 
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
     i = 0
+    !$omp parallel private(n_uv, x_start, x_stop, m, tid, en_frac)
+    tid = omp_get_thread_num() + 1
+    !omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
-          n_uv = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
+          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+
           do m = 1, n_uv
-             en_frac = GL_rng%unif_01()
+             en_frac = prng%rng(tid)%unif_01()
              if (frac_CH4 > epsilon(1.0_dp) .and. is_absorbed_by_CH4(en_frac)) cycle
              x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start, en_frac)
+             x_stop  = get_x_stop(x_start, en_frac, prng%rngs(tid))
+
              if (is_in_gas(tree, x_stop)) then
+               !$omp critical
                call single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
+               !$omp end critical
              end if
           end do
        end if
     end do
-
+    !omp end do
+    !$omp end parallel
     n_photons = i
+    call prng%update_seed(GL_rng)
   end subroutine photoi_Zheleznyak
 
+  ! Perform photoemission based on the Zheleznyak model
   subroutine photoe_Zheleznyak(tree, pc)
-    ! Perform photoemission based on the Zheleznyak model
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
-    logical       :: on_surface
-    integer       :: n, m, n_uv, n_low_en, n_high_en
-    real(dp)      :: x_start(3), x_stop(3)
-    real(dp)      :: en_frac
+    logical                       :: on_surface
+    integer                       :: n, m, n_uv, tid
+    real(dp)                      :: x_start(3), x_stop(3)
+    real(dp)                      :: en_frac
+    type(prng_t)                  :: prng
 
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
+    !$omp parallel private(n_uv, x_start, x_stop, on_surface, m, tid)
+    tid = omp_get_thread_num() + 1
+    !omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
-         n_low_en = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
-         n_high_en = GL_rng%poisson(get_mean_n_photons(pc%event_list(n)%part))
-         n_uv = n_low_en + n_high_en ! low-energy photons come from O2 and are generated at the same rate as high energy photons from N2
+         n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv ! High&low en photons are handled equally
             en_frac = GL_rng%unif_01()
             x_start = pc%event_list(n)%part%x
-            x_stop  = get_x_stop(x_start, en_frac)
+            x_stop  = get_x_stop(x_start, en_frac, prng%rngs(tid))
 
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
-              call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+              if ((prng%rngs(tid)%unif_01() < photoe_probability)) then
+                !$omp critical
+                call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+                !$omp end critical
+              end if
             end if
           end do
       end if
     end do
+    !omp end do
+    !$omp end parallel
+    call prng%update_seed(GL_rng)
   end subroutine photoe_Zheleznyak
 
+  ! Calculate the mean number of generate photons according to Zheleznyak model
   real(dp) function get_mean_n_photons(part)
-    ! Calculate the mean number of generate photons according to Zheleznyak model
     type(PC_part_t), intent(in)  :: part
     real(dp)                     :: fld
+
     fld         = norm2(part%a / UC_elec_q_over_m)
     get_mean_n_photons = get_photoi_eff(fld) * pi_quench_fac * &
          part%w / particle_min_weight
   end function
 
-  function get_x_stop(x_start, en_frac) result(x_stop)
-    ! Calculate the coordinates of photon absorption according to Zheleznyak model
-    real(dp), intent(in)  :: en_frac
-    real(dp)              :: fly_len
-    real(dp), intent(in)  :: x_start(3)
-    real(dp)              :: x_stop(3)
+  ! Calculate the coordinates of photon absorption according to Zheleznyak model
+  function get_x_stop(x_start, en_frac, rng) result(x_stop)
+    type(rng_t), intent(inout)  :: rng
+    real(dp), intent(in)        :: en_frac
+    real(dp), intent(in)        :: x_start(3)
+    real(dp)                    :: x_stop(3)
+    real(dp)                    :: fly_len
 
-    fly_len = -log(1.0_dp - GL_rng%unif_01()) / get_photoi_lambda(en_frac)
-    x_stop  = x_start + GL_rng%sphere(fly_len)
+    fly_len = -log(1.0_dp - rng%unif_01()) / get_photoi_lambda(en_frac)
+    x_stop  = x_start + rng%sphere(fly_len)
   end function
 
+  ! Returns the photo-efficiency (for ionization) coefficient corresponding to an electric
+  ! field of strength fld, according to Zheleznyak model
   real(dp) function get_photoi_eff(fld)
-    ! Returns the photo-efficiency (for ionization) coefficient corresponding to an electric
-    ! field of strength fld, according to Zheleznyak model
     use m_lookup_table
     real(dp), intent(in) :: fld
     get_photoi_eff = 0.075_dp
@@ -405,8 +428,8 @@ contains
          ! pi_photo_eff_table2, fld, get_photoi_eff)
   end function get_photoi_eff
 
+  ! Returns the inverse mean free path for a photon according to Zheleznyak model
   real(dp) function get_photoi_lambda(en_frac)
-    ! Returns the inverse mean free path for a photon according to Zheleznyak model
     real(dp), intent(in) :: en_frac
     get_photoi_lambda = pi_min_inv_abs_len * &
          (pi_max_inv_abs_len/pi_min_inv_abs_len)**en_frac
@@ -427,31 +450,28 @@ contains
 
   ! ==== General modules
 
+  ! Generate photo-emitted electrons on the surface of a dielectric
   subroutine single_photoemission_event(tree, pc, photon_w, x_gas, x_diel)
-    ! use m_particles, only: surface_charge_to_particle
-    ! Generate photo-emitted electrons on the surface of a dielectric
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     type(PC_part_t)                  :: new_part
     real(dp), intent(in)             :: photon_w, x_gas(3), x_diel(3)
 
-    if (GL_rng%unif_01() < photoe_probability) then
-      ! Create photo-emitted electron
-      new_part%x(:) = x_gas
-      new_part%v(:) = 0.0_dp
-      new_part%a(:) = pc%accel_function(new_part)
-      new_part%w    = photon_w
-      new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
+    new_part%x(:) = x_gas
+    new_part%v(:) = 0.0_dp
+    new_part%a(:) = pc%accel_function(new_part)
 
-      call pc%add_part(new_part)
-      ! Update charge density on the dielectric
-      call surface_charge_to_particle(tree, new_part, i_surf_elec)
-    end if
+    new_part%w    = photon_w
+    new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
+
+    call pc%add_part(new_part)
+    ! Update charge density on the dielectric
+    call surface_charge_to_particle(tree, new_part, i_surf_elec)
   end subroutine single_photoemission_event
 
+  ! Input: a particle that is ejected from the dielectric.
+  ! The surface charge is altered by the charge leaving
   subroutine surface_charge_to_particle(tree, my_part, i_surf)
-    ! Input: a particle that is ejected from the dielectric.
-    ! The surface charge is altered by the charge leaving
     use m_units_constants
 
     type(af_t), intent(in)      :: tree
@@ -468,14 +488,14 @@ contains
          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
-    error stop
+    diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) = &
+         diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) - &
+         my_part%w / product(diel%surfaces(ix_surf)%dr)
 #endif
   end subroutine surface_charge_to_particle
 
   subroutine single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
-    ! use m_particles, only: get_accel
-
-    type(af_t), intent(inout)     :: tree
+    type(af_t), intent(inout)     :: tree!
     type(PC_t), intent(inout)     :: pc
     real(dp), intent(inout)       :: photo_pos(:, :)
     real(dp), intent(inout)       :: photo_w(:)
@@ -485,10 +505,10 @@ contains
     integer                 :: i_cpy
     real(dp)                :: x_stop(3)
 
-    !$omp critical
+    !!$omp critical
     i = i + 1
     i_cpy = i
-    !$omp end critical
+    !!$omp end critical
     if (i_cpy > size(photo_w)) error stop "Too many photons were generated"
     ! Return coordinates and weights for ion production
     photo_pos(:, i_cpy) = x_stop(1:NDIM)
@@ -505,8 +525,8 @@ contains
     call pc%add_part(new_part)
   end subroutine single_photoionization_event
 
+  ! Check if the photon is absorbed in the gas
   logical function is_in_gas(tree, x_stop)
-    ! Check if the photon is absorbed in the gas
     type(af_t), intent(in)         :: tree
     real(dp), intent(in)           :: x_stop(NDIM)
     real(dp)                       :: m_eps(1)
@@ -520,9 +540,9 @@ contains
     end if
   end function is_in_gas
 
+  ! Determine if an emitted photon is absorbed by the gas or dielectric surface
+  ! Return coordinates of gas/diel points nearest to intersection
   subroutine photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
-    ! Determine if an emitted photon is absorbed by the gas or dielectric surface
-    ! Return coordinates of gas/diel points nearest to intersection
     type(af_t), intent(in)         :: tree
     real(dp), intent(inout)        :: x_start(NDIM), x_stop(NDIM) !< Coordinates of photon event
     real(dp)                       :: m_eps(1)
@@ -534,19 +554,15 @@ contains
     if (m_eps(1) > 1.0_dp .or. .not. success) then
       call bisect_line(tree, x_start, x_stop, i_eps)
       m_eps = af_interp0(tree, x_stop, [i_eps], success)
-      if (.not. success) then ! Photon travelled outside the domain
-         on_surface = .false.
-      else ! Photon is absorbed by the dielectric
-         on_surface = .true.
-      end if
+      on_surface = success
     else ! The photon is absorbed by the gas
       on_surface = .false.
     end if
   end subroutine photon_diel_absorbtion
 
+  ! given start (in gas) and stop (not in gas), this method finds the possible transition.
+  ! x_start and x_stop will be moved to corresponding points
   subroutine bisect_line(tree, x_start, x_stop, i_eps)
-    ! given start (in gas) and stop (not in gas), this method finds the possible transition.
-    ! x_start and x_stop will be moved to corresponding points
     type(af_t), intent(in)  :: tree
     real(dp), intent(inout) :: x_start(NDIM), x_stop(NDIM) !< Coordinates of interval
     real(dp)                :: distance
@@ -556,8 +572,8 @@ contains
     logical                 :: success
 
     distance = norm2(x_start - x_stop)
+    ! Determine the number of steps to ensure a minimum error smaller than the cell size
     n_steps = -ceiling(log(af_min_dr(tree)/distance) / log(2.0_dp))
-
     do n = 1, n_steps
       x_mid = 0.5_dp * (x_start + x_stop)
       m_eps = af_interp0(tree, x_mid, [i_eps], success)
@@ -567,7 +583,6 @@ contains
         x_start = x_mid ! Move the start to the middle
       end if
     end do
-
   end subroutine bisect_line
 
 end module m_photons

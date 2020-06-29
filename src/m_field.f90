@@ -138,8 +138,8 @@ contains
     call af_gc_tree(tree, [i_E_all])
 
     if (GL_use_dielectric) then
-       call dielectric_correct_field_cc(tree, diel, i_surf_sum_dens, &
-            i_E_all, i_phi, -fac)
+       ! call dielectric_correct_field_cc(tree, diel, i_surf_sum_dens, &
+            ! i_E_all, i_phi, -fac)
        call dielectric_correct_field_fc(tree, diel, i_surf_sum_dens, &
             ifc_E, i_phi, -fac)
     end if
@@ -254,6 +254,13 @@ contains
          box%cc(1:nc, 1:nc, 1:nc, i_Ex)**2 + &
          box%cc(1:nc, 1:nc, 1:nc, i_Ey)**2 + &
          box%cc(1:nc, 1:nc, 1:nc, i_Ez)**2)
+    box%cc(1:nc, 1:nc, 1:nc, i_E_v2) = 0.5_dp * sqrt(&
+             (box%fc(1:nc, 1:nc, 1:nc, 1, ifc_E) + &
+              box%fc(2:nc+1, 1:nc, 1:nc, 1, ifc_E))**2 + &
+             (box%fc(1:nc, 1:nc, 1:nc, 2, ifc_E) + &
+              box%fc(1:nc, 2:nc+1, 1:nc, 2, ifc_E))**2 + &
+             (box%fc(1:nc, 1:nc, 1:nc, 3, ifc_E) + &
+              box%fc(1:nc, 1:nc, 2:nc+1, 3, ifc_E))**2)
 #endif
   end subroutine compute_field_norm
 
