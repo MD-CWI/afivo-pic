@@ -336,7 +336,7 @@ subroutine Ar2_radiative_decay(tree, pc)
           n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv
-             en_frac = prng%rng(tid)%unif_01()
+             en_frac = prng%rngs(tid)%unif_01()
              if (frac_CH4 > epsilon(1.0_dp) .and. is_absorbed_by_CH4(en_frac)) cycle
              x_start = pc%event_list(n)%part%x
              x_stop  = get_x_stop(x_start, en_frac, prng%rngs(tid))

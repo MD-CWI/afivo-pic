@@ -33,7 +33,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 100
-       pos(1:3) = [0.5_dp, 0.5_dp, 0.75_dp] * domain_len
+       pos(1:3) = [0.5_dp, 0.5_dp, 0.7_dp] * domain_len
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
        part%x(2:3) = pos(2:3) + GL_rng%two_normals() * 1e-5_dp
@@ -54,7 +54,7 @@ contains
          do k = 0, box%n_cell+1
             r = af_r_cc(box, [i, j, k])
 
-            if (r(3)/domain_len(3) < 0.25_dp) then
+            if (r(3)/domain_len(3) < 0.25_dp .or. r(3)/domain_len(3) > 0.75_dp) then
                box%cc(i, j, k, i_eps) = 4.5_dp
             else
                box%cc(i, j, k, i_eps) = 1.0_dp
