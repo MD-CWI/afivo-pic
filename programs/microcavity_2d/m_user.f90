@@ -18,7 +18,7 @@ contains
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
-    ! user_initial_particles => init_particles
+    user_initial_particles => init_particles
     user_initial_particles_and_ions => init_particles_and_ions
     ! user_generate_particles => background_charge
     user_set_dielectric_eps => set_epsilon!set_epsilon_boxwise!
