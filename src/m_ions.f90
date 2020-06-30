@@ -95,7 +95,7 @@ contains
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
           call particle_to_surface_charge(tree, pc%event_list(n)%part, &
-               i_surf_elec)
+               i_surf_elec, 1.0_dp)
        end if
     end do
 
@@ -128,7 +128,7 @@ contains
       if (pc_ions%event_list(n)%ctype == PC_particle_went_out .and. &
           pc_ions%event_list(n)%cIx == inside_dielectric) then
         call particle_to_surface_charge(tree, pc_ions%event_list(n)%part, &
-              i_surf_pos_ion)
+              i_surf_pos_ion, 1.0_dp)
         call secondary_electron_emission(tree, diel, pc, pc_ions%event_list(n)%part)
       end if
     end do
@@ -206,7 +206,7 @@ contains
 
     integer :: i
     type(PC_part_t)         :: new_part
-    do i = 1, n_new_ions !TODO do it with buffer!  or in parallel idk
+    do i = 1, n_new_ions
       new_part%x(1:NDIM) = coords(1:NDIM, i)
       new_part%v = drift_velocity(new_part)
       new_part%w = weights(i)
@@ -229,6 +229,9 @@ contains
 
     type(af_loc_t)  :: loc
     integer         :: ix_surf, nb, id, id_out
+
+    ! Only perform secondary electron emission once every '1/se_coefficient' times
+    if (GL_rng%unif_01() > se_coefficient) return
 
     ! Find location
     loc = af_get_loc(tree, ion%x(1:NDIM))
@@ -260,13 +263,16 @@ contains
     error stop
 #endif
   end select
+
     new_electron%v(:) = 0
     new_electron%a(:) = pc%accel_function(new_electron)
-    new_electron%w    = se_coefficient * ion%w
+    new_electron%w    = ion%w
     new_electron%id   = id_out
 
-    call pc%add_part(new_electron) !TODO do it with buffer! or in parallel idk
+    call pc%add_part(new_electron)
 
+    ! An emitted electron leaves behind positive charge on the surface
+    call particle_to_surface_charge(tree, new_electron, i_surf_elec, -1.0_dp)
   end subroutine secondary_electron_emission
 
   !> Adjust the weights of the ions

@@ -262,7 +262,7 @@ contains
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
           call particle_to_surface_charge(tree, pc%event_list(n)%part, &
-               i_surf_elec)
+               i_surf_elec, 1.0_dp)
        end if
     end do
 
@@ -299,7 +299,7 @@ contains
 
   end subroutine particles_to_density_and_events
 
-  subroutine particle_to_surface_charge(tree, my_part, i_surf)
+  subroutine particle_to_surface_charge(tree, my_part, i_surf, fac)
     ! Input: a particle that is found in the dielectric (after timestep, and is
     ! thus flagged for removal) This particle will be mapped to the surface
     ! charge of the corresponding cell
@@ -309,6 +309,7 @@ contains
     type(PC_part_t), intent(in) :: my_part
     integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
+    real(dp), optional :: fac
 
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
          ix_surf, ix_cell)
@@ -317,7 +318,7 @@ contains
 #if NDIM == 2
     diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) + &
-         my_part%w / diel%surfaces(ix_surf)%dr(1)
+         fac * my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
     error stop
 #endif
