@@ -117,13 +117,17 @@ end if
   time_ions          = 0
   time_last_generate = GL_time
 
+  ! Start from small time step
+  GL_dt   = GL_dt_min
+  dt_ions = 2*GL_dt_min
+
   ! Set up the initial conditions
   if (.not. associated(user_initial_particles) .and. .not. associated(user_initial_particles_and_ions)) &
     error stop "user routine for particles (or ions) not defined"
 
-  if (associated(user_initial_particles)) then
-    call user_initial_particles(pc)
-  end if
+  ! if (associated(user_initial_particles)) then
+  !   call user_initial_particles(pc)
+  ! end if
   if (associated(user_initial_particles_and_ions)) then
     call user_initial_particles_and_ions(pc, pc_ions)
   end if
@@ -152,10 +156,6 @@ end if
 
   print *, "Number of threads", af_get_max_threads()
   call af_print_info(tree)
-
-  ! Start from small time step
-  GL_dt   = GL_dt_min
-  dt_ions = 2*GL_dt_min
 
   ! Initial wall clock time
   call system_clock(t_start, count_rate)
@@ -253,8 +253,8 @@ end if
      n_elec      = pc%get_num_real_part()
      if (n_elec > 0.0_dp) then
        dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
-       dt_drt      = dielectric_relaxation_time(max_elec_dens, 0.67_dp / GL_gas_pressure) 
-       dt_growth   = 1.0_dp!get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
+       dt_drt      = dielectric_relaxation_time(max_elec_dens, 0.67_dp / GL_gas_pressure)
+       dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/(n_elec_prev+1.0_dp)), 20.0e-2_dp)
        GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      else
        GL_dt = dt_ions !if no electrons are present, relax dt to the ion time scale

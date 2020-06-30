@@ -48,6 +48,7 @@ contains
     use m_random
     use m_particle_core
     use m_domain, only: outside_check
+
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     type(PC_t), intent(inout)        :: pc_ions
