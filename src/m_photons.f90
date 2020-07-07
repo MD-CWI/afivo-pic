@@ -87,7 +87,12 @@ contains
         photoionization => null() ! No photoionization is considered
         photoemission => photoe_Argon
       case default
-        error stop "Unrecognized photon model"
+        if (photoi_enabled .or. photoe_enabled) then
+          error stop "Unrecognized photon model"
+        else
+          photoionization => null()
+          photoemission => null()
+        end if
     end select
 
   end subroutine photons_initialize
@@ -328,7 +333,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
     i = 0
-    !$omp parallel private(n_uv, x_start, x_stop, m, tid, en_frac)
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, en_frac)
     tid = omp_get_thread_num() + 1
     !omp do
     do n = 1, pc%n_events
@@ -368,7 +373,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
-    !$omp parallel private(n_uv, x_start, x_stop, on_surface, m, tid)
+    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid)
     tid = omp_get_thread_num() + 1
     !omp do
     do n = 1, pc%n_events
