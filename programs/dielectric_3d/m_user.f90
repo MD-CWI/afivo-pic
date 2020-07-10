@@ -18,7 +18,7 @@ contains
 
     user_initial_particles => init_particles
     user_set_dielectric_eps => set_epsilon
-    ! user_potential_bc => null() !my_potential
+    user_potential_bc => my_potential
   end subroutine user_initialize
 
   subroutine init_particles(pc)
@@ -54,7 +54,7 @@ contains
          do k = 0, box%n_cell+1
             r = af_r_cc(box, [i, j, k])
 
-            if (r(3)/domain_len(3) < 0.25_dp .or. r(3)/domain_len(3) > 0.75_dp) then
+            if (r(3)/domain_len(3) < 0.25_dp) then
                box%cc(i, j, k, i_eps) = 4.5_dp
             else
                box%cc(i, j, k, i_eps) = 1.0_dp
@@ -64,27 +64,27 @@ contains
     end do
   end subroutine set_epsilon
 
-  ! subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
-  !   type(box_t), intent(in) :: box
-  !   integer, intent(in)     :: nb
-  !   integer, intent(in)     :: iv
-  !   real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
-  !   real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
-  !   integer, intent(out)    :: bc_type
-  !
-  !   select case (nb)
-  !   case (af_neighb_lowy)
-  !       bc_type = af_bc_dirichlet
-  !       bc_val = 0.0_dp
-  !     case (af_neighb_highy)
-  !       bc_type = af_bc_dirichlet
-  !       bc_val = - 2.5e4_dp
-  !     case default
-  !       bc_type = af_bc_neumann
-  !       bc_val = 0.0_dp
-  !   end select
-  !
-  ! end subroutine my_potential
+  subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
+    type(box_t), intent(in) :: box
+    integer, intent(in)     :: nb
+    integer, intent(in)     :: iv
+    real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
+    real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
+    integer, intent(out)    :: bc_type
+
+    select case (nb)
+    case (af_neighb_lowz)
+        bc_type = af_bc_dirichlet
+        bc_val = 0.0_dp
+      case (af_neighb_highz)
+        bc_type = af_bc_dirichlet
+        bc_val = - 1.65e4_dp
+      case default
+        bc_type = af_bc_neumann
+        bc_val = 0.0_dp
+    end select
+
+  end subroutine my_potential
 
 
 end module m_user
