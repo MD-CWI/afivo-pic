@@ -2,15 +2,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+# from tkinter.filedialog import askopenfilename
+# filename = askopenfilename()
+# print(filename)
 
-# file = os.getcwd() + "/output/test_werktdit.txt"
+file = "/home/ddb/results/PIC_3D_airfuel_5e6_double/sim_werktdit.txt"
 # file = os.getcwd() + "/output/archive/ledger_phi_25/test_werktdit.txt"
-file = os.getcwd() + "/output/archive/ledger_phi_3/test_werktdit.txt"
+# file = os.getcwd() + "/output/archive/ledger_phi_3/test_werktdit.txt"
 # file = os.getcwd() + "/output/archive/ledger_phi_35/test_werktdit.txt"
 
 ledger = np.genfromtxt(file)
 N = np.size(ledger, 0)
-dt_out = 5e-11
+dt_out = 2.5e-10
 timesteps = np.linspace(0, N, N) * dt_out
 
 N2_ion  = ledger[:, 24]
@@ -66,7 +69,7 @@ plt.legend()
 # plt.xlabel("time")
 # plt.ylabel("# occurences")
 # plt.legend()
-#
+# #
 # plt.figure()
 # plt.semilogy(timesteps, d_N2_ion, label="d_N2_ion")
 # plt.semilogy(timesteps, d_O2_ion, label="d_O2_ion")
