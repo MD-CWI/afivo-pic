@@ -19,6 +19,9 @@ from scipy.optimize import curve_fit
 # else:
 #     print("default")
 
+def lin_func(x, a, b):
+    return a*x+b
+
 def exp_func(x, a, c):
     return a*np.exp(c*x)
 
@@ -90,40 +93,44 @@ class Ledger:
     def plot_single_species(self, index, label):
         plt.semilogy(self.timesteps, np.sum(self.ledger[:, index], 1), label=label)
 
-    def plot_single_fit(self, index, label, logplot=False):
-        popt, pcov = curve_fit(exp_func, self.timesteps, np.squeeze(np.sum(self.ledger[:, index], 1)), p0=(1e7, 1e5))
-        yy = exp_func(self.timesteps, *popt)
+    def plot_single_fit(self, index, label, skip=0, logplot=False):
+        # popt, pcov = curve_fit(exp_func, self.timesteps, np.squeeze(np.sum(self.ledger[:, index], 1)), p0=(1e7, 1e5))
+        # yy = exp_func(self.timesteps, *popt)
+        popt, pcov = curve_fit(lin_func, self.timesteps[skip:], np.log(np.squeeze(np.sum(self.ledger[skip:, index], 1))),  p0=(16, 11))
+        y_fit = np.exp(lin_func(self.timesteps, *popt))
 
-        # plt.figure()
         if logplot == True:
-            # plt.semilogy(self.timesteps, np.sum(self.ledger[:, index], 1), label=label)
-            plt.semilogy(self.timesteps, yy, label=str(index))
+            self.plot_single_species(index, label)
+            plt.semilogy(self.timesteps, y_fit, label=str(index), marker='o')
         else:
             plt.plot(self.timesteps, np.sum(self.ledger[:, index], 1), label=label)
-            plt.plot(self.timesteps, yy, label="fit")
+            plt.plot(self.timesteps, y_fit, label="fit")
         plt.title( "{:.2e}".format(popt[1]) )
         plt.legend()
 
-    def print_single_fit(self, index):
-        popt, pcov = curve_fit(exp_func, self.timesteps, np.squeeze(np.sum(self.ledger[:, index], 1)), p0=(1e7, 1e5))
+    def print_single_fit(self, index, skip=0):
+        popt, pcov = curve_fit(lin_func, self.timesteps[skip:], np.log(np.squeeze(np.sum(self.ledger[skip:, index], 1))),  p0=(16, 11))
+        # popt[0] = np.exp(popt[0])
         print("(A, lambda) = " + str(popt))
 
 # ==============================
 
 ledger = Ledger()
-ledger.get_file("/home/ddb/results/PIC_3D_airfuel_5e6_negative/sim_werktdit.txt")
+ledger.get_file("/home/ddb/codes/afivo-pic/programs/standard_3d/output/sim_werktdit.txt")
 # ledger.plot_grouped_species()
 
 plt.figure()
-for ii in range(1, 24):
-    ledger.print_single_fit([ii])
-    ledger.plot_single_fit([ii], str(ii), logplot=True)
+# for ii in range(1, 24):
+#     ledger.print_single_fit([ii])
+#     ledger.plot_single_fit([ii], str(ii), logplot=True)
 
-# ledger.plot_single_fit(ledger.i_N2_exc, "N2_exc", logplot=True)
-# ledger.plot_single_fit(ledger.i_O2_exc, "O2_exc", logplot=True)
-# ledger.plot_single_fit(ledger.i_CH4_exc, "CH4_exc", logplot=True)
-# ledger.plot_single_fit(ledger.i_N2_ion, "N2_ion", logplot=True)
-# ledger.plot_single_fit(ledger.i_O2_ion, "O2_ion", logplot=True)
-# ledger.plot_single_fit(ledger.i_CH4_ion, "CH4_ion", logplot=True)
+ledger.plot_single_fit(ledger.i_N2_exc, "N2_exc", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_O2_exc, "O2_exc", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_CH4_exc, "CH4_exc", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_N2_ion, "N2_ion", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_O2_ion, "O2_ion", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_CH4_ion, "CH4_ion", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_CH4_frag, "CH4_frag", skip=20, logplot=True)
+ledger.plot_single_fit(ledger.i_O_diss, "O_diss", skip=20, logplot=True)
 # ledger.plot_single_species(ledger.i_N2_ion, "N2_ion")
 plt.show()
