@@ -30,8 +30,8 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 100
-       pos(1:3) = [0.5_dp, 0.5_dp, 0.75_dp] * domain_len
+    do n = 1, 10000
+       pos(1:3) = [0.5_dp, 0.5_dp, 0.975_dp] * domain_len
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
        part%x(2:3) = pos(2:3) + GL_rng%two_normals() * 1e-5_dp
