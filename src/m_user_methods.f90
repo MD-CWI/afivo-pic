@@ -19,6 +19,9 @@ module m_user_methods
   !> If defined, call this routine to set the dielectric permittivity
   procedure(af_subr), pointer :: user_set_dielectric_eps => null()
 
+  !> If defined, set the surface charge on a dielectric surface
+  procedure(sigma_func), pointer :: user_set_surface_charge => null()
+
   !> To set custom boundary conditions for the electric potential
   procedure(af_subr_bc), pointer :: user_potential_bc => null()
 
@@ -43,6 +46,11 @@ module m_user_methods
        character(len=*), intent(in) :: filename
        integer, intent(in)          :: out_cnt
      end subroutine log_subr
+
+     real(dp) function sigma_func(r)
+       import
+       real(dp), intent(in) :: r(NDIM)
+     end function sigma_func
   end interface
 
 end module m_user_methods

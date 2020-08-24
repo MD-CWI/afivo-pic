@@ -107,14 +107,15 @@ program apic
   time_last_generate = GL_time
 
   ! Set up the initial conditions
-  if (.not. associated(user_initial_particles)) &
-       error stop "user_initial_particles not defined"
-  call user_initial_particles(pc)
+  if (associated(user_initial_particles)) then
+       ! error stop "user_initial_particles not defined"
+       call user_initial_particles(pc)
+  end if
 
   ! Perform additional refinement
   do
      call af_tree_clear_cc(tree, i_pos_ion)
-     call particles_to_density_and_events(tree, pc, .true., dt)
+     call particles_to_density_and_events(tree, pc, associated(user_initial_particles), dt)
      call field_compute(tree, mg, .false.)
 
      if (GL_use_dielectric) then
@@ -129,6 +130,11 @@ program apic
      end if
      if (ref_info%n_add == 0) exit
   end do
+
+  ! Set an initial surface charge
+  if (associated(user_set_surface_charge)) then
+     call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_surface_charge)
+  end if
 
   call pc%set_accel()
 
