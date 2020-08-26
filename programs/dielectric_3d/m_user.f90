@@ -19,7 +19,7 @@ contains
     user_initial_particles => init_particles
     user_generate_particles => null() !init_electrons_only
     user_set_dielectric_eps => set_epsilon
-    user_set_surface_charge => set_surface_charge
+    ! user_set_surface_charge => set_surface_charge
     user_potential_bc => my_potential
   end subroutine user_initialize
 
@@ -34,8 +34,8 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 500
-       pos(1:3) = [0.5_dp, 0.5_dp, 0.275_dp] * domain_len
+    do n = 1, 50000
+       pos(1:3) = [0.5_dp, 0.5_dp, 0.2_dp] * domain_len
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1.0e-4_dp
        randn = GL_rng%two_normals()
@@ -117,6 +117,7 @@ contains
     real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
     real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
     integer, intent(out)    :: bc_type
+    integer                 :: ii
 
     select case (nb)
     case (af_neighb_lowz)
@@ -124,7 +125,9 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highz)
         bc_type = af_bc_dirichlet
-        bc_val = - 1.55e4_dp
+        do ii = 1, box%n_cell**(NDIM-1)
+          bc_val(ii) = 2.5e4_dp + 7.5e3_dp * exp( - (sum(coords(1:2, ii)/domain_len(1:2) - 0.5_dp))**2 / 5.0e-2_dp)
+        end do
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
