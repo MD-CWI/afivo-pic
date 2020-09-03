@@ -35,7 +35,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 50000
-       pos(1:2) = [0.5_dp, 0.3_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.15_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-4_dp
@@ -63,7 +63,7 @@ contains
           part%t_left = 0.0_dp
 
           do n = 1, 1000
-             pos(1:2) = [0.5_dp, 0.31_dp] * domain_len
+             pos(1:2) = [0.5_dp, 0.15_dp] * domain_len
              pos(3)   = 0.0_dp
              part%w   = 1.0_dp
              part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1.0e-5_dp
@@ -122,7 +122,7 @@ contains
       case (af_neighb_lowy)
         bc_type = af_bc_dirichlet
         do ii = 1, box%n_cell**(NDIM-1)
-          bc_val(ii) = 2.5e4_dp + 7.5e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 5.0e-2_dp)
+          bc_val(ii) = 1.5e4_dp + 8.5e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 2.5e-2_dp)
         end do
       case default
         bc_type = af_bc_neumann
