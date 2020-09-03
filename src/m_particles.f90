@@ -32,6 +32,7 @@ contains
     character(len=20), allocatable :: gas_names(:)
     real(dp), allocatable          :: gas_fracs(:)
     type(CS_t), allocatable        :: cross_secs(:)
+    integer                        :: ii
 
     ! Gas parameters
     call CFG_add(cfg, "gas%temperature", 300.0_dp, &
@@ -89,6 +90,9 @@ contains
     call CS_write_summary(cross_secs, &
          trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_summary.txt")
 
+    call CS_create_ledger(cross_secs, &
+         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt")
+
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
     pc%particle_mover => PC_verlet_advance
@@ -102,8 +106,14 @@ contains
 
     where (pc%colls(:)%type == CS_ionize_t .or. &
          pc%colls(:)%type == CS_attach_t)
-       pc%coll_is_event(:) = .true.
+         pc%coll_is_event(:) = .true.
     end where
+
+    if (GL_track_CAS) then
+      do ii = 1, num_cIx_to_track
+        pc%coll_is_event(GL_cIx_to_track(ii)) = .true.
+      end do
+    end if
 
   end subroutine init_particle
 
@@ -187,11 +197,11 @@ contains
     logical, intent(in)              :: init_cond
     real(dp), intent(in)             :: dt
 
-    integer                     :: n, i, n_part, n_photons
+    integer                     :: n, i, j, ii, n_part, n_photons
 
-    real(dp), allocatable, save :: coords(:, :)
-    real(dp), allocatable, save :: weights(:)
-    integer, allocatable, save  :: id_guess(:)
+    real(dp), allocatable, save :: coords(:, :), coords_CAS(:, :)
+    real(dp), allocatable, save :: weights(:), weights_CAS(:), mask_var(:)
+    integer, allocatable, save  :: id_guess(:), id_guess_CAS(:), mask(:)
     real(dp), allocatable, save :: energy_lost(:)
 
     n_part = pc%get_num_sim_part()
@@ -202,16 +212,37 @@ contains
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       if (GL_track_CAS) then
+         allocate(coords_CAS(NDIM, n))
+         allocate(weights_CAS(n))
+         allocate(id_guess_CAS(n))
+         allocate(mask(n))
+         allocate(mask_var(n))
+       end if
        allocate(energy_lost(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
        deallocate(coords)
        deallocate(weights)
        deallocate(id_guess)
+       if (GL_track_CAS) then
+         deallocate(coords_CAS)
+         deallocate(weights_CAS)
+         deallocate(id_guess_CAS)
+         deallocate(mask)
+         deallocate(mask_var)
+       end if
        deallocate(energy_lost)
        allocate(coords(NDIM, n))
        allocate(weights(n))
        allocate(id_guess(n))
+       if (GL_track_CAS) then
+         allocate(coords_CAS(NDIM, n))
+         allocate(weights_CAS(n))
+         allocate(id_guess_CAS(n))
+         allocate(mask(n))
+         allocate(mask_var(n))
+       end if
        allocate(energy_lost(n))
     end if
 
@@ -246,7 +277,8 @@ contains
 
     pc%particles(1:n_part)%id = id_guess(1:n_part)
 
-    i = 0
+    i = 0 ! Counter for ionizing events
+    j = 0 ! Counter for CAS tracker
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           i = i + 1
@@ -259,18 +291,21 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
-          energy_lost(i) = PC_v_to_en(pc%event_list(n)%part%v, UC_elec_mass) + pc%event_list(n)%part%en_loss! All of the particles energy is deposited in the gass
-
-          ! TODO these lines are deprecated due to Git shit -> Jannis touched it I think...
-          ! if (pc%event_list(n)%cIx == 53) then ! Only select reaction 53 (formation of atomic oxygen)
-          !    mask(i) = 1.0_dp
-          ! end if
+          energy_lost(i) = PC_v_to_en(pc%event_list(n)%part%v, UC_elec_mass) + pc%event_list(n)%part%en_loss! All of the particles energy is deposited in the gas
 
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
           call particle_to_surface_charge(tree, pc%event_list(n)%part, &
                i_surf_elec)
+       end if
+
+       if (GL_track_CAS .and. any(pc%event_list(n)%cIx == GL_cIx_to_track)) then
+         j = j + 1
+         coords_CAS(:, j) = pc%event_list(n)%part%x(1:NDIM)
+         weights_CAS(j)   = pc%event_list(n)%part%w
+         id_guess_CAS(j)  = pc%event_list(n)%part%id
+         mask(j) = pc%event_list(n)%cIx
        end if
     end do
 
@@ -283,10 +318,15 @@ contains
            id_guess(1:i))
     end if
 
-   ! TODO these lines are deprecated due to Git shit -> Jannis touched it I think...
-   ! call af_particles_to_grid(tree, i_O_atom, coords(:, 1:i), &
-   !      weights(1:i), i, interpolation_order_to_density, &
-   !      id_guess(1:i))
+    if (j > 0) then
+      do ii = 1, num_cIx_to_track
+        mask_var = 0.0_dp
+        where (mask == GL_cIx_to_track(ii)) mask_var = 1.0_dp
+
+        call af_particles_to_grid(tree,i_tracked_cIx(ii), coords_CAS(:, 1:j), &
+              mask_var(1:j), j, 1, id_guess_CAS(1:j))
+      end do
+    end if
 
     if (photoi_enabled) then
       call photoionization(tree, pc, coords, weights, n_photons)

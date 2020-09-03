@@ -49,6 +49,7 @@ module m_globals
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
   integer, protected :: i_P_dep    = -1 ! Density of deposited power
+  integer, protected, allocatable :: i_tracked_cIx(:) ! CAS that will be tracked
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -63,6 +64,17 @@ module m_globals
 
   ! Whether a dielectric is used
   logical, protected :: GL_use_dielectric = .false.
+
+  ! Wheter additional active species will be tracked
+  logical, protected :: GL_track_CAS = .false.
+
+  ! List of collision indices corresponding to species to track
+  integer, allocatable, protected :: GL_cIx_to_track(:)
+
+  character(len=GL_slen), allocatable, protected :: GL_cIx_labels(:)
+
+  ! Total number of species to track
+  integer :: num_cIx_to_track
 
   ! Random number generator
   type(rng_t) :: GL_rng
@@ -103,6 +115,7 @@ module m_globals
   real(dp) :: particle_max_weight = 1.0e20_dp
   real(dp) :: particle_per_cell = 100.0_dp
 
+  integer  :: ii
 contains
 
   !> Create the configuration file with default values
@@ -155,6 +168,8 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
+    call CFG_add_get(cfg, "track_CAS", GL_track_CAS, "Whether additional grid-data &
+          is used to track specific collision types")
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
@@ -163,6 +178,28 @@ contains
        call af_add_cc_variable(tree, "eps", ix=i_eps)
        call af_set_cc_methods(tree, i_eps, af_bc_neumann_zero, &
             af_gc_prolong_copy, af_prolong_zeroth)
+    end if
+
+    if (GL_track_CAS) then !NOTE Names of CAS_tracker are unintuitive...
+      call CFG_add(cfg, "cIx_to_track", [-1], &
+            "List of collision indices that are tracked", .true.)
+
+      call CFG_get_size(cfg, "cIx_to_track", num_cIx_to_track)
+
+      allocate(GL_cIx_to_track(num_cIx_to_track))
+      allocate(i_tracked_cIx(num_cIx_to_track))
+      allocate(GL_cIx_labels(num_cIx_to_track))
+
+      i_tracked_cIx = -1
+
+      call CFG_get(cfg, "cIx_to_track", GL_cIx_to_track)
+      call CFG_add_get(cfg, "cIx_labels", GL_cIx_labels, &
+           "Output labels for tracked species")
+
+      do ii = 1, num_cIx_to_track
+        call af_add_cc_variable(tree, trim(GL_cIx_labels(ii)), ix=i_tracked_cIx(ii))
+        call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero)
+      end do
     end if
 
     call GL_rng%set_random_seed()

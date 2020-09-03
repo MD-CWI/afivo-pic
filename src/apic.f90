@@ -222,7 +222,8 @@ program apic
              add_curve_dat = write_EEDF_as_curve(pc))
         call print_info()
         call CS_write_ledger(pc%coll_ledger, &
-        trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_werktdit.txt")
+        trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
+        GL_time)
      end if
 
      if (mod(it, refine_per_steps) == 0) then
