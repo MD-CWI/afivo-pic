@@ -65,6 +65,9 @@ module m_globals
   ! Whether a dielectric is used
   logical, protected :: GL_use_dielectric = .false.
 
+  ! Whether a the output is also written to a .dat file
+  logical, protected :: GL_write_to_dat = .false.
+
   ! Wheter additional active species will be tracked
   logical, protected :: GL_track_CAS = .false.
 
@@ -170,6 +173,8 @@ contains
          "Whether a dielectric is used")
     call CFG_add_get(cfg, "track_CAS", GL_track_CAS, "Whether additional grid-data &
           is used to track specific collision types")
+    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Wheter the output is &
+          also written to a .dat file")
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
