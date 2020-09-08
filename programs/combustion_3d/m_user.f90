@@ -34,7 +34,7 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 5000
+    do n = 1, 1000
        pos(1:3) = [0.5_dp, 0.5_dp, 0.05_dp] * domain_len
        part%w   = 1.0_dp
        part%x(1:3) = pos(1:3) + GL_rng%three_normals() * 1e-4_dp
@@ -122,7 +122,7 @@ contains
         bc_type = af_bc_dirichlet
         do ii = 1, box%n_cell**(NDIM-1)
           ! This one is still a bit weird, do to AMR
-          bc_val(ii) = 1.5e4_dp + 7.5e3_dp * exp( - sum((coords(1:2, ii)/domain_len(1:2) - 0.5_dp)**2) / 1.0e-2_dp)
+          bc_val(ii) = 1.5e4_dp + 5.5e3_dp * exp( - sum((coords(1:2, ii)/domain_len(1:2) - 0.5_dp)**2) / 1.0e-2_dp)
         end do
       case default
         bc_type = af_bc_neumann
