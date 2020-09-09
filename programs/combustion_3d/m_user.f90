@@ -122,7 +122,7 @@ contains
         bc_type = af_bc_dirichlet
         do ii = 1, box%n_cell**(NDIM-1)
           ! This one is still a bit weird, do to AMR
-          bc_val(ii) = 1.5e4_dp + 5.5e3_dp * exp( - sum((coords(1:2, ii)/domain_len(1:2) - 0.5_dp)**2) / 1.0e-2_dp)
+          bc_val(ii) = 1.5e4_dp + 5.0e3_dp * exp( - sum((coords(1:2, ii)/domain_len(1:2) - 0.5_dp)**2) / 1.0e-2_dp)
         end do
       case default
         bc_type = af_bc_neumann
