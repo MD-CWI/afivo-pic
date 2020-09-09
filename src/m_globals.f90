@@ -131,7 +131,7 @@ contains
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
-    call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
+    call af_add_cc_variable(tree, "phi", .false., ix=i_phi)
     call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
     call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
 
@@ -144,11 +144,11 @@ contains
 
     call af_add_fc_variable(tree, "E_fc", ix=ifc_E)
 
-    call af_add_cc_variable(tree, "E", .true., ix=i_E)
+    call af_add_cc_variable(tree, "E", .false., ix=i_E)
     call af_add_cc_variable(tree, "E_v2", .true., ix=i_E_v2)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
-    call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
-    call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
+    call af_add_cc_variable(tree, "ppc", .false., ix=i_ppc)
+    call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
     call af_add_cc_variable(tree, "power_deposition", .true., ix=i_P_dep)
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
@@ -185,7 +185,7 @@ contains
             af_gc_prolong_copy, af_prolong_zeroth)
     end if
 
-    if (GL_track_CAS) then !NOTE Names of CAS_tracker are unintuitive...
+    if (GL_track_CAS) then
       call CFG_add(cfg, "cIx_to_track", [-1], &
             "List of collision indices that are tracked", .true.)
 
@@ -202,8 +202,9 @@ contains
            "Output labels for tracked species")
 
       do ii = 1, num_cIx_to_track
-        call af_add_cc_variable(tree, trim(GL_cIx_labels(ii)), ix=i_tracked_cIx(ii))
-        call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero)
+        call af_add_cc_variable(tree, trim(GL_cIx_labels(ii)), .true., ix=i_tracked_cIx(ii))
+        call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero, &
+            prolong=af_prolong_limit)
       end do
     end if
 
