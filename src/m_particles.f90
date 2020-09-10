@@ -305,7 +305,7 @@ contains
          coords_CAS(:, j) = pc%event_list(n)%part%x(1:NDIM)
          weights_CAS(j)   = pc%event_list(n)%part%w
          id_guess_CAS(j)  = pc%event_list(n)%part%id
-         mask(j) = pc%event_list(n)%cIx
+         mask(j)          = pc%event_list(n)%cIx
        end if
     end do
 
@@ -323,8 +323,8 @@ contains
         mask_var = 0.0_dp
         where (mask == GL_cIx_to_track(ii)) mask_var = 1.0_dp
 
-        call af_particles_to_grid(tree,i_tracked_cIx(ii), coords_CAS(:, 1:j), &
-              mask_var(1:j), j, 1, id_guess_CAS(1:j))
+        call af_particles_to_grid(tree, i_tracked_cIx(ii), coords_CAS(:, 1:j), &
+              mask_var(1:j) * weights_CAS(1:j), j, 1, id_guess_CAS(1:j))
       end do
     end if
 
