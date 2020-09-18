@@ -402,12 +402,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
     en_frac = rng%unif_01()
     fly_len = -log(1.0_dp - rng%unif_01()) / get_photoi_lambda(en_frac)
-#if NDIM == 2
-    x_stop  = x_start + rng%circle(fly_len)
-#elif NDIM == 3
     x_stop  = x_start + rng%sphere(fly_len)
-#endif
-
   end function
 
   ! Returns the photo-efficiency (for ionization) coefficient corresponding to an electric
