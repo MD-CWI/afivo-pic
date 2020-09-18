@@ -17,7 +17,7 @@ contains
     type(CFG_t), intent(inout) :: cfg
 
     user_initial_particles => init_particles
-    user_set_dielectric_eps => set_epsilon
+    ! user_set_dielectric_eps => set_epsilon
   end subroutine user_initialize
 
   subroutine init_particles(pctest)
@@ -32,7 +32,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 100
-       pos(1:2) = [0.5_dp, 0.75_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.125_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
