@@ -541,11 +541,19 @@ subroutine Ar2_radiative_decay(tree, pc)
     real(dp)                       :: m_eps(1)
     logical                        :: success
 
-    m_eps = af_interp0(tree, x_stop, [i_eps], success)
-    if (m_eps(1) > 1.0_dp .or. .not. success) then
-      is_in_gas     = .false.
+    if (GL_use_dielectric) then
+      m_eps = af_interp0(tree, x_stop, [i_eps], success)
+      if (m_eps(1) > 1.0_dp .or. .not. success) then
+        is_in_gas     = .false.
+      else
+        is_in_gas     = .true.
+      end if
     else
-      is_in_gas     = .true.
+      if (any(x_stop < 0.0_dp .or. x_stop > domain_len)) then
+        is_in_gas     = .false.
+      else
+        is_in_gas     = .true.
+      end if
     end if
   end function is_in_gas
 

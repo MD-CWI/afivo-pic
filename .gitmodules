@@ -1,7 +1,7 @@
 [submodule "particle_core"]
 	path = particle_core
 	url = git@gitlab.com:MD-CWI-NL/particle_core.git
-        branch = combustion 
+        branch = combustion
 [submodule "afivo"]
 	path = afivo
 	url = https://gitlab.com/MD-CWI-NL/afivo.git
