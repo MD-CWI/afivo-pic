@@ -210,7 +210,7 @@ class Ledger:
 
 # ==============================
 
-ledger = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_3d/output/sim_cs_ledger.txt")
+ledger = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/sim_cs_ledger.txt")
 ledger.set_manual_grouping()
 
 # %% Now some plotting
