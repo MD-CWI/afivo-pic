@@ -13,6 +13,7 @@ program apic
   use m_particles
   use m_user
   use m_user_methods
+  use m_cross_sec
 
   implicit none
 
@@ -128,6 +129,11 @@ program apic
      if (ref_info%n_add == 0) exit
   end do
 
+  ! Set an initial surface charge
+  if (associated(user_set_surface_charge)) then
+     call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_surface_charge)
+  end if
+
   call pc%set_accel()
 
   print *, "Number of threads", af_get_max_threads()
@@ -213,6 +219,14 @@ program apic
              dir=GL_output_dir, add_curve_names = ["EEDF"], &
              add_curve_dat = write_EEDF_as_curve(pc))
         call print_info()
+        call CS_write_ledger(pc%coll_ledger, &
+        trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
+        GL_time)
+
+        if (GL_write_to_dat) then
+          call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
+        end if
+
      end if
 
      if (mod(it, refine_per_steps) == 0) then
@@ -261,6 +275,22 @@ contains
          " ncell:", real(af_num_cells_used(tree), dp), &
          " npart:", real(pc%get_num_sim_part(), dp)
   end subroutine print_status
+
+  subroutine write_sim_data(my_unit)
+    integer, intent(in) :: my_unit
+    real(dp) :: time, global_time, photoi_prev_time, global_dt
+
+    time = GL_time
+    global_time = GL_time
+    photoi_prev_time = GL_time
+    global_dt = GL_dt
+
+    write(my_unit) output_cnt
+    write(my_unit) time
+    write(my_unit) global_time
+    write(my_unit) photoi_prev_time
+    write(my_unit) global_dt
+  end subroutine write_sim_data
 
   subroutine print_info()
     use m_units_constants

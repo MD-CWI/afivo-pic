@@ -63,6 +63,9 @@ module m_globals
   ! Whether a dielectric is used
   logical, protected :: GL_use_dielectric = .false.
 
+  ! Whether a the output is also written to a .dat file
+  logical, protected :: GL_write_to_dat = .false.
+  
   ! Random number generator
   type(rng_t) :: GL_rng
 
@@ -114,7 +117,7 @@ contains
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
-    call af_add_cc_variable(tree, "phi", .true., ix=i_phi)
+    call af_add_cc_variable(tree, "phi", .false., ix=i_phi)
     call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
     call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
 
@@ -127,11 +130,11 @@ contains
 
     call af_add_fc_variable(tree, "E_fc", ix=ifc_E)
 
-    call af_add_cc_variable(tree, "E", .true., ix=i_E)
+    call af_add_cc_variable(tree, "E", .false., ix=i_E)
     call af_add_cc_variable(tree, "E_v2", .true., ix=i_E_v2)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
-    call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
-    call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
+    call af_add_cc_variable(tree, "ppc", .false., ix=i_ppc)
+    call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")
@@ -153,6 +156,8 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
+    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Wheter the output is &
+          also written to a .dat file")
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
