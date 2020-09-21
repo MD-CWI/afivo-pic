@@ -65,7 +65,10 @@ module m_globals
 
   ! Whether a the output is also written to a .dat file
   logical, protected :: GL_write_to_dat = .false.
-  
+
+  ! Interval for writing to .dat file
+  real(dp), protected :: GL_write_to_dat_interval(2)
+
   ! Random number generator
   type(rng_t) :: GL_rng
 
@@ -158,6 +161,8 @@ contains
          "Whether a dielectric is used")
     call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Wheter the output is &
           also written to a .dat file")
+    call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, "The time interval &
+          that is written to a .dat file")
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
