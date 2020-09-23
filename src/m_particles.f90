@@ -300,12 +300,14 @@ contains
                i_surf_elec)
        end if
 
-       if (GL_track_CAS .and. any(pc%event_list(n)%cIx == GL_cIx_to_track)) then
-         j = j + 1
-         coords_CAS(:, j) = pc%event_list(n)%part%x(1:NDIM)
-         weights_CAS(j)   = pc%event_list(n)%part%w
-         id_guess_CAS(j)  = pc%event_list(n)%part%id
-         mask(j)          = pc%event_list(n)%cIx
+       if (GL_track_CAS) then
+         if(any(pc%event_list(n)%cIx == GL_cIx_to_track)) then
+           j = j + 1
+           coords_CAS(:, j) = pc%event_list(n)%part%x(1:NDIM)
+           weights_CAS(j)   = pc%event_list(n)%part%w
+           id_guess_CAS(j)  = pc%event_list(n)%part%id
+           mask(j)          = pc%event_list(n)%cIx
+         end if
        end if
     end do
 

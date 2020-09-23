@@ -173,7 +173,7 @@ contains
          "Whether a dielectric is used")
     call CFG_add_get(cfg, "track_CAS", GL_track_CAS, "Whether additional grid-data &
           is used to track specific collision types")
-    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Wheter the output is &
+    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Whether the output is &
           also written to a .dat file")
 
     if (GL_use_dielectric) then
