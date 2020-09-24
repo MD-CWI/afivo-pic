@@ -159,10 +159,10 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
-    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Wheter the output is &
-          also written to a .dat file")
-    call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, "The time interval &
-          that is written to a .dat file")
+    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, &
+          "Wheter the output is also written to a .dat file")
+    call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, &
+          "The time interval that is written to a .dat file")
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
