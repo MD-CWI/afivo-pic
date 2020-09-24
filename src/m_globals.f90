@@ -68,7 +68,6 @@ module m_globals
   ! Whether a the output is also written to a .dat file
   logical, protected :: GL_write_to_dat = .false.
 
-<<<<<<< HEAD
   ! Wheter additional active species will be tracked
   logical, protected :: GL_track_CAS = .false.
 
@@ -79,10 +78,10 @@ module m_globals
 
   ! Total number of species to track
   integer :: num_cIx_to_track
-=======
+
   ! Interval for writing to .dat file
   real(dp), protected :: GL_write_to_dat_interval(2)
->>>>>>> master
+
 
   ! Random number generator
   type(rng_t) :: GL_rng
@@ -177,10 +176,8 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
-    call CFG_add_get(cfg, "track_CAS", GL_track_CAS, "Whether additional grid-data &
-          is used to track specific collision types")
-    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, "Whether the output is &
-          also written to a .dat file")
+    call CFG_add_get(cfg, "track_CAS", GL_track_CAS, &
+          "Whether additional grid-data is used to track specific collision types")
     call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, &
           "Wheter the output is also written to a .dat file")
     call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, &
