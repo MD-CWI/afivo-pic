@@ -226,7 +226,9 @@ program apic
         GL_time)
 
         if (GL_write_to_dat) then
-          call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
+          if (GL_write_to_dat_interval(1) .le. GL_time .and. GL_time .le. GL_write_to_dat_interval(2)) then
+            call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
+          end if
         end if
 
      end if

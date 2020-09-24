@@ -335,7 +335,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     i = 0
     !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, en_frac)
     tid = omp_get_thread_num() + 1
-    !omp do
+    !$omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
@@ -354,7 +354,7 @@ subroutine Ar2_radiative_decay(tree, pc)
           end do
        end if
     end do
-    !omp end do
+    !$omp end do
     !$omp end parallel
     n_photons = i
     call prng%update_seed(GL_rng)
@@ -375,7 +375,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
     !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid, en_frac)
     tid = omp_get_thread_num() + 1
-    !omp do
+    !$omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
@@ -396,7 +396,7 @@ subroutine Ar2_radiative_decay(tree, pc)
           end do
       end if
     end do
-    !omp end do
+    !$omp end do
     !$omp end parallel
     call prng%update_seed(GL_rng)
   end subroutine photoe_Zheleznyak
