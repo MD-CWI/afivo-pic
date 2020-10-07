@@ -13,6 +13,9 @@ module m_user_methods
   !> If defined, call this routine after setting initial conditions
   procedure(init_part), pointer :: user_initial_particles => null()
 
+  !> If defined, call this routine to set initial ion densities
+  procedure(init_ions), pointer :: user_initial_ion_density => null()
+
   !> Call this routine every time step to generate particles
   procedure(gen_part), pointer :: user_generate_particles => null()
 
@@ -32,6 +35,11 @@ module m_user_methods
        import
        type(PC_t), intent(inout) :: pc
      end subroutine init_part
+
+     subroutine init_ions(box)
+       import
+       type(box_t), intent(inout) :: box
+     end subroutine init_ions
 
      subroutine gen_part(pc, time, time_elapsed)
        import
