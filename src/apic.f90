@@ -114,6 +114,10 @@ program apic
   do
      call af_tree_clear_cc(tree, i_pos_ion)
      call particles_to_density_and_events(tree, pc, .true.)
+
+     if (associated(user_initial_ion_density)) &
+          call af_loop_box(tree, user_initial_ion_density)
+
      call field_compute(tree, mg, .false.)
 
      if (GL_use_dielectric) then
