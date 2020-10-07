@@ -26,17 +26,21 @@ contains
     type(PC_t), intent(inout) :: pc
     integer                   :: n
     real(dp)                  :: pos(3)
+    real(dp)                  :: rand_seed(2)
     type(PC_part_t)           :: part
 
     part%v      = 0.0_dp
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 100
-       pos(1:2) = [0.5_dp, 0.6_dp] * domain_len
+    do n = 1, 1000
+       pos(1:2) = [0.26_dp, 0.9_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
+
+       rand_seed = GL_rng%two_normals()
+       part%x(1:2) = pos(1:2) + [rand_seed(1) * 2e-5_dp, rand_seed(2) * 1e-3_dp]
+       ! part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
@@ -53,8 +57,8 @@ contains
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
-          if (r(2)/domain_len(2) < 0.25_dp .or. r(2)/domain_len(2) > 0.75_dp) then
-             box%cc(i, j, i_eps) = 4.5_dp
+          if (r(1)/domain_len(1) < 0.25_dp) then
+             box%cc(i, j, i_eps) = 2.0_dp
           else
              box%cc(i, j, i_eps) = 1.0_dp
           end if
@@ -76,7 +80,7 @@ contains
         bc_val = 0.0_dp
       case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = - 1.7e4_dp
+        bc_val = 3.0e4_dp
       case default
         bc_type = af_bc_neumann
         bc_val = 0.0_dp
