@@ -122,7 +122,7 @@ contains
       case (af_neighb_lowy)
         bc_type = af_bc_dirichlet
         do ii = 1, box%n_cell**(NDIM-1)
-          bc_val(ii) = 1.5e4_dp + 8.5e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 2.5e-2_dp)
+          bc_val(ii) = 1.5e4_dp + 6.0e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 2.0e-2_dp)
         end do
       case default
         bc_type = af_bc_neumann
