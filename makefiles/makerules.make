@@ -14,6 +14,9 @@ ifeq ($(COMPILER), gfortran)
 	ifeq ($(PROF), 1)
 		FFLAGS += -pg
 	endif
+	ifeq ($(PROF), gperftools)
+		FFLAGS += -lprofiler
+	endif
 else ifeq ($(COMPILER), ifort)
 	FC 	:= ifort
 	FFLAGS := -warn all -O2 -g -stand f08 -openmp -assume realloc-lhs -fpp
