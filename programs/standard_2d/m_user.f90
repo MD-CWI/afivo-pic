@@ -18,7 +18,6 @@ contains
 
     user_initial_particles => init_particles
     user_potential_bc => my_potential
-    user_set_dielectric_eps => null()
   end subroutine user_initialize
 
   subroutine init_particles(pc)
@@ -32,10 +31,10 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 50000
-       pos(1:2) = [0.5_dp, 0.15_dp] * domain_len
+    do n = 1, 2000
+       pos(1:2) = [0.5_dp, 0.02_dp] * domain_len
        pos(3)   = 0.0_dp
-       part%w   = 1.0_dp
+       part%w   = particle_min_weight
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-4_dp
 
        if (outside_check(part) <= 0) then
@@ -43,24 +42,6 @@ contains
        end if
     end do
   end subroutine init_particles
-
-  subroutine set_epsilon(box)
-    type(box_t), intent(inout) :: box
-    real(dp)                   :: r(2)
-    integer                    :: i, j
-
-    do j = 0, box%n_cell+1
-       do i = 0, box%n_cell+1
-          r = af_r_cc(box, [i, j])
-
-          if (r(2)/domain_len(2) < 0.5_dp) then
-             box%cc(i, j, i_eps) = 4.5_dp
-          else
-             box%cc(i, j, i_eps) = 1.0_dp
-          end if
-       end do
-    end do
-  end subroutine set_epsilon
 
   subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
     type(box_t), intent(in) :: box
@@ -74,11 +55,11 @@ contains
     select case (nb)
     case (af_neighb_highy)
         bc_type = af_bc_dirichlet
-        bc_val = 0.0_dp
+        bc_val = -2.5e4_dp
       case (af_neighb_lowy)
         bc_type = af_bc_dirichlet
         do ii = 1, box%n_cell**(NDIM-1)
-          bc_val(ii) = 1.5e4_dp + 8.5e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 2.5e-2_dp)
+          bc_val(ii) = 1.75e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 5.0e-4_dp)
         end do
       case default
         bc_type = af_bc_neumann
