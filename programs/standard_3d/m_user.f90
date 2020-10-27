@@ -9,12 +9,17 @@ module m_user
   ! Public methods
   public :: user_initialize
 
+  integer :: n_particles_init = 100
+
 contains
 
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
     user_initial_particles => init_particles
+
+    call CFG_add_get(cfg, "n_particles_init", n_particles_init, &
+         "Number of initial particles")
   end subroutine user_initialize
 
   subroutine init_particles(pctest)
@@ -30,7 +35,7 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 100
+    do n = 1, n_particles_init
        pos(1:3) = [0.5_dp, 0.5_dp, 0.75_dp] * domain_len
        part%w   = 1.0_dp
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
