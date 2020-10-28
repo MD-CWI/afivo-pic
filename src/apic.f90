@@ -213,7 +213,7 @@ program apic
      GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      n_elec_prev = n_elec
 
-     call print_diagnostics(.false.)
+     ! call print_diagnostics(print_output=.false., print_info=.true.)
 
      if (write_out) then
         call set_output_variables()
@@ -385,9 +385,10 @@ contains
   end subroutine check_path_writable
 
   !> Print diagnostics that are useful for benchmarking the performance of the code
-  subroutine print_diagnostics(print_output)
+  subroutine print_diagnostics(print_output, print_info)
     use iso_fortran_env, only: error_unit
     logical, optional, intent(in)    ::  print_output ! Setting this to false will suppress the output of the code
+    logical, optional, intent(in)    ::  print_info ! Setting this to false will suppress the output of the code
     character(LEN=GL_slen) :: filename
     integer                :: io_state, my_unit
     real(dp)               :: n_part
@@ -397,13 +398,14 @@ contains
     ! write_out should not be always set to true
     if (present(print_output) .and. .not. print_output) write_out = print_output
 
+    ! Print info to the command line
+    if (present(print_info) .and. print_info) then
+      write(*, "(A6,E24.3,A,I5,A,E24.3)") "time: ", GL_time, " iteration number: ", it, " number of particles:", n_part
+    end if
+
     wtime_run = omp_get_wtime() - wtime_start
     write(filename, "(A)") "output/" // trim(GL_simulation_name) // "_diagnostics"
     my_unit = 123
-
-    !TODO Format for time, and, tabs between columns in output file
-
-    write(*, "(A6,E24.3,A,I5,A,E24.3)") "time: ", GL_time, " iteration number: ", it, " number of particles:", n_part
 
     if (it .eq. 1) then
       open(my_unit, FILE = trim(filename), ACTION = "WRITE", &
