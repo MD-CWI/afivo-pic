@@ -310,6 +310,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
+    type(PC_buf_t)                :: buffer
     real(dp), intent(inout)       :: photo_pos(:, :)
     real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
@@ -321,7 +322,9 @@ subroutine Ar2_radiative_decay(tree, pc)
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
     i = 0
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer)
+    call init_buffer(buffer) !Initialize private copies of the buffer
+
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
@@ -332,14 +335,18 @@ subroutine Ar2_radiative_decay(tree, pc)
              x_start = pc%event_list(n)%part%x
              x_stop  = get_x_stop(x_start, prng%rngs(tid))
              if (is_in_gas(tree, x_stop)) then
-               !$omp critical
-               call single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
-               !$omp end critical
+               call single_photoionization_event(tree, pc, buffer, i, photo_pos, photo_w, x_stop)
+
+               ! Make sure buffers are not getting too full
+               call handle_buffer(pc, buffer, PC_advance_buf_size/2)
              end if
           end do
        end if
     end do
     !$omp end do
+
+    ! Ensure all buffers are empty at the end of the loop
+    call handle_buffer(pc, buffer, 0)
     !$omp end parallel
     n_photons = i
     call prng%update_seed(GL_rng)
@@ -370,6 +377,7 @@ subroutine Ar2_radiative_decay(tree, pc)
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
               if ((prng%rngs(tid)%unif_01() < photoe_probability)) then
+                ! TODO removing this critical section by using buffer and array reduction for surface charge?
                 !$omp critical
                 call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
                 !$omp end critical
@@ -468,9 +476,10 @@ subroutine Ar2_radiative_decay(tree, pc)
 #endif
   end subroutine surface_charge_to_particle
 
-  subroutine single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
-    type(af_t), intent(inout)     :: tree!
+  subroutine single_photoionization_event(tree, pc, buffer, i, photo_pos, photo_w, x_stop)
+    type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
+    type(PC_buf_t), intent(inout) :: buffer
     real(dp), intent(inout)       :: photo_pos(:, :)
     real(dp), intent(inout)       :: photo_w(:)
 
@@ -479,16 +488,17 @@ subroutine Ar2_radiative_decay(tree, pc)
     integer                 :: i_cpy
     real(dp)                :: x_stop(3)
 
-    !!$omp critical
+    !$omp critical
     i = i + 1
     i_cpy = i
-    !!$omp end critical
+    !$omp end critical
     if (i_cpy > size(photo_w)) error stop "Too many photons were generated"
+
     ! Return coordinates and weights for ion production
     photo_pos(:, i_cpy) = x_stop(1:NDIM)
     photo_w(i_cpy)      = particle_min_weight
 
-    ! Create new particle
+    ! Initialize new particle
     new_part%x = 0
     new_part%x(1:NDIM) = x_stop(1:NDIM)
     new_part%v = 0
@@ -496,7 +506,9 @@ subroutine Ar2_radiative_decay(tree, pc)
     new_part%w = particle_min_weight
     new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
 
-    call pc%add_part(new_part)
+    ! Add the particle to the buffer
+    buffer%i_part = buffer%i_part + 1
+    buffer%part(buffer%i_part) = new_part
   end subroutine single_photoionization_event
 
   ! Check if the photon is absorbed in the gas
