@@ -333,7 +333,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
     i = 0
-    
+
     !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer, en_frac)
     call init_buffer(buffer) !Initialize private copies of the buffer
 
@@ -342,7 +342,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           ! The Zheleznyak model is calibrated for air, i.e. CH4-ionizations dont participate
-          if (pc%colls(pc%event_list(n)%cIx)%gas_name == "CH4") cycle
+          if (pc%colls(pc%event_list(n)%cIx)%gas_name == CS_is_CH4) cycle
           n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv
@@ -388,7 +388,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           ! The Zheleznyak model is calibrated for air, i.e. CH4-ionizations dont participate
-          if (pc%colls(pc%event_list(n)%cIx)%gas_name == "CH4") cycle
+          if (pc%colls(pc%event_list(n)%cIx)%gas_name == CS_is_CH4) cycle
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv ! High&low en photons are handled equally
