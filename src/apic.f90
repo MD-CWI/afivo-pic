@@ -385,13 +385,16 @@ contains
   !> Print diagnostics that are useful for benchmarking the performance of the code
   subroutine print_diagnostics(print_output)
     use iso_fortran_env, only: error_unit
-    logical, intent(in)    ::  print_output ! Setting this to false will suppress the output of the code
+    logical, optional, intent(in)    ::  print_output ! Setting this to false will suppress the output of the code
     character(LEN=GL_slen) :: filename
     integer                :: io_state, my_unit
     real(dp)               :: n_part
 
     n_part  = pc%get_num_sim_part()
-    write_out = print_output
+
+    ! write_out should not be always set to true
+    if (present(print_output) .and. .not. print_output) write_out = print_output
+
     wtime_run = omp_get_wtime() - wtime_start
     write(filename, "(A)") "output/" // trim(GL_simulation_name) // "_diagnostics"
     my_unit = 123
