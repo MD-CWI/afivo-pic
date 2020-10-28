@@ -11,6 +11,8 @@ module m_user
   ! Public methods
   public :: user_initialize
 
+  integer :: n_particles_init = 100
+
 contains
 
   subroutine user_initialize(cfg)
@@ -18,6 +20,7 @@ contains
 
     user_initial_particles => init_particles
     user_potential_bc => my_potential
+
   end subroutine user_initialize
 
   subroutine init_particles(pctest)

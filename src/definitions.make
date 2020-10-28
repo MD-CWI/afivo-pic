@@ -13,6 +13,10 @@ m_particles.o: m_domain.mod
 m_particles.o: m_field.mod
 m_particles.o: m_globals.mod
 m_particles.o: m_photons.mod
+m_photons.o: m_config.mod
+m_photons.o: m_domain.mod
+m_photons.o: m_globals.mod
+m_photons.o: m_time_step.mod
 m_refine.o: m_config.mod
 m_refine.o: m_geometry.mod
 m_refine.o: m_globals.mod

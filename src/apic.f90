@@ -213,6 +213,8 @@ program apic
      GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      n_elec_prev = n_elec
 
+     call print_diagnostics(.false.)
+
      if (write_out) then
         call set_output_variables()
 
@@ -381,5 +383,56 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+
+  !> Print diagnostics that are useful for benchmarking the performance of the code
+  subroutine print_diagnostics(print_output)
+    use iso_fortran_env, only: error_unit
+    logical, optional, intent(in)    ::  print_output ! Setting this to false will suppress the output of the code
+    character(LEN=GL_slen) :: filename
+    integer                :: io_state, my_unit
+    real(dp)               :: n_part
+
+    n_part  = pc%get_num_sim_part()
+
+    ! write_out should not be always set to true
+    if (present(print_output) .and. .not. print_output) write_out = print_output
+
+    wtime_run = omp_get_wtime() - wtime_start
+    write(filename, "(A)") "output/" // trim(GL_simulation_name) // "_diagnostics"
+    my_unit = 123
+
+    !TODO Format for time, and, tabs between columns in output file
+
+    write(*, "(A6,E24.3,A,I5,A,E24.3)") "time: ", GL_time, " iteration number: ", it, " number of particles:", n_part
+
+    if (it .eq. 1) then
+      open(my_unit, FILE = trim(filename), ACTION = "WRITE", &
+        ERR = 998, IOSTAT = io_state)
+    else
+      open(my_unit, FILE = trim(filename), ACTION = "WRITE", position = "append", &
+        ERR = 998, IOSTAT = io_state)
+    end if
+
+    write(my_unit, "(I0, A)", advance = 'no') it, char(9)
+    write(my_unit, "(E12.6, A)", advance = 'no') n_part, char(9)
+    write(my_unit, "(E12.6, A)", advance = 'no') wc_time, char(9)
+    write(my_unit, "(E12.6, A)", advance = 'no') wtime_advance, char(9)
+    write(my_unit, "(E12.6, A)", advance = 'no') wtime_run, char(9)
+    write(my_unit, "(F8.2, A)", advance = 'no') 1e2 * wtime_advance / (wtime_run + 1.0e-10_dp)
+
+    close(my_unit, STATUS = "KEEP", ERR = 999, IOSTAT = io_state)
+
+    return
+
+    998 continue ! If there was an error, the routine will end here
+        write(error_unit, *) " Error while opening ", trim(filename), ", io_state = ", io_state
+        error stop
+    999 continue ! If there was an error, the routine will end here
+        write(error_unit, *) "Error while writing to ", trim(filename), ", io_state = ", io_state
+        error stop
+
+
+
+  end subroutine
 
 end program apic
