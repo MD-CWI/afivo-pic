@@ -38,7 +38,7 @@ class Ledger:
         self.coll_type = np.loadtxt(file, skiprows = 6, max_rows = 1, dtype=np.dtype('U'))
 
         # now load collision data to ledger
-        self.ledger = np.loadtxt(file, skiprows = 7)
+        self.ledger = np.loadtxt(file, skiprows = 7, dtype=np.dtype('float'))
         # Extract timestamps
         self.timesteps = self.ledger[:, -1]
         # Remove timestamps from ledger
@@ -102,6 +102,42 @@ class Ledger:
 
         self.i_CH4_frag    = [42, 43, 52]
         self.i_O_diss      = [41]
+
+    def set_grouping_biagi_and_lisbon(self):
+        self.i_O_rad = [47, 57, 58]
+        self.i_H2    = [62, 66]
+        self.i_H_rad   = [61, 66, 67, 69]
+
+    def plot_biagi_and_lisbon(self):
+        plt.figure()
+        self.plot_single_species_weighted(self.i_O_rad, "Oxygen radicals", [1, 1, 1])
+        self.plot_single_species_weighted(self.i_H2, "Hydrogen (molecular)", [1, 0.5])
+        self.plot_single_species_weighted(self.i_H_rad, "Hydrogen radicals", [1, 0.5, 1, 1])
+
+        plt.legend()
+        plt.xlabel("time")
+        plt.ylabel("no. occurences")
+        plt.title("Radicals")
+
+    def plot_biagi_and_lisbon_seperate(self):
+        plt.figure()
+        self.plot_single_species([47], "47")
+        self.plot_single_species([57], "57")
+        self.plot_single_species([58], "58")
+        plt.legend()
+
+        plt.figure()
+        self.plot_single_species([62], "62")
+        self.plot_single_species([66], "66")
+        plt.legend()
+
+        plt.figure()
+        self.plot_single_species([61], "61")
+        self.plot_single_species([66], "66")
+        self.plot_single_species([67], "67")
+        self.plot_single_species([69], "69")
+        plt.legend()
+
 
     def plot_generic_grouped_species(self):
         "Plot the grouped CAS, ions/excited states/fragmented fuel/dissociated oxygen"
@@ -169,6 +205,9 @@ class Ledger:
     def plot_single_species(self, index, label):
         plt.semilogy(self.timesteps, np.sum(self.ledger[:, index], 1), label=label)
 
+    def plot_single_species_weighted(self, index, label, weight):
+        plt.semilogy(self.timesteps, np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1), label=label)
+
     def plot_excitations(self, index, label):
         exc_total = np.tile(np.sum(self.ledger[:, index], 1, keepdims=True), (1, np.size(index)))
         exc_relative = np.divide(self.ledger[:, index], exc_total + 1e-10)
@@ -211,14 +250,18 @@ class Ledger:
 # ==============================
 
 ledger = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/sim_cs_ledger.txt")
-ledger.set_manual_grouping()
+# ledger.set_manual_grouping()
+# ledger.generic_grouping()
+# ledger.plot_generic_grouped_species()
 
 # %% Now some plotting
+ledger.set_grouping_biagi_and_lisbon()
+ledger.plot_biagi_and_lisbon_seperate()
 
-ledger.plot_grouped_species()
-
-ledger.plot_excitations(ledger.i_N2_exc, "N2")
-ledger.plot_excitations(ledger.i_O2_exc, "O2")
-ledger.plot_excitations(ledger.i_CH4_exc, "CH4")
+# ledger.plot_grouped_species()
+#
+# ledger.plot_excitations(ledger.i_N2_exc, "N2")
+# ledger.plot_excitations(ledger.i_O2_exc, "O2")
+# ledger.plot_excitations(ledger.i_CH4_exc, "CH4")
 
 plt.show()

@@ -13,10 +13,10 @@ visit.Launch()
 visit.DeleteAllPlots()
 
 # Opening a virtual database representing all wave*.silo files.
-visit.OpenDatabase("/run/media/ddb/The_Ark/Streamer_simulations/CAS_for_neg_streamers/4e6/sim_*.silo database") # <- Path your results
+visit.OpenDatabase("/home/ddb/codes/afivo-pic/programs/standard_2d/output/sim_*.silo database") # <- Path your results
 
 # Make plots
-visit.AddPlot("Pseudocolor", "power_deposition")
+visit.AddPlot("Pseudocolor", "O2_dis_at")
 visit.DrawPlots()
 
 s = []
@@ -34,10 +34,10 @@ for states in range(visit.TimeSliderGetNStates()):
 plt.figure()
 plt.plot(t, s)
 plt.xlabel('time (s)')
-plt.ylabel('Power_deposited')
+plt.ylabel('O2_dis_at')
 
 plt.figure()
 plt.semilogy(t, s)
 plt.xlabel('time (s)')
-plt.ylabel('Power_deposited')
+plt.ylabel('O2_dis_at')
 plt.show()

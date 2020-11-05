@@ -9,7 +9,7 @@ file5 = "/home/ddb/results/benchmark/sim_diagnostics_C24_2"
 
 file3 = "/home/ddb/results/benchmark/laptop/test_diagnostics_PHOTOI"
 file4 = "/home/ddb/results/benchmark/laptop/test_diagnostics_vanilla"
-file000 = "/home/ddb/codes/afivo-pic/programs/standard_2d/output/test_diagnostics"
+file000 = "/home/ddb/codes/afivo-pic/programs/combustion_2d/output/sim_diagnostics"
 
 # files = [file1, file2, file5]
 files = [file000, file3, file4]
