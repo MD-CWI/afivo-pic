@@ -315,6 +315,7 @@ contains
     n_elec  = pc%get_num_real_part()
 
     write(*, "(A20,E12.4)") "dt", GL_dt
+    write(*, "(A20,E12.4)") "dt_drt", dt_drt
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
     write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
@@ -416,10 +417,10 @@ contains
     end if
 
     write(my_unit, "(I0, A)", advance = 'no') it, char(9)
-    write(my_unit, "(E12.6, A)", advance = 'no') n_part, char(9)
-    write(my_unit, "(E12.6, A)", advance = 'no') wc_time, char(9)
-    write(my_unit, "(E12.6, A)", advance = 'no') wtime_advance, char(9)
-    write(my_unit, "(E12.6, A)", advance = 'no') wtime_run, char(9)
+    write(my_unit, "(ES13.6, A)", advance = 'no') n_part, char(9)
+    write(my_unit, "(ES13.6, A)", advance = 'no') wc_time, char(9)
+    write(my_unit, "(ES13.6, A)", advance = 'no') wtime_advance, char(9)
+    write(my_unit, "(ES13.6, A)", advance = 'no') wtime_run, char(9)
     write(my_unit, "(F8.2, A)", advance = 'no') 1e2 * wtime_advance / (wtime_run + 1.0e-10_dp)
 
     close(my_unit, STATUS = "KEEP", ERR = 999, IOSTAT = io_state)
