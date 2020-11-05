@@ -31,11 +31,11 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 5000
-       pos(1:2) = [0.5_dp, 0.15_dp] * domain_len
+    do n = 1, 50000
+       pos(1:2) = [0.5_dp, 0.075_dp] * domain_len
        pos(3)   = 0.0_dp
-       part%w   = particle_min_weight
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-3_dp
+       part%w   = 4000 * particle_min_weight
+       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * [1.5e-4_dp, 3.0e-4_dp]
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
