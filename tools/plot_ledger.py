@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -32,6 +34,10 @@ def idx(cIx):
 class Ledger:
     def __init__(self, file):
 
+        self.get_streamer_length(file+"streamer_length.txt")
+
+        file = file + "sim_cs_ledger.txt"
+
         # Header data is loaded seperately
         self.cIx = np.loadtxt(file, skiprows = 4, max_rows = 1, dtype=np.dtype('i4'))
         self.gas = np.loadtxt(file, skiprows = 5, max_rows = 1, dtype=np.dtype('U'))
@@ -45,6 +51,17 @@ class Ledger:
         self.ledger = self.ledger[:, :-1]
         # Assuming equal timespacing calculate dt
         self.dt = self.timesteps[1] - self.timesteps[0]
+
+        # Finally, always set generic labels (ion/exc/...) to the set
+        self.generic_grouping()
+
+    def get_streamer_length(self, file):
+        if os.path.isfile(file):
+            self.L = np.loadtxt(file, dtype=np.dtype('float'))
+        else:
+            print("Cannot find file containing streamer length: " + file)
+            print("First define streamer length by running write_streamer_length.py in the tools-directory")
+            1/0 #Laziest error message ever
 
     def generic_grouping(self):
         self.i_N2_ion  = []
@@ -89,19 +106,10 @@ class Ledger:
                 print(self.gas[n]=='O2' and self.coll_type[n] =='Atttachment')
                 1/0 # I am too lazy to look for the proper clausule
 
-    def set_manual_grouping(self):
-        " This grouping of species keeps the dissocation and fragmentation of ..."
-        "... O2 and CH4 seperate (respectively)."
-        self.i_N2_ion    = [24]
-        self.i_O2_ion    = np.arange(39, 41)
-        self.i_CH4_ion   = [51]
-
-        self.i_N2_exc    = np.arange(1, 24)
-        self.i_O2_exc    = np.arange(26, 39)
-        self.i_CH4_exc   = np.arange(45, 51)
-
-        self.i_CH4_frag    = [42, 43, 52]
-        self.i_O_diss      = [41]
+    def set_grouping_all_repo(self):
+        self.i_O_rad = []
+        self.i_H2    = []
+        self.i_H_rad = []
 
     def set_grouping_biagi_and_lisbon(self):
         self.i_O_rad = [47, 57, 58]
@@ -109,33 +117,83 @@ class Ledger:
         self.i_H_rad   = [61, 66, 67, 69]
 
     def plot_biagi_and_lisbon(self):
-        plt.figure()
-        self.plot_single_species_weighted(self.i_O_rad, "Oxygen radicals", [1, 1, 1])
-        self.plot_single_species_weighted(self.i_H2, "Hydrogen (molecular)", [1, 0.5])
-        self.plot_single_species_weighted(self.i_H_rad, "Hydrogen radicals", [1, 0.5, 1, 1])
+        # plt.figure()
+        self.plot_single_species_weighted(self.i_O_rad, "BIAGI_IST-L O rad", [2, 2, 2])
+        self.plot_single_species_weighted(self.i_H2, "BIAGI_IST-L H2", [1, 0.5])
+        self.plot_single_species_weighted(self.i_H_rad, "BIAGI_IST-L H rad", [1, 1, 1, 1])
 
         plt.legend()
-        plt.xlabel("time")
+        plt.xlabel("length")
         plt.ylabel("no. occurences")
         plt.title("Radicals")
 
     def plot_biagi_and_lisbon_seperate(self):
         plt.figure()
-        self.plot_single_species([47], "47")
-        self.plot_single_species([57], "57")
-        self.plot_single_species([58], "58")
+        self.plot_single_species_weighted([47], "O- + O", 2.0)
+        self.plot_single_species_weighted([57], "O2(EXC A3 DISOC)", 2.0)
+        self.plot_single_species_weighted([58], "O2(EXC B3 DISOC)", 2.0)
+        plt.title("Amount of oxygen radicals produced")
         plt.legend()
 
         plt.figure()
-        self.plot_single_species([62], "62")
-        self.plot_single_species([66], "66")
+        self.plot_single_species([62], "CH2- + H2")
+        self.plot_single_species_weighted([66], "CH2 + H2", 0.5)
+        plt.title("Amount of molecular hydrogen produced")
         plt.legend()
 
         plt.figure()
-        self.plot_single_species([61], "61")
-        self.plot_single_species([66], "66")
-        self.plot_single_species([67], "67")
-        self.plot_single_species([69], "69")
+        self.plot_single_species([61], "CH3 + H-")
+        self.plot_single_species_weighted([66], "CH2 + H + H", 1.0)
+        self.plot_single_species([67], "CH3 + H")
+        self.plot_single_species([69], "CH3+ + H")
+        plt.title("Amount of hydrogen radicals produced")
+        plt.legend()
+
+    def set_grouping_biagi_and_repo(self):
+        self.i_O_rad = [47, 57, 58]
+        self.i_H2    = [62, 63, 68, 69, 70, 73, 74, 76]
+        self.i_H_rad   = [61, 63, 64, 68, 71, 75, 76]
+
+    def plot_biagi_and_repo(self):
+        # plt.figure()
+        self.plot_single_species_weighted(self.i_O_rad, "BIAGI_REPO O rad", [2, 2, 2])
+        self.plot_single_species_weighted(self.i_H2, "BIAGI_REPO H2", [1, 0.5, 1, 2, 1, 1, 2, 1])
+        self.plot_single_species_weighted(self.i_H_rad, "BIAGI_REPO H rad", [1, 1, 1, 1, 1, 1, 1])
+
+        plt.legend()
+        plt.xlabel("length")
+        plt.ylabel("no. occurences")
+        plt.title("Radicals")
+
+    def plot_biagi_and_repo_seperate(self):
+        plt.figure()
+        self.plot_single_species_weighted([47], "O- + O", 2.0)
+        self.plot_single_species_weighted([57], "O2(EXC A3 DISOC)", 2.0)
+        self.plot_single_species_weighted([58], "O2(EXC B3 DISOC)", 2.0)
+        plt.title("Amount of oxygen radicals produced")
+        plt.legend()
+
+        plt.figure()
+        self.plot_single_species_weighted([62], "CH2- + H2", 1)
+        self.plot_single_species_weighted([63], "CH2 + H2", 0.5)
+        self.plot_single_species_weighted([68], "CH + H2 + H", 1)
+        self.plot_single_species_weighted([69], "C + H2 + H2", 2)
+        self.plot_single_species_weighted([70], "CH2 + H2+", 1)
+        self.plot_single_species_weighted([73], "CH2+ + H2", 1)
+        self.plot_single_species_weighted([74], "C+ + H2 + H2", 2)
+        self.plot_single_species_weighted([76], "CH+ + H + H2", 1)
+        plt.title("Amount of molecular hydrogen produced")
+        plt.legend()
+
+        plt.figure()
+        self.plot_single_species_weighted([61], "CH3 + H-", 1.0)
+        self.plot_single_species_weighted([63], "CH2 + H + H", 1.0)
+        self.plot_single_species_weighted([64], "CH3 + H", 1.0)
+        self.plot_single_species_weighted([68], "CH + H2 + H", 1.0)
+        self.plot_single_species_weighted([71], "CH3 + H+", 1.0)
+        self.plot_single_species_weighted([75], "CH3+ + H", 1.0)
+        self.plot_single_species_weighted([76], "CH+ + H + H2", 1.0)
+        plt.title("Amount of hydrogen radicals produced")
         plt.legend()
 
 
@@ -159,54 +217,27 @@ class Ledger:
         plt.ylabel("no. occurences")
         plt.title("Grouped CAS")
 
-    def plot_grouped_species(self):
-        "Plot the grouped CAS, ions/excited states/fragmented fuel/dissociated oxygen"
-        plt.figure()
-        self.plot_single_species(self.i_N2_ion, "N2_ion")
-        self.plot_single_species(self.i_O2_ion, "O2_ion")
-        self.plot_single_species(self.i_CH4_ion, "CH4_ion")
+    def plot_single_species(self, index, label, xaxis='length'):
+        if xaxis == 'length':
+            xsteps = self.L
+        elif xaxis == 'time':
+            xsteps = self.timesteps
+        else:
+            print("Given xaxis not permitted. Use length or time")
+            1/0
 
-        self.plot_single_species(self.i_N2_exc, "N2_exc")
-        self.plot_single_species(self.i_O2_exc, "O2_exc")
-        self.plot_single_species(self.i_CH4_exc, "CH4_exc")
+        plt.semilogy(xsteps, np.sum(self.ledger[:, index], 1), label=label)
 
-        self.plot_single_species([self.i_O_diss, self.i_O_diss], "O_diss")
-        self.plot_single_species(self.i_CH4_frag, "CH4_frag")
+    def plot_single_species_weighted(self, index, label, weight, xaxis='length'):
+        if xaxis == 'length':
+            xsteps = self.L
+        elif xaxis == 'time':
+            xsteps = self.timesteps
+        else:
+            print("Given xaxis not permitted. Use length or time")
+            1/0
 
-        plt.legend()
-        plt.xlabel("time")
-        plt.ylabel("no. occurences")
-        plt.title("Grouped CAS")
-
-    def plot_grouped_species_derivative(self):
-        "Plot the derivative of grouped CAS, ions/excited states/fragmented fuel/dissociated oxygen"
-        plt.figure()
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_N2_ion], 1), self.dt), label="d_N2_ion")
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_O2_ion], 1), self.dt), label="d_O2_ion")
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_CH4_ion],1), self.dt), label="d_CH4_ion")
-
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_N2_exc], 1), self.dt),
-                            label="d_N2_exc")
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_O2_exc], 1), self.dt),
-                            label="d_O2_exc")
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_CH4_exc], 1), self.dt),
-                            label="d_CH4_exc")
-
-        plt.semilogy(self.timesteps, np.gradient(np.sum(2 * self.ledger[:, self.i_O_diss], 1), self.dt),
-                            label="d_O_diss") # One occasion produces two dissociated oxygen
-        plt.semilogy(self.timesteps, np.gradient(np.sum(self.ledger[:, self.i_CH4_frag], 1), self.dt),
-                            label="d_CH4_frag")
-
-        plt.legend()
-        plt.xlabel("time")
-        plt.ylabel("no. occurences")
-        plt.title("Derivative of grouped CAS")
-
-    def plot_single_species(self, index, label):
-        plt.semilogy(self.timesteps, np.sum(self.ledger[:, index], 1), label=label)
-
-    def plot_single_species_weighted(self, index, label, weight):
-        plt.semilogy(self.timesteps, np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1), label=label)
+        plt.semilogy(xsteps, np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1), label=label)
 
     def plot_excitations(self, index, label):
         exc_total = np.tile(np.sum(self.ledger[:, index], 1, keepdims=True), (1, np.size(index)))
@@ -249,19 +280,34 @@ class Ledger:
 
 # ==============================
 
-ledger = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/sim_cs_ledger.txt")
-# ledger.set_manual_grouping()
-# ledger.generic_grouping()
-# ledger.plot_generic_grouped_species()
+repo = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/archive/CS_comparison/SUCCES/biagi_repo/")
+full_repo = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/archive/CS_comparison/SUCCES/full_repo/")
+# lisbon = Ledger("/home/ddb/results/catch/cart_lisbon_andy/sim_cs_ledger.txt")
 
-# %% Now some plotting
-ledger.set_grouping_biagi_and_lisbon()
-ledger.plot_biagi_and_lisbon_seperate()
+# lisbon.set_grouping_biagi_and_lisbon()
+repo.set_grouping_biagi_and_repo()
 
-# ledger.plot_grouped_species()
+full_repo.plot_generic_grouped_species()
+repo.plot_generic_grouped_species()
+
+# plt.figure()
+# lisbon.plot_biagi_and_lisbon()
+# repo.plot_biagi_and_repo()
 #
-# ledger.plot_excitations(ledger.i_N2_exc, "N2")
-# ledger.plot_excitations(ledger.i_O2_exc, "O2")
-# ledger.plot_excitations(ledger.i_CH4_exc, "CH4")
+# # plt.figure()
+# # lisbon.plot_biagi_and_lisbon_seperate()
+# repo.plot_biagi_and_repo_seperate()
+#
+#
+# # %% Now some plotting
+# # ledger.set_grouping_biagi_and_lisbon()
+# # ledger.plot_biagi_and_lisbon_seperate()
+# # ledger.generic_grouping()
+# #
+# repo.plot_generic_grouped_species()
+# # #
+# repo.plot_excitations(repo.i_N2_exc, "N2")
+# repo.plot_excitations(repo.i_O2_exc, "O2")
+# repo.plot_excitations(repo.i_CH4_exc, "CH4")
 
 plt.show()

@@ -13,14 +13,15 @@ visit.Launch()
 visit.DeleteAllPlots()
 
 # Opening a virtual database representing all wave*.silo files.
-visit.OpenDatabase("/home/ddb/codes/afivo-pic/programs/standard_2d/output/sim_*.silo database") # <- Path your results
+visit.OpenDatabase("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/archive/CS_comparison/SUCCES/biagi_repo/sim_*.silo database") # <- Path your results
 
 # Make plots
-visit.AddPlot("Pseudocolor", "O2_dis_at")
+visit.AddPlot("Pseudocolor", "power_deposition")
 visit.DrawPlots()
 
 s = []
 t = []
+L = []
 
 # plot over time
 for states in range(visit.TimeSliderGetNStates()):
@@ -30,14 +31,27 @@ for states in range(visit.TimeSliderGetNStates()):
     visit.Query("Time")
     t = np.append(t, [visit.GetQueryOutputValue()])
 
+visit.AddPlot("Pseudocolor", "E_v2")
+visit.DrawPlots()
+
+for states in range(visit.TimeSliderGetNStates()):
+    visit.SetTimeSliderState(states)
+    visit.Query("Max")
+    L = np.append(L, [visit.GetQueryOutputObject()['max_coord'][1]])
 
 plt.figure()
-plt.plot(t, s)
+plt.plot(t, L)
 plt.xlabel('time (s)')
-plt.ylabel('O2_dis_at')
+plt.ylabel('Length (m)')
+plt.title('Streamer length')
 
 plt.figure()
-plt.semilogy(t, s)
-plt.xlabel('time (s)')
-plt.ylabel('O2_dis_at')
+plt.plot(L, s)
+plt.xlabel('Length (m)')
+plt.ylabel('P_dep')
+
+plt.figure()
+plt.semilogy(L, s)
+plt.xlabel('Length (m)')
+plt.ylabel('P_dep')
 plt.show()
