@@ -395,6 +395,10 @@ contains
     accel(1:NDIM) = af_interp1_fc(tree, my_part%x(1:NDIM), ifc_E, &
          success, id_guess=my_part%id)
 
+    ! accel(1:NDIM) = af_interp_trilinear_fc(tree, my_part%x(1:NDIM), ifc_E, &
+         ! success, id_guess=my_part%id)
+
+
     accel(:) = accel(:) * UC_elec_q_over_m
   end function get_accel
 

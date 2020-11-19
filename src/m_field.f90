@@ -223,15 +223,15 @@ contains
          (box%cc(1:nc, 0:nc-1, 1:nc, i_phi) - box%cc(1:nc, 2:nc+1, 1:nc, i_phi))
     box%cc(1:nc, 1:nc, 1:nc, i_Ez) = 0.5_dp * inv_dr(3) * &
          (box%cc(1:nc, 1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 1:nc, 2:nc+1, i_phi))
-    box%fc(1:nc+1, 1:nc, 1:nc, 1, ifc_E) = inv_dr(1) * &
-         (box%cc(0:nc, 1:nc, 1:nc, i_phi) - &
-         box%cc(1:nc+1, 1:nc, 1:nc, i_phi))
-    box%fc(1:nc, 1:nc+1, 1:nc, 2, ifc_E) = inv_dr(2) * &
-         (box%cc(1:nc, 0:nc, 1:nc, i_phi) - &
-         box%cc(1:nc, 1:nc+1, 1:nc, i_phi))
-    box%fc(1:nc, 1:nc, 1:nc+1, 3, ifc_E) = inv_dr(3) * &
-         (box%cc(1:nc, 1:nc, 0:nc, i_phi) - &
-         box%cc(1:nc, 1:nc, 1:nc+1, i_phi))
+    box%fc(1:nc+1, 0:nc+1, 0:nc+1, 1, ifc_E) = inv_dr(1) * &
+         (box%cc(0:nc, 0:nc+1, 0:nc+1, i_phi) - &
+         box%cc(1:nc+1, 0:nc+1, 0:nc+1, i_phi))
+    box%fc(0:nc+1, 1:nc+1, 0:nc+1, 2, ifc_E) = inv_dr(2) * &
+         (box%cc(0:nc+1, 0:nc, 0:nc+1, i_phi) - &
+         box%cc(0:nc+1, 1:nc+1, 0:nc+1, i_phi))
+    box%fc(0:nc+1, 0:nc+1, 1:nc+1, 3, ifc_E) = inv_dr(3) * &
+         (box%cc(0:nc+1, 0:nc+1, 0:nc+1, i_phi) - &
+         box%cc(0:nc+1, 0:nc+1, 1:nc+1, i_phi))
 #endif
 
   end subroutine field_from_potential
