@@ -34,16 +34,38 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 5000
+    do n = 1, 3000
        pos(1:2) = [0.5_dp, 0.02_dp] * domain_len
        pos(3)   = 0.0_dp
-       part%w   = 1.0_dp
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 2e-4_dp
+       part%w   = particle_min_weight
+       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 2e-5_dp
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
        end if
     end do
+
+      ! do n = 1, 50000
+      !    pos(1:2) = [0.5_dp, 0.03_dp] * domain_len
+      !    pos(3)   = 0.0_dp
+      !    part%w   = 4000 * particle_min_weight
+      !    part%x(1:2) = pos(1:2) + GL_rng%two_normals() * [0.5e-4_dp, 1.0e-4_dp]
+      !
+      !    if (outside_check(part) <= 0) then
+      !       call pc%add_part(part)
+      !    end if
+      ! end do
+      !
+      ! do n = 1, 5000
+      !    pos(1:2) = [0.5_dp, 0.03_dp] * domain_len
+      !    pos(3)   = 0.0_dp
+      !    part%w   = particle_min_weight
+      !    part%x(1:2) = pos(1:2) + GL_rng%two_normals() * [0.5e-4_dp, 2.0e-4_dp]
+      !
+      !    if (outside_check(part) <= 0) then
+      !       call pc%add_part(part)
+      !    end if
+      ! end do
   end subroutine init_particles
 
   subroutine init_electrons_only(pc, time, time_elapsed)
@@ -62,8 +84,8 @@ contains
           part%a      = 0.0_dp
           part%t_left = 0.0_dp
 
-          do n = 1, 1000
-             pos(1:2) = [0.5_dp, 0.15_dp] * domain_len
+          do n = 1, 5000
+             pos(1:2) = [0.5_dp, 0.02_dp] * domain_len
              pos(3)   = 0.0_dp
              part%w   = 1.0_dp
              part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1.0e-5_dp
@@ -122,7 +144,7 @@ contains
       case (af_neighb_lowy)
         bc_type = af_bc_dirichlet
         do ii = 1, box%n_cell**(NDIM-1)
-          bc_val(ii) = 1.5e4_dp + 1.0e4_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 2.0e-2_dp)
+          bc_val(ii) = 2.75e4_dp + 2.0e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 1.0e-3_dp)
         end do
       case default
         bc_type = af_bc_neumann
