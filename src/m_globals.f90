@@ -48,6 +48,7 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
+  integer, protected :: i_lsf      = -1 ! level set function (for electrode)
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -62,6 +63,16 @@ module m_globals
 
   ! Whether a dielectric is used
   logical, protected :: GL_use_dielectric = .false.
+
+  ! Whether a dielectric is used
+  logical, protected :: GL_use_electrode = .false.
+
+  ! Stop multigrid when residual is smaller than this factor times max(|rhs|)
+  real(dp), public, protected :: GL_multigrid_max_rel_residual = 1e-4_dp
+
+  !> Boundary condition for the plasma species
+  procedure(af_subr_bc), public, protected, pointer :: &
+       bc_species => null()
 
   ! Whether a the output is also written to a .dat file
   logical, protected :: GL_write_to_dat = .false.
@@ -163,6 +174,8 @@ contains
           "Wheter the output is also written to a .dat file")
     call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, &
           "The time interval that is written to a .dat file")
+    call CFG_add_get(cfg, "use_electrode", GL_use_electrode, &
+             "Whether to include an electrode")
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1
@@ -173,8 +186,35 @@ contains
             af_gc_prolong_copy, af_prolong_zeroth)
     end if
 
+    if (GL_use_electrode) then
+      call af_add_cc_variable(tree, "lsf", .true., ix=i_lsf)
+      bc_species => bc_species_dirichlet_zero ! TODO why this instead of neumann zero?
+    end if
+
     call GL_rng%set_random_seed()
 
   end subroutine GL_initialize
+
+    !> Impose a Dirichlet zero boundary condition for plasma species in the last
+    !> dimension, which is supposed to have the electrodes. We use Neumann
+    !> conditions in the other dimensions. Note that this version avoids
+    !> extrapolation (in contrast to the regular Dirichlet b.c.), which is more
+    !> suitable for conserved species densities.
+    subroutine bc_species_dirichlet_zero(box, nb, iv, coords, bc_val, bc_type)
+      type(box_t), intent(in) :: box
+      integer, intent(in)     :: nb
+      integer, intent(in)     :: iv
+      real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
+      real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
+      integer, intent(out)    :: bc_type
+
+      if (af_neighb_dim(nb) == NDIM) then
+         bc_type = af_bc_dirichlet_copy
+         bc_val  = 0.0_dp
+      else
+         bc_type = af_bc_neumann
+         bc_val  = 0.0_dp
+      end if
+    end subroutine bc_species_dirichlet_zero
 
 end module m_globals
