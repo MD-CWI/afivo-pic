@@ -73,9 +73,7 @@ program apic
           error stop "field_rod_r1 not set correctly"
      if (field_rod_radius <= 0) &
           error stop "field_rod_radius not set correctly"
-     ! print *, "AT YOUR SERVICE"
-     call af_set_cc_methods(tree, i_lsf, af_bc_neumann_zero, &
-          af_gc_prolong_copy, af_prolong_zeroth, funcval=field_rod_lsf)
+     call af_set_cc_methods(tree, i_lsf, rb=rb_err, funcval=field_rod_lsf)
      mg%i_lsf = i_lsf
   end if
 
@@ -102,6 +100,7 @@ program apic
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_E_v2, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
 #if NDIM == 3
@@ -128,7 +127,7 @@ program apic
   ! Perform additional refinement
   do
      call af_tree_clear_cc(tree, i_pos_ion)
-     
+
      call particles_to_density_and_events(tree, pc, associated(user_initial_particles), dt)
 
      if (associated(user_initial_ion_density)) &
@@ -386,7 +385,7 @@ contains
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output
-    call af_gc_tree(tree, [i_electron, i_pos_ion])
+    call af_gc_tree(tree, [i_electron, i_pos_ion, i_E_v2])
 
   end subroutine set_output_variables
 
@@ -451,9 +450,15 @@ contains
     999 continue ! If there was an error, the routine will end here
         write(error_unit, *) "Error while writing to ", trim(filename), ", io_state = ", io_state
         error stop
-
-
-
   end subroutine
+
+  subroutine rb_err(boxes, id, nb, iv)
+     type(box_t), intent(inout) :: boxes(:) !< Array with all boxes
+     integer, intent(in)         :: id       !< Id of the box that needs to have ghost cells filled
+     integer, intent(in)         :: nb       !< Neighbor direction in which ghost cells need to be filled
+     integer, intent(in)         :: iv       !< Variable for which ghost cells are filled
+
+     error stop "rb called for lsf"
+  end subroutine rb_err
 
 end program apic

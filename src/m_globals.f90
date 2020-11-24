@@ -228,6 +228,7 @@ contains
         call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero, &
             prolong=af_prolong_limit)
       end do
+    end if
 
     if (GL_use_electrode) then
       call af_add_cc_variable(tree, "lsf", .true., ix=i_lsf)

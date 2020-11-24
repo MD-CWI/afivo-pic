@@ -554,23 +554,32 @@ subroutine Ar2_radiative_decay(tree, pc)
   logical function is_in_gas(tree, x_stop)
     type(af_t), intent(in)         :: tree
     real(dp), intent(in)           :: x_stop(NDIM)
-    real(dp)                       :: m_eps(1)
+    real(dp)                       :: m_eps(1), m_lsf(1)
     logical                        :: success
+
+    is_in_gas     = .true.
 
     if (GL_use_dielectric) then
       m_eps = af_interp0(tree, x_stop, [i_eps], success)
       if (m_eps(1) > 1.0_dp .or. .not. success) then
         is_in_gas     = .false.
-      else
-        is_in_gas     = .true.
-      end if
-    else
-      if (any(x_stop < 0.0_dp .or. x_stop > domain_len)) then
-        is_in_gas     = .false.
-      else
-        is_in_gas     = .true.
+        return
       end if
     end if
+
+    if (GL_use_electrode) then
+      m_lsf = af_interp1(tree, x_stop, [i_lsf], success)
+      if (m_lsf(1) < 0.0_dp .or. .not. success) then
+        is_in_gas     = .false.
+        return
+      end if
+    end if
+
+    if (any(x_stop < 0.0_dp .or. x_stop > domain_len)) then
+      is_in_gas     = .false.
+      return
+    end if
+
   end function is_in_gas
 
   ! Determine if an emitted photon is absorbed by the gas or dielectric surface

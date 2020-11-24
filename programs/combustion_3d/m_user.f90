@@ -17,10 +17,6 @@ contains
     type(CFG_t), intent(inout) :: cfg
 
     user_initial_particles => init_particles
-    user_potential_bc => my_potential
-    user_set_dielectric_eps => null()
-    user_generate_particles => null()
-    user_set_surface_charge => null()
   end subroutine user_initialize
 
   subroutine init_particles(pc)
@@ -35,100 +31,14 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 1000
-       pos(1:3) = [0.5_dp, 0.5_dp, 0.02_dp] * domain_len
-       part%w   = 100.0_dp
-       part%x(1:3) = pos(1:3) + GL_rng%three_normals() * 7.5e-5_dp
+       pos(1:3) = [0.5_dp, 0.5_dp, 0.825_dp] * domain_len
+       part%w   = 10.0_dp
+       part%x(1:3) = pos(1:3) + GL_rng%three_normals() * 1e-4_dp
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
        end if
     end do
   end subroutine init_particles
-
-  ! subroutine init_electrons_only(pc, time, time_elapsed)
-  !   ! This model can be used to generate electrons (without ions)
-  !   use m_particle_core
-  !   type(PC_t), intent(inout)  :: pc
-  !   real(dp), intent(in)      :: time         !< Current time
-  !   real(dp), intent(in)      :: time_elapsed !< Time since last call
-  !
-  !   integer                   :: n
-  !   real(dp)                  :: pos(3)
-  !   type(PC_part_t)           :: part
-  !
-  !   if (time <= 0.0_dp) then
-  !         part%v      = 0.0_dp
-  !         part%a      = 0.0_dp
-  !         part%t_left = 0.0_dp
-  !
-  !         do n = 1, 1000
-  !            pos(1:2) = [0.5_dp, 0.15_dp] * domain_len
-  !            pos(3)   = 0.0_dp
-  !            part%w   = 1.0_dp
-  !            part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1.0e-5_dp
-  !
-  !            if (outside_check(part) <= 0) then
-  !               call pc%add_part(part)
-  !            end if
-  !         end do
-  !   end if
-  ! end subroutine
-
-  ! subroutine set_epsilon(box)
-  !   type(box_t), intent(inout) :: box
-  !   real(dp)                   :: r(2)
-  !   integer                    :: i, j, k
-  !
-  !   do j = 0, box%n_cell+1
-  !      do i = 0, box%n_cell+1
-  !         r = af_r_cc(box, [i, j, k])
-  !
-  !         if (r(3)/domain_len(3) < 0.25_dp) then
-  !            box%cc(i, j, k, i_eps) = 4.5_dp
-  !         else
-  !            box%cc(i, j, k, i_eps) = 1.0_dp
-  !         end if
-  !      end do
-  !   end do
-  ! end subroutine set_epsilon
-
-  ! real(dp) function set_surface_charge(r)
-  !   ! Set the surface charge on all dielectric surfaces as a function of r
-  !   real(dp), intent(in) :: r(NDIM)
-  !   real(dp)  :: coord, var, amplitude
-  !
-  !
-  !   coord     = r(1)/domain_len(1) - 0.5_dp
-  !   var       = 5.0e-5_dp
-  !   amplitude = 3.5e16_dp
-  !
-  !   set_surface_charge = amplitude * exp(- coord**2 / var)
-  ! end function set_surface_charge
-
-  subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
-    type(box_t), intent(in) :: box
-    integer, intent(in)     :: nb
-    integer, intent(in)     :: iv
-    real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
-    real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
-    integer, intent(out)    :: bc_type
-    integer                 :: ii
-
-    select case (nb)
-    case (af_neighb_highz)
-        bc_type = af_bc_dirichlet
-        bc_val = 0.0_dp
-      case (af_neighb_lowz)
-        bc_type = af_bc_dirichlet
-        do ii = 1, box%n_cell**(NDIM-1)
-          bc_val(ii) = 2.8e4_dp + 0.75e3_dp * exp( - sum((coords(1:2, ii)/domain_len(1:2) - 0.5_dp)**2) / 1.0e-4_dp)
-        end do
-      case default
-        bc_type = af_bc_neumann
-        bc_val = 0.0_dp
-    end select
-
-  end subroutine my_potential
-
 
 end module m_user

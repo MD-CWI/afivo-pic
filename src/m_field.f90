@@ -290,13 +290,10 @@ contains
 
     nc = box%n_cell
 
-    ! print *, "I HAVE BEEN CALLED"
-
     do KJI_DO(0,nc+1)
        rr = af_r_cc(box, [IJK])
        box%cc(IJK, iv) = GM_dist_line(rr, field_rod_r0 * domain_len, &
             field_rod_r1 * domain_len, NDIM) - field_rod_radius
-       ! print *, box%cc(IJK, iv)
     end do; CLOSE_DO
 
   end subroutine field_rod_lsf
