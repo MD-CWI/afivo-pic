@@ -4,6 +4,7 @@ module m_field
   use m_af_all
   use m_globals
   use m_domain
+  use m_geometry
 
   implicit none
   private
@@ -40,12 +41,25 @@ module m_field
 
   character(GL_slen) :: field_bc_type = "homogeneous"
 
+  !> Whether the electrode is grounded or at the applied voltage
+  logical, public, protected :: field_electrode_grounded = .false.
+
+  !> Electrode relative start position (for standard rod electrode)
+  real(dp), public, protected :: field_rod_r0(NDIM) = -1.0_dp
+
+  !> Electrode relative end position (for standard rod electrode)
+  real(dp), public, protected :: field_rod_r1(NDIM) = -1.0_dp
+
+  !> Electrode radius (in m, for standard rod electrode)
+  real(dp), public, protected :: field_rod_radius = -1.0_dp
+
   public :: field_initialize
   public :: field_compute
   public :: field_from_potential
   public :: field_get_amplitude
   public :: field_set_voltage
   public :: field_bc_homogeneous
+  public :: field_rod_lsf
 
 contains
 
@@ -77,6 +91,15 @@ contains
     call CFG_add_get(cfg, "multigrid_num_vcycles", multigrid_num_vcycles, &
          "Number of V-cycles to perform per time step")
 
+    call CFG_add_get(cfg, "field%electrode_grounded", field_electrode_grounded, &
+         "Whether the electrode is grounded or at the applied voltage")
+    call CFG_add_get(cfg, "field%rod_r0", field_rod_r0, &
+         "Electrode relative start position (for standard rod electrode)")
+    call CFG_add_get(cfg, "field%rod_r1", field_rod_r1, &
+         "Electrode relative end position (for standard rod electrode)")
+    call CFG_add_get(cfg, "field%rod_radius", field_rod_radius, &
+         "Electrode radius (in m, for standard rod electrode)")
+
     call field_set_voltage(0.0_dp)
 
     if (associated(user_potential_bc)) then
@@ -95,6 +118,12 @@ contains
     type(mg_t), intent(inout) :: mg ! Multigrid option struct
     logical, intent(in)       :: have_guess
     real(dp), parameter       :: fac = -UC_elem_charge / UC_eps0
+    real(dp)                  :: max_rhs, residual_threshold, conv_fac
+    real(dp)                  :: residual_ratio
+    integer, parameter        :: max_initial_iterations = 30
+    real(dp), parameter       :: max_residual = 1e8_dp
+    real(dp), parameter       :: min_residual = 1e-6_dp
+    real(dp)                  :: residuals(max_initial_iterations)
     integer                   :: lvl, i, id, nc
 
     nc = tree%n_cell
@@ -121,18 +150,71 @@ contains
 
     call field_set_voltage(GL_time)
 
+    call af_tree_maxabs_cc(tree, mg%i_rhs, max_rhs)
+
+    ! With an electrode, the initial convergence testing should be less strict
+    if (GL_use_electrode) then
+       conv_fac = 1e-8_dp
+       if (field_electrode_grounded) then
+          mg%lsf_boundary_value = 0.0_dp
+       else
+          mg%lsf_boundary_value = field_voltage
+       end if
+    else
+       conv_fac = 1e-10_dp
+    end if
+
+    ! Set threshold based on rhs and on estimate of round-off error, given by
+    ! delta phi / dx^2 = (phi/L * dx)/dx^2
+    ! Note that we use min_residual in case max_rhs and field_voltage are zero
+    residual_threshold = max(min_residual, &
+         max_rhs * GL_multigrid_max_rel_residual, &
+         conv_fac * abs(field_voltage)/(domain_len(NDIM) * af_min_dr(tree)))
+
+    ! Perform a FMG cycle when we have no guess
     if (.not. have_guess) then
-       ! Perform a FMG cycle when we have no guess
-       call mg_fas_fmg(tree, mg, .false., have_guess)
+      do i = 1, max_initial_iterations
+        call mg_fas_fmg(tree, mg, .true., .true.)
+        call af_tree_maxabs_cc(tree, mg%i_tmp, residuals(i))
+
+        if (residuals(i) < residual_threshold) then
+           exit
+        else if (i > 2) then
+           ! Check if the residual is not changing much anymore, and if it is
+           ! small enough, in which case we assume convergence
+           residual_ratio = minval(residuals(i-2:i)) / &
+                maxval(residuals(i-2:i))
+           if (residual_ratio < 2.0_dp .and. residual_ratio > 0.5_dp &
+                .and. residuals(i) < max_residual) exit
+        end if
+      end do
+
+       ! Check for convergence
+       if (i == max_initial_iterations + 1) then
+          print *, "Iteration    residual"
+          do i = 1, max_initial_iterations
+             write(*, "(I4,E18.2)") i, residuals(i)
+          end do
+          print *, "Maybe increase multigrid_max_rel_residual?"
+          error stop "No convergence in initial field computation"
+       end if
     end if
 
     ! Perform cheaper V-cycles
     do i = 1, multigrid_num_vcycles
-       call mg_fas_vcycle(tree, mg, .false.)
+       call mg_fas_vcycle(tree, mg, .true.)
+       call af_tree_maxabs_cc(tree, mg%i_tmp, residuals(i))
+       if (residuals(i) < residual_threshold) exit
     end do
 
     ! Compute field from potential
-    call af_loop_box(tree, field_from_potential)
+    if (GL_use_electrode) then
+      call mg_compute_phi_gradient(tree, mg, ifc_E, -1.0_dp, i_E_v2)
+    else
+      ! Keep this routine to ensure compatibility with trilinear interpolation
+      ! If tril-interp will be used, incorporate this in `mg_compute_phi_gradient`
+      call af_loop_box(tree, field_from_potential)
+    end if
 
     ! Set ghost cells for the field components
     call af_gc_tree(tree, [i_E_all])
@@ -197,6 +279,27 @@ contains
        bc_val = 0.0_dp
     end if
   end subroutine field_bc_homogeneous
+
+  ! This routine sets the level set function for a simple rod
+  subroutine field_rod_lsf(box, iv)
+    use m_geometry
+    type(box_t), intent(inout) :: box
+    integer, intent(in)        :: iv
+    integer                    :: IJK, nc
+    real(dp)                   :: rr(NDIM)
+
+    nc = box%n_cell
+
+    ! print *, "I HAVE BEEN CALLED"
+
+    do KJI_DO(0,nc+1)
+       rr = af_r_cc(box, [IJK])
+       box%cc(IJK, iv) = GM_dist_line(rr, field_rod_r0 * domain_len, &
+            field_rod_r1 * domain_len, NDIM) - field_rod_radius
+       ! print *, box%cc(IJK, iv)
+    end do; CLOSE_DO
+
+  end subroutine field_rod_lsf
 
   !> Compute electric field from electrical potential
   subroutine field_from_potential(box)

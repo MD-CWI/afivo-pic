@@ -43,11 +43,22 @@ contains
 
     if (any(x < 0.0_dp .or. x > domain_len)) then
        outside_check = outside_domain
-    else if (GL_use_dielectric) then
+       return
+    end if
+
+    if (GL_use_dielectric) then
        if (is_in_dielectric(my_part)) then
           ! The particle is IN the domain and IN the dielectric
           outside_check = inside_dielectric
+          return
        end if
+    end if
+
+    if (GL_use_electrode) then
+      if (is_in_electrode(my_part)) then
+        outside_check = outside_domain
+        return
+      end if
     end if
   end function outside_check
 
@@ -61,4 +72,13 @@ contains
     is_in_dielectric = (eps(1) > 1)
   end function is_in_dielectric
 
+  logical function is_in_electrode(my_part)
+    type(PC_part_t), intent(inout) :: my_part
+    real(dp)                       :: lsf(1)
+    logical                        :: success
+
+    lsf = af_interp1(tree, my_part%x(1:NDIM), [i_lsf], success, my_part%id)
+    if (.not. success) error stop "unexpected particle outside domain"
+    is_in_electrode = (lsf(1) < 0)
+  end function is_in_electrode
 end module m_domain
