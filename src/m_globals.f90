@@ -48,12 +48,10 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
-<<<<<<< HEAD
   integer, protected :: i_P_dep    = -1 ! Density of deposited power
   integer, protected, allocatable :: i_tracked_cIx(:) ! CAS that will be tracked
-=======
   integer, protected :: i_lsf      = -1 ! level set function (for electrode)
->>>>>>> master
+
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
