@@ -31,6 +31,9 @@ module m_refine
   ! Only derefine if grid spacing if smaller than this value
   real(dp), protected :: derefine_dx = 5e-5_dp
 
+  ! Ensure grid spacing around electrode is less than this value
+  real(dp), protected :: refine_electrode_dx = 1e99_dp
+
   ! Refine a region up to this grid spacing
   real(dp), protected, allocatable :: refine_regions_dr(:)
 
@@ -69,6 +72,8 @@ contains
          "The grid spacing will always be smaller than this value")
     call CFG_add_get(cfg, "refine%surface_max_dx", refine_surface_max_dx, &
          "The grid spacing for boxes on a dielectric surface will always be smaller than this value")
+    call CFG_add_get(cfg, "refine%electrode_dx", refine_electrode_dx, &
+         "Ensure grid spacing around electrode is less than this value")
 
     if (refine_min_dx > refine_surface_max_dx) &
      error stop "Cannot have refine_min_dx < refine_surface_max_dx"
@@ -118,7 +123,7 @@ contains
     ! Refinement flags for the cells of the box
     integer, intent(out)     :: &
          cell_flags(DTIMES(box%n_cell))
-    integer                  :: IJK, n, nc
+    integer                  :: IJK, n, nc, i0(NDIM), i1(NDIM)
     real(dp)                 :: max_dx, fld, alpha, adx, elec_dens
     real(dp)                 :: rmin(NDIM), rmax(NDIM)
 
@@ -141,6 +146,16 @@ contains
        else
           cell_flags(IJK) = af_keep_ref
        end if
+
+      ! Refine around electrode
+      if (box%tag == mg_lsf_box .and. max_dx > refine_electrode_dx) then
+         i0 = [IJK] - 1
+         i1 = [IJK] + 1
+         if (minval(box%cc(DSLICE(i0, i1), i_lsf)) * &
+              maxval(box%cc(DSLICE(i0, i1), i_lsf)) <= 0) then
+            cell_flags(IJK) = af_do_ref
+         end if
+      end if
     end do; CLOSE_DO
 
     ! Check fixed refinements
