@@ -69,9 +69,9 @@ contains
          "The model that is used for photon interactions")
 
     call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
-         "Whether photoionization is used")
+         "Whether photoemission is used")
     call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
-        "Whether photoionization is used")
+        "Whether photoemission is used")
         call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
         "Whether photoionization is used")
 
@@ -146,7 +146,7 @@ contains
        allocate(weights(pc%n_events))
        allocate(id_guess(pc%n_events))
     end if
-
+!xiaoran
     call Ar2_radiative_decay(tree, pc) ! Do photoemission events (updates the Ar2 pool)
     call af_loop_box(tree, perform_argon_reactions, .true.)
 
@@ -204,7 +204,8 @@ subroutine Ar2_radiative_decay(tree, pc)
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
               ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
-              call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
+              !Xiaoran: just comment this for now. 
+              !call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
               ! print *, "photoemission event has occurred"
             end if
           end do
@@ -361,10 +362,15 @@ subroutine Ar2_radiative_decay(tree, pc)
     integer                       :: n, m, n_uv, tid
     real(dp)                      :: x_start(3), x_stop(3)
     type(prng_t)                  :: prng
+    type(PC_buf_t)                :: buffer
+    type(PC_buf_surf_t)           :: buffer_surf
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
-    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid)
+    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid, buffer)
+    call init_buffer(buffer) !Initialize private copies of the buffer
+    call init_buffer_surf(buffer_surf) !Initialize private copies of the buffer
+    
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
@@ -377,16 +383,22 @@ subroutine Ar2_radiative_decay(tree, pc)
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
               if ((prng%rngs(tid)%unif_01() < photoe_probability)) then
-                ! TODO removing this critical section by using buffer and array reduction for surface charge?
-                !$omp critical
-                call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
-                !$omp end critical
+               ! TODO removing this critical section by using buffer and array reduction for surface charge?
+                call single_photoemission_event(tree, pc, buffer, buffer_surf, particle_min_weight, x_start, x_stop)
+
+               ! Make sure buffers are not getting too full
+               call handle_buffer(pc, buffer, PC_advance_buf_size/2)
+               call handle_buffer_surf(diel, buffer_surf, PC_advance_buf_surf_size/2)
               end if
             end if
           end do
       end if
     end do
     !$omp end do
+    
+    ! Ensure all buffers are empty at the end of the loop
+    call handle_buffer(pc, buffer, 0)
+    call handle_buffer_surf(diel, buffer_surf, 0)
     !$omp end parallel
     call prng%update_seed(GL_rng)
   end subroutine photoe_Zheleznyak
@@ -433,9 +445,11 @@ subroutine Ar2_radiative_decay(tree, pc)
   ! ==== General modules
 
   ! Generate photo-emitted electrons on the surface of a dielectric
-  subroutine single_photoemission_event(tree, pc, photon_w, x_gas, x_diel)
+  subroutine single_photoemission_event(tree, pc, buffer, buffer_surf, photon_w, x_gas, x_diel)
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
+    type(PC_buf_t), intent(inout)    :: buffer
+    type(PC_buf_surf_t), intent(inout):: buffer_surf
     type(PC_part_t)                  :: new_part
     real(dp), intent(in)             :: photon_w, x_gas(3), x_diel(3)
 
@@ -446,17 +460,20 @@ subroutine Ar2_radiative_decay(tree, pc)
     new_part%w    = photon_w
     new_part%id   = af_get_id_at(tree, x_gas(1:NDIM))
 
-    call pc%add_part(new_part)
+    ! Add the particle to the buffer
+    buffer%i_part = buffer%i_part + 1
+    buffer%part(buffer%i_part) = new_part
     ! Update charge density on the dielectric
-    call surface_charge_to_particle(tree, new_part, i_surf_elec)
+    call surface_charge_to_particle(tree, buffer_surf, new_part, i_surf_elec)
   end subroutine single_photoemission_event
 
   ! Input: a particle that is ejected from the dielectric.
   ! The surface charge is altered by the charge leaving
-  subroutine surface_charge_to_particle(tree, my_part, i_surf)
+  subroutine surface_charge_to_particle(tree, buffer_surf, my_part, i_surf)
     use m_units_constants
 
     type(af_t), intent(in)      :: tree
+    type(PC_buf_surf_t), intent(inout):: buffer_surf
     type(PC_part_t), intent(in) :: my_part
     integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
@@ -464,16 +481,17 @@ subroutine Ar2_radiative_decay(tree, pc)
     call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
          ix_surf, ix_cell)
 
-    ! Update the charge in the surface cell
+    buffer_surf%i_event = buffer_surf%i_event + 1
+    buffer_surf%bur_surf_event(buffer_surf%i_event)%i_surf = i_surf
+    buffer_surf%bur_surf_event(buffer_surf%i_event)%ix_surf = ix_surf
 #if NDIM == 2
-    diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
-         my_part%w / diel%surfaces(ix_surf)%dr(1)
+!still some problem here
+    buffer_surf%bur_surf_event(buffer_surf%i_event)%ix_cell = [ix_cell, 0]
 #elif NDIM == 3
-    diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) = &
-         diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) - &
-         my_part%w / product(diel%surfaces(ix_surf)%dr)
+    buffer_surf%bur_surf_event(buffer_surf%i_event)%ix_cell = ix_cell
 #endif
+    buffer_surf%bur_surf_event(buffer_surf%i_event)%charge = my_part%w
+
   end subroutine surface_charge_to_particle
 
   subroutine single_photoionization_event(tree, pc, buffer, i, photo_pos, photo_w, x_stop)
@@ -491,7 +509,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     !$omp critical
     i = i + 1
     i_cpy = i
-    !$omp end critical
+    !$omp end critical !xiaoran: Why record i_cpy here. This induced omp critical
     if (i_cpy > size(photo_w)) error stop "Too many photons were generated"
 
     ! Return coordinates and weights for ion production
@@ -578,5 +596,40 @@ subroutine Ar2_radiative_decay(tree, pc)
       end if
     end do
   end subroutine bisect_line
+  
+  !> If the buffers for a thread are getting too full, empty them
+  subroutine handle_buffer_surf(dielectric, buffer_surf, max_size)
+    use m_dielectric
+    type(dielectric_t), intent(inout) :: dielectric        !< The dielectric surface
+    type(PC_buf_surf_t), intent(inout)    :: buffer_surf
+    !> Keep at most this many buffered items
+    integer, intent(in)              :: max_size
+    integer                          :: i
+    integer                          :: i_surf !< Surface variable
+    integer                          :: ix_surf, ix_cell(2)
+
+    ! The buffer for happened events
+    if (buffer_surf%i_event > max_size) then
+       !$omp critical
+    ! Update the charge in the surface cell
+        do i = 0, buffer_surf%i_event
+            i_surf = buffer_surf%bur_surf_event(i)%i_surf
+            ix_surf = buffer_surf%bur_surf_event(i)%ix_surf
+            ix_cell = buffer_surf%bur_surf_event(i)%ix_cell
+#if NDIM == 2
+            dielectric%surfaces(ix_surf)%sd(ix_cell(1), i_surf) = &
+                dielectric%surfaces(ix_surf)%sd(ix_cell(1), i_surf) - &
+                buffer_surf%bur_surf_event(i)%charge / dielectric%surfaces(ix_surf)%dr(1)
+#elif NDIM == 3
+            dielectric%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) = &
+                dielectric%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) - &
+                buffer_surf%bur_surf_event(i)%charge / product(dielectric%surfaces(ix_surf)%dr)
+#endif
+        end do
+       !$omp end critical
+       buffer_surf%i_event = 0
+    end if
+
+  end subroutine handle_buffer_surf
 
 end module m_photons
