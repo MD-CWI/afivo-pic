@@ -8,7 +8,7 @@ module m_user
   implicit none
   private
 
-  real(dp)  :: seed_location = [0.5, 0.5, 0.825]
+  real(dp)  :: seed_location(3) = [0.5, 0.5, 0.825]
   real(dp)  :: seed_variance = 2.5e-4
   integer   :: seed_particles = 10000
 
@@ -22,7 +22,7 @@ contains
 
     call CFG_add_get(cfg, "seed%location", seed_location, &
         "Location of the initial seed")
-    call CFG_add_get(cfg, "seed%spread", seed_variance, &
+    call CFG_add_get(cfg, "seed%variance", seed_variance, &
         "Variance of the (Gaussian) initial seed")
     call CFG_add_get(cfg, "seed%num_particles", seed_particles, &
         "Number of particles in the initial seed")
