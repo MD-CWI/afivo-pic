@@ -31,6 +31,7 @@ program apic
   type(ref_info_t)       :: ref_info
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
+  real(dp)               :: ptd_start, ptd_end
 
   real(dp) :: t0
   real(dp) :: wtime_start
@@ -192,8 +193,9 @@ program apic
      wtime_advance = wtime_advance + omp_get_wtime() - t0
 
      GL_time = GL_time + dt
-
+     ptd_start = omp_get_wtime()
      call particles_to_density_and_events(tree, pc, .false.)
+     ptd_end = omp_get_wtime()
 
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase) then
@@ -327,6 +329,8 @@ contains
     wtime_run = omp_get_wtime() - wtime_start
     write(*, "(A20,F8.2,A)") "cost of advance", &
          1e2 * wtime_advance / wtime_run, "%"
+    write(*, "(A20,E12.4,A)") "particles_to_density_and_events time : ", &
+         ptd_end-ptd_start, "s"
   end subroutine print_info
 
   subroutine set_output_variables()
