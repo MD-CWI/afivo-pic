@@ -8,6 +8,10 @@ module m_user
   implicit none
   private
 
+  real(dp)  :: seed_location = [0.5, 0.5, 0.825]
+  real(dp)  :: seed_variance = 2.5e-4
+  integer   :: seed_particles = 10000
+
   ! Public methods
   public :: user_initialize
 
@@ -15,6 +19,13 @@ contains
 
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
+
+    call CFG_add_get(cfg, "seed%location", seed_location, &
+        "Location of the initial seed")
+    call CFG_add_get(cfg, "seed%spread", seed_variance, &
+        "Variance of the (Gaussian) initial seed")
+    call CFG_add_get(cfg, "seed%num_particles", seed_particles, &
+        "Number of particles in the initial seed")
 
     user_initial_particles => init_particles
   end subroutine user_initialize
@@ -30,10 +41,10 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 1000
-       pos(1:3) = [0.5_dp, 0.5_dp, 0.825_dp] * domain_len
-       part%w   = 10.0_dp
-       part%x(1:3) = pos(1:3) + GL_rng%three_normals() * 1e-4_dp
+    do n = 1, seed_particles
+       pos(1:3) = seed_location * domain_len
+       part%w   = 1.0_dp
+       part%x(1:3) = pos(1:3) + GL_rng%three_normals() * seed_variance
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
