@@ -355,7 +355,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
   ! Perform photoemission based on the Zheleznyak model for air
   subroutine photoe_Zheleznyak(tree, pc)
-    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num, omp_set_num_threads
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
     logical                       :: on_surface
@@ -612,7 +612,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     if (buffer_surf%i_event > max_size) then
        !$omp critical
     ! Update the charge in the surface cell
-        do i = 0, buffer_surf%i_event
+        do i = 1, buffer_surf%i_event
             i_surf = buffer_surf%bur_surf_event(i)%i_surf
             ix_surf = buffer_surf%bur_surf_event(i)%ix_surf
             ix_cell = buffer_surf%bur_surf_event(i)%ix_cell
