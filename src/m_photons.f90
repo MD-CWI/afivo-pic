@@ -367,7 +367,7 @@ subroutine Ar2_radiative_decay(tree, pc)
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
-    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid, buffer)
+    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid, buffer, buffer_surf)
     call init_buffer(buffer) !Initialize private copies of the buffer
     call init_buffer_surf(buffer_surf) !Initialize private copies of the buffer
     
