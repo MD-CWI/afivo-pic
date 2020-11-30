@@ -87,8 +87,6 @@ contains
          "Only refine if electron density is above this value")
     call CFG_add_get(cfg, "refine%derefine_dx", derefine_dx, &
          "Only derefine if grid spacing is smaller than this value")
-    call CFG_add_get(cfg, "refine%electrode_dx", refine_electrode_dx, &
-         "Ensure grid spacing around electrode is less than this value")
 
     call CFG_add(cfg, "refine%regions_dr", [1.0e99_dp], &
          "Refine regions up to this grid spacing", .true.)
