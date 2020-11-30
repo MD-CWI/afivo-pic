@@ -87,6 +87,8 @@ contains
          "Only refine if electron density is above this value")
     call CFG_add_get(cfg, "refine%derefine_dx", derefine_dx, &
          "Only derefine if grid spacing is smaller than this value")
+    call CFG_add_get(cfg, "refine%electrode_dx", refine_electrode_dx, &
+         "Ensure grid spacing around electrode is less than this value")
 
     call CFG_add(cfg, "refine%regions_dr", [1.0e99_dp], &
          "Refine regions up to this grid spacing", .true.)
@@ -147,15 +149,12 @@ contains
           cell_flags(IJK) = af_keep_ref
        end if
 
-      ! Refine around electrode
-      if (box%tag == mg_lsf_box .and. max_dx > refine_electrode_dx) then
-         i0 = [IJK] - 1
-         i1 = [IJK] + 1
-         if (minval(box%cc(DSLICE(i0, i1), i_lsf)) * &
-              maxval(box%cc(DSLICE(i0, i1), i_lsf)) <= 0) then
-            cell_flags(IJK) = af_do_ref
-         end if
-      end if
+       ! Refine around electrode
+       if (box%tag == mg_lsf_box .and. max_dx > refine_electrode_dx) then
+          if (box%cc(IJK, i_lsf) < 0) then
+             cell_flags(IJK) = af_do_ref
+          end if
+       end if
     end do; CLOSE_DO
 
     ! Check fixed refinements

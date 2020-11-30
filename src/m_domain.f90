@@ -11,7 +11,7 @@ module m_domain
   real(dp), protected, public :: domain_len(NDIM) = 4e-3_dp
 
   ! The coarse grid size (in number of cells)
-  integer, protected, public :: coarse_grid_size(NDIM)
+  integer, protected, public :: coarse_grid_size(NDIM) = -1
 
   ! The size of the boxes that we use to construct our mesh
   integer, protected, public :: box_size = 8
@@ -29,8 +29,13 @@ contains
          "The length of the domain (m)")
     call CFG_add_get(cfg, "box_size", box_size, &
          "The number of grid cells per coordinate in a box")
+    call CFG_add_get(cfg, "coarse_grid_size", coarse_grid_size, &
+         "The size of the coarse grid (relevant with electrode)")
 
-    coarse_grid_size = nint(domain_len/minval(domain_len)) * box_size
+    if (all(coarse_grid_size == -1)) then
+       ! Automatically set coarse grid size
+       coarse_grid_size = nint(domain_len/minval(domain_len)) * box_size
+    end if
 
   end subroutine domain_init
 
