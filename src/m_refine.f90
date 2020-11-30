@@ -31,6 +31,9 @@ module m_refine
   ! Only derefine if grid spacing if smaller than this value
   real(dp), protected :: derefine_dx = 5e-5_dp
 
+  ! Ensure grid spacing around electrode is less than this value
+  real(dp), protected :: refine_electrode_dx = 1e99_dp
+
   ! Refine a region up to this grid spacing
   real(dp), protected, allocatable :: refine_regions_dr(:)
 
@@ -82,6 +85,8 @@ contains
          "Only refine if electron density is above this value")
     call CFG_add_get(cfg, "refine%derefine_dx", derefine_dx, &
          "Only derefine if grid spacing is smaller than this value")
+    call CFG_add_get(cfg, "refine%electrode_dx", refine_electrode_dx, &
+         "Ensure grid spacing around electrode is less than this value")
 
     call CFG_add(cfg, "refine%regions_dr", [1.0e99_dp], &
          "Refine regions up to this grid spacing", .true.)
@@ -140,6 +145,13 @@ contains
           cell_flags(IJK) = af_rm_ref
        else
           cell_flags(IJK) = af_keep_ref
+       end if
+
+       ! Refine around electrode
+       if (box%tag == mg_lsf_box .and. max_dx > refine_electrode_dx) then
+          if (box%cc(IJK, i_lsf) < 0) then
+             cell_flags(IJK) = af_do_ref
+          end if
        end if
     end do; CLOSE_DO
 
