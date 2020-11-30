@@ -137,6 +137,11 @@ contains
           tree%boxes(id)%cc(DTIMES(:), i_rhs) = fac * (&
                tree%boxes(id)%cc(DTIMES(:), i_pos_ion) - &
                tree%boxes(id)%cc(DTIMES(:), i_electron))
+          if (GL_use_electrode) then
+             where (tree%boxes(id)%cc(DTIMES(:), i_lsf) <= 0)
+                tree%boxes(id)%cc(DTIMES(:), i_rhs) = 0.0_dp
+             end where
+          end if
        end do
        !$omp end do nowait
     end do
