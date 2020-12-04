@@ -37,14 +37,10 @@ module m_globals
   integer, protected :: i_electron = -1 ! Electron density
   integer, protected :: i_pos_ion  = -1 ! Positive ion density
   integer, protected :: i_phi      = -1 ! Electrical potential
-  integer, protected :: i_Ex       = -1 ! Electric field (x)
-  integer, protected :: i_Ey       = -1 ! Electric field (y)
-  integer, protected :: i_Ez       = -1 ! Electric field (z)
-  integer, protected :: i_E_all(NDIM) = -1 ! Electric field components
   integer, protected :: ifc_E = -1 ! Face-centered electric field
-  integer, protected :: i_E        = -1 ! norm(E) (cell-centered)
-  integer, protected :: i_E_v2 = -1     ! norm(E) (face-centered)
+  integer, protected :: i_E = -1     ! norm(E) (face-centered)
   integer, protected :: i_rhs      = -1 ! Source term Poisson
+  integer, protected :: i_residual = -1 ! Multigrid residual
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
@@ -132,21 +128,11 @@ contains
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
     call af_add_cc_variable(tree, "phi", .false., ix=i_phi)
-    call af_add_cc_variable(tree, "Ex", .true., ix=i_Ex)
-    call af_add_cc_variable(tree, "Ey", .true., ix=i_Ey)
-
-#if NDIM == 2
-    i_E_all = [i_Ex, i_Ey]
-#elif NDIM == 3
-    call af_add_cc_variable(tree, "Ez", .true., ix=i_Ez)
-    i_E_all = [i_Ex, i_Ey, i_Ez]
-#endif
-
     call af_add_fc_variable(tree, "E_fc", ix=ifc_E)
 
-    call af_add_cc_variable(tree, "E", .false., ix=i_E)
-    call af_add_cc_variable(tree, "E_v2", .true., ix=i_E_v2)
+    call af_add_cc_variable(tree, "E", .true., ix=i_E)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
+    call af_add_cc_variable(tree, "residual", .false., ix=i_residual)
     call af_add_cc_variable(tree, "ppc", .false., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
 
