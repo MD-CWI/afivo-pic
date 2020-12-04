@@ -214,7 +214,7 @@ contains
 
     ! Compute field from potential
     if (GL_use_electrode) then
-      call mg_compute_phi_gradient(tree, mg, ifc_E, -1.0_dp, i_E_v2)
+      call mg_compute_phi_gradient(tree, mg, ifc_E, -1.0_dp, i_E)
     else
       ! Keep this routine to ensure compatibility with trilinear interpolation
       ! If tril-interp will be used, incorporate this in `mg_compute_phi_gradient`
@@ -222,7 +222,7 @@ contains
     end if
 
     ! Set ghost cells for the field components
-    call af_gc_tree(tree, [i_E_all])
+    call af_gc_tree(tree, [i_E])
 
     if (GL_use_dielectric) then
        ! call dielectric_correct_field_cc(tree, diel, i_surf_sum_dens, &
@@ -313,30 +313,20 @@ contains
     inv_dr = 1 / box%dr
 
 #if NDIM == 2
-    box%cc(1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr(1) * &
-         (box%cc(0:nc-1, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, i_phi))
-    box%cc(1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr(2) * &
-         (box%cc(1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 2:nc+1, i_phi))
     box%fc(1:nc+1, 1:nc, 1, ifc_E) = inv_dr(1) * &
          (box%cc(0:nc, 1:nc, i_phi) - box%cc(1:nc+1, 1:nc, i_phi))
     box%fc(1:nc, 1:nc+1, 2, ifc_E) = inv_dr(2) * &
          (box%cc(1:nc, 0:nc, i_phi) - box%cc(1:nc, 1:nc+1, i_phi))
 #elif NDIM == 3
-    box%cc(1:nc, 1:nc, 1:nc, i_Ex) = 0.5_dp * inv_dr(1) * &
-         (box%cc(0:nc-1, 1:nc, 1:nc, i_phi) - box%cc(2:nc+1, 1:nc, 1:nc, i_phi))
-    box%cc(1:nc, 1:nc, 1:nc, i_Ey) = 0.5_dp * inv_dr(2) * &
-         (box%cc(1:nc, 0:nc-1, 1:nc, i_phi) - box%cc(1:nc, 2:nc+1, 1:nc, i_phi))
-    box%cc(1:nc, 1:nc, 1:nc, i_Ez) = 0.5_dp * inv_dr(3) * &
-         (box%cc(1:nc, 1:nc, 0:nc-1, i_phi) - box%cc(1:nc, 1:nc, 2:nc+1, i_phi))
-    box%fc(1:nc+1, 0:nc+1, 0:nc+1, 1, ifc_E) = inv_dr(1) * &
-         (box%cc(0:nc, 0:nc+1, 0:nc+1, i_phi) - &
-         box%cc(1:nc+1, 0:nc+1, 0:nc+1, i_phi))
-    box%fc(0:nc+1, 1:nc+1, 0:nc+1, 2, ifc_E) = inv_dr(2) * &
-         (box%cc(0:nc+1, 0:nc, 0:nc+1, i_phi) - &
-         box%cc(0:nc+1, 1:nc+1, 0:nc+1, i_phi))
-    box%fc(0:nc+1, 0:nc+1, 1:nc+1, 3, ifc_E) = inv_dr(3) * &
-         (box%cc(0:nc+1, 0:nc+1, 0:nc+1, i_phi) - &
-         box%cc(0:nc+1, 0:nc+1, 1:nc+1, i_phi))
+    box%fc(1:nc+1, 1:nc, 1:nc, 1, ifc_E) = inv_dr(1) * &
+         (box%cc(0:nc, 1:nc, 1:nc, i_phi) - &
+         box%cc(1:nc+1, 1:nc, 1:nc, i_phi))
+    box%fc(1:nc, 1:nc+1, 1:nc, 2, ifc_E) = inv_dr(2) * &
+         (box%cc(1:nc, 0:nc, 1:nc, i_phi) - &
+         box%cc(1:nc, 1:nc+1, 1:nc, i_phi))
+    box%fc(1:nc, 1:nc, 1:nc+1, 3, ifc_E) = inv_dr(3) * &
+         (box%cc(1:nc, 1:nc, 0:nc, i_phi) - &
+         box%cc(1:nc, 1:nc, 1:nc+1, i_phi))
 #endif
 
   end subroutine field_from_potential
@@ -347,19 +337,13 @@ contains
 
     nc = box%n_cell
 #if NDIM == 2
-    box%cc(1:nc, 1:nc, i_E) = sqrt(box%cc(1:nc, 1:nc, i_Ex)**2 + &
-         box%cc(1:nc, 1:nc, i_Ey)**2)
-    box%cc(1:nc, 1:nc, i_E_v2) = 0.5_dp * sqrt(&
+    box%cc(1:nc, 1:nc, i_E) = 0.5_dp * sqrt(&
          (box%fc(1:nc, 1:nc, 1, ifc_E) + &
          box%fc(2:nc+1, 1:nc, 1, ifc_E))**2 + &
          (box%fc(1:nc, 1:nc, 2, ifc_E) + &
          box%fc(1:nc, 2:nc+1, 2, ifc_E))**2)
 #elif NDIM == 3
-    box%cc(1:nc, 1:nc, 1:nc, i_E) = sqrt(&
-         box%cc(1:nc, 1:nc, 1:nc, i_Ex)**2 + &
-         box%cc(1:nc, 1:nc, 1:nc, i_Ey)**2 + &
-         box%cc(1:nc, 1:nc, 1:nc, i_Ez)**2)
-    box%cc(1:nc, 1:nc, 1:nc, i_E_v2) = 0.5_dp * sqrt(&
+    box%cc(1:nc, 1:nc, 1:nc, i_E) = 0.5_dp * sqrt(&
              (box%fc(1:nc, 1:nc, 1:nc, 1, ifc_E) + &
               box%fc(2:nc+1, 1:nc, 1:nc, 1, ifc_E))**2 + &
              (box%fc(1:nc, 1:nc, 1:nc, 2, ifc_E) + &
