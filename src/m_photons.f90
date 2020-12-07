@@ -80,7 +80,7 @@ contains
     select case (model)
     case("Zheleznyak")
         call Zheleznyak_initialize(cfg)
-        photoionization => photoi_Zheleznyak
+        photoionization => photoi_Zheleznyak_OMP
         photoemission => photoe_Zheleznyak
       case("Argon")
         call Argon_initialize(cfg)
@@ -369,7 +369,88 @@ subroutine Ar2_radiative_decay(tree, pc)
     call prng%update_seed(GL_rng)
   end subroutine photoi_Zheleznyak
 
-  ! Perform photoemission based on the Zheleznyak model
+  ! Perform photon generation and ionization according to the Zheleznyak model
+  ! But optimized for use with multiple cores
+  subroutine photoi_Zheleznyak_OMP(tree, pc, photo_pos, photo_w, n_photons)
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+    type(PC_buf_t)                :: buffer
+    real(dp), intent(inout)       :: photo_pos(:, :)
+    real(dp), intent(inout)       :: photo_w(:)
+    real(dp), allocatable, save   :: pw_array(:, :), ppos_array(:, :, :)
+    integer, allocatable, save    :: pindex(:)
+    integer, intent(out)          :: n_photons
+    type(prng_t)                  :: prng
+
+    integer         :: tid, max_threads, n_alloc, HEAD
+    integer         :: n, m, n_uv, ii
+    real(dp)        :: x_start(3), x_stop(3)
+
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer)
+    call init_buffer(buffer) !Initialize private copies of the buffer
+
+    ! allocate the arrays for storing results of individual threads
+    !$omp single
+    max_threads = omp_get_num_threads()
+    n_alloc = int(max(pc%get_num_sim_part(), pc%n_events) / max_threads)
+    if (.not. allocated(pw_array)) then
+      allocate(pw_array(max_threads, n_alloc))
+      allocate(ppos_array(max_threads, NDIM, n_alloc))
+      allocate(pindex(max_threads))
+    else if (size(pw_array, dim=1)<max_threads .or. size(pw_array, dim=2)<n_alloc) then
+      deallocate(pw_array)
+      deallocate(ppos_array)
+      deallocate(pindex)
+      allocate(pw_array(max_threads, n_alloc))
+      allocate(ppos_array(max_threads, NDIM, n_alloc))
+      allocate(pindex(max_threads))
+    end if
+
+    pindex = 0
+    !$omp end single
+
+    !$omp barrier
+
+    tid = omp_get_thread_num() + 1
+    !$omp do
+    do n = 1, pc%n_events
+       if (pc%event_list(n)%ctype == CS_ionize_t) then
+          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+
+          do m = 1, n_uv
+             x_start = pc%event_list(n)%part%x
+             x_stop  = get_x_stop(x_start, prng%rngs(tid))
+             if (is_in_gas(tree, x_stop)) then
+               call single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
+
+               ! Make sure buffers are not getting too full
+               call handle_buffer(pc, buffer, PC_advance_buf_size/2)
+             end if
+          end do
+       end if
+    end do
+    !$omp end do
+
+    ! Ensure all buffers are empty at the end of the loop
+    call handle_buffer(pc, buffer, 0)
+    !$omp end parallel
+
+    ! Now combine the results of individual threads
+    HEAD = 1
+    do ii = 1, max_threads
+      photo_w(HEAD:(HEAD+pindex(ii)-1)) = pw_array(ii, 1:pindex(ii))
+      photo_pos(:, HEAD:(HEAD+pindex(ii)-1)) = ppos_array(ii, :, 1:pindex(ii))
+      HEAD = HEAD + pindex(ii)
+    end do
+    n_photons = HEAD - 1
+
+    call prng%update_seed(GL_rng)
+  end subroutine photoi_Zheleznyak_OMP
+
+  ! Perform photoemission based on the Zheleznyak model for air
   subroutine photoe_Zheleznyak(tree, pc)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
@@ -549,6 +630,36 @@ subroutine Ar2_radiative_decay(tree, pc)
     buffer%i_part = buffer%i_part + 1
     buffer%part(buffer%i_part) = new_part
   end subroutine single_photoionization_event
+
+  subroutine single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+    type(PC_buf_t), intent(inout) :: buffer
+    real(dp), intent(inout)       :: ppos_array(:, :, :)
+    real(dp), intent(inout)       :: pw_array(:, :)
+
+
+    type(PC_part_t)         :: new_part
+    integer, intent(inout)  :: pindex(:)
+    integer, intent(in)     :: tid
+    real(dp)                :: x_stop(3)
+
+    pindex(tid) = pindex(tid) + 1
+    ppos_array(tid, :, pindex(tid)) = x_stop(1:NDIM)
+    pw_array(tid, pindex(tid)) =  particle_min_weight
+
+    ! Initialize new particle
+    new_part%x = 0
+    new_part%x(1:NDIM) = x_stop(1:NDIM)
+    new_part%v = 0
+    new_part%a = pc%accel_function(new_part)
+    new_part%w = particle_min_weight
+    new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
+
+    ! Add the particle to the buffer
+    buffer%i_part = buffer%i_part + 1
+    buffer%part(buffer%i_part) = new_part
+  end subroutine single_photoionization_event_OMP
 
   ! Check if the photon is absorbed in the gas
   logical function is_in_gas(tree, x_stop)
