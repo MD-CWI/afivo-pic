@@ -62,7 +62,7 @@ program apic
 
   ! Set the multigrid options. First define the variables to use
   mg%i_phi = i_phi
-  mg%i_tmp = i_Ex ! TODO Is this line redundant?
+  mg%i_tmp = i_residual
   mg%i_rhs = i_rhs
   if (GL_use_dielectric) mg%i_eps = i_eps
 
@@ -100,12 +100,6 @@ program apic
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_E_v2, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
-#if NDIM == 3
-  call af_set_cc_methods(tree, i_Ez, af_bc_neumann_zero)
-#endif
   call af_set_cc_methods(tree, i_P_dep, af_bc_neumann_zero)
 
   if (GL_use_dielectric) then
@@ -385,7 +379,7 @@ contains
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output
-    call af_gc_tree(tree, [i_electron, i_pos_ion, i_E_v2])
+    call af_gc_tree(tree, [i_electron, i_pos_ion, i_E])
 
   end subroutine set_output_variables
 
