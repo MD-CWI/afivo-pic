@@ -8,7 +8,7 @@ import os
 import visit
 import numpy as np
 
-output_path = "/home/ddb/codes/afivo-pic/programs/combustion_2d/output/"
+output_path = "/home/ddb/results/electrode_fat/fuel/"
 
 visit.Launch()
 
@@ -29,4 +29,5 @@ for states in range(visit.TimeSliderGetNStates()):
     visit.Query("Max")
     L = np.append(L, [visit.GetQueryOutputObject()['max_coord'][-1]])
 
+L = (1e-2 - L) - (1e-2 - L[0])
 np.savetxt(output_path + "streamer_length.txt", L)

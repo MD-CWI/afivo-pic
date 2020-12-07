@@ -13,7 +13,7 @@ visit.Launch()
 visit.DeleteAllPlots()
 
 # Opening a virtual database representing all wave*.silo files.
-visit.OpenDatabase("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/archive/CS_comparison/SUCCES/biagi_repo/sim_*.silo database") # <- Path your results
+visit.OpenDatabase("/home/ddb/results/electrode_fat/fuel/sim_*.silo database") # <- Path your results
 
 # Make plots
 visit.AddPlot("Pseudocolor", "power_deposition")
@@ -37,7 +37,37 @@ visit.DrawPlots()
 for states in range(visit.TimeSliderGetNStates()):
     visit.SetTimeSliderState(states)
     visit.Query("Max")
-    L = np.append(L, [visit.GetQueryOutputObject()['max_coord'][1]])
+    L = np.append(L, [visit.GetQueryOutputObject()['max_coord'][-1]])
+L = (1e-2 - L) - (1e-2 - L[0])
+
+#####
+# Opening a virtual database representing all wave*.silo files.
+visit.OpenDatabase("/home/ddb/results/electrode_fat/air/sim_*.silo database") # <- Path your results
+
+# Make plots
+visit.AddPlot("Pseudocolor", "power_deposition")
+visit.DrawPlots()
+
+L_air = []
+s_air = []
+
+# plot over time
+for states in range(visit.TimeSliderGetNStates()):
+    visit.SetTimeSliderState(states)
+    visit.Query("Weighted Variable Sum")
+    s_air = np.append(s_air, [visit.GetQueryOutputValue()])
+
+visit.AddPlot("Pseudocolor", "E_v2")
+visit.DrawPlots()
+
+for states in range(visit.TimeSliderGetNStates()):
+    visit.SetTimeSliderState(states)
+    visit.Query("Max")
+    L_air = np.append(L_air, [visit.GetQueryOutputObject()['max_coord'][-1]])
+L_air = (1e-2 - L_air) - (1e-2 - L_air[0])
+
+###
+
 
 plt.figure()
 plt.plot(t, L)
@@ -51,7 +81,9 @@ plt.xlabel('Length (m)')
 plt.ylabel('P_dep')
 
 plt.figure()
-plt.semilogy(L, s)
-plt.xlabel('Length (m)')
-plt.ylabel('P_dep')
+plt.semilogy(L/1e-3, s, label='fuel')
+plt.semilogy(L_air/1e-3, s_air, label='air')
+plt.xlabel('Length (mm)')
+plt.ylabel('Power deposition (J/s)')
+plt.legend()
 plt.show()

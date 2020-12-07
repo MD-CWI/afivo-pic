@@ -32,7 +32,7 @@ def idx(cIx):
     return cIx - 1 # Converts cIx to Python index
 
 class Ledger:
-    def __init__(self, file):
+    def __init__(self, file, name=""):
 
         self.get_streamer_length(file+"streamer_length.txt")
 
@@ -54,6 +54,8 @@ class Ledger:
 
         # Finally, always set generic labels (ion/exc/...) to the set
         self.generic_grouping()
+
+        self.name = name
 
     def get_streamer_length(self, file):
         if os.path.isfile(file):
@@ -107,9 +109,20 @@ class Ledger:
                 1/0 # I am too lazy to look for the proper clausule
 
     def set_grouping_all_repo(self):
-        self.i_O_rad = []
-        self.i_H2    = []
-        self.i_H_rad = []
+        self.i_O_rad = [17, 28, 30, 31]
+        self.i_H2    = [34, 35, 40, 41, 42, 45, 46, 48]
+        self.i_H_rad = [33, 35, 36, 40, 43, 47, 48]
+
+    def plot_all_repo(self):
+        # plt.figure()
+        # self.plot_single_species_weighted(self.i_O_rad, "O rad"+self.name, [2, 2, 2, 2])
+        self.plot_single_species_weighted(self.i_H2, "H2"+self.name, [1, 0.5, 1, 2, 1, 1, 2, 1])
+        self.plot_single_species_weighted(self.i_H_rad, "H rad"+self.name, [1, 1, 1, 1, 1, 1, 1])
+
+        plt.legend()
+        plt.xlabel("length")
+        plt.ylabel("no. occurences")
+        plt.title("Radicals")
 
     def set_grouping_biagi_and_lisbon(self):
         self.i_O_rad = [47, 57, 58]
@@ -280,15 +293,37 @@ class Ledger:
 
 # ==============================
 
-repo = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/archive/CS_comparison/SUCCES/biagi_repo/")
-full_repo = Ledger("/home/ddb/codes/afivo-pic/programs/combustion_2d/output/archive/CS_comparison/SUCCES/full_repo/")
-# lisbon = Ledger("/home/ddb/results/catch/cart_lisbon_andy/sim_cs_ledger.txt")
+fuel = Ledger("/home/ddb/results/electrode_fat/fuel/")
+air = Ledger("/home/ddb/results/electrode_fat/air/")
+
+fuel.set_grouping_all_repo()
+fuel.plot_all_repo()
+plt.figure()
+air.set_grouping_all_repo()
+air.plot_all_repo()
+
+# plt.figure()
+# plt.plot(fuel.timesteps/1e-9, fuel.L/1e-3, label='fuel')
+# plt.plot(air.timesteps/1e-9, air.L/1e-3, label='air')
+# plt.xlabel('time (ns)')
+# plt.ylabel('Length (mm)')
+# plt.legend()
+#
+xn_fuel = (fuel.L[:-1] + fuel.L[1:])/2
+xn_air = (air.L[:-1] + air.L[1:])/2
+
+plt.figure()
+plt.plot(xn_fuel/1e-3, np.diff(fuel.L)/np.diff(fuel.timesteps)/1e6, label='fuel')
+plt.plot(xn_air/1e-3, np.diff(air.L)/np.diff(air.timesteps)/1e6, label='air')
+plt.xlabel('length (mm)')
+plt.ylabel('velocity (mm/ns)')
+plt.legend()
 
 # lisbon.set_grouping_biagi_and_lisbon()
-repo.set_grouping_biagi_and_repo()
-
-full_repo.plot_generic_grouped_species()
-repo.plot_generic_grouped_species()
+# repo.set_grouping_biagi_and_repo()
+#
+# full_repo.plot_generic_grouped_species()
+# repo.plot_generic_grouped_species()
 
 # plt.figure()
 # lisbon.plot_biagi_and_lisbon()
