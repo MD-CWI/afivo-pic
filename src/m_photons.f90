@@ -386,10 +386,11 @@ subroutine Ar2_radiative_decay(tree, pc)
     integer         :: tid, max_threads, n_alloc, HEAD
     integer         :: n, m, n_uv, ii
     real(dp)        :: x_start(3), x_stop(3)
+    real(dp)        :: en_frac
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer)
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer, en_frac)
     call init_buffer(buffer) !Initialize private copies of the buffer
 
     ! allocate the arrays for storing results of individual threads
@@ -418,11 +419,15 @@ subroutine Ar2_radiative_decay(tree, pc)
     !$omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
+         ! The Zheleznyak model is calibrated for air, i.e. CH4-ionizations dont participate
+         if (pc%colls(pc%event_list(n)%cIx)%gas_name == CS_is_CH4) cycle
           n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv
+             en_frac = prng%rngs(tid)%unif_01()
+             if (frac_CH4 > epsilon(1.0_dp) .and. is_absorbed_by_CH4(en_frac)) cycle
              x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start, prng%rngs(tid))
+             x_stop  = get_x_stop(x_start, en_frac, prng%rngs(tid))
              if (is_in_gas(tree, x_stop)) then
                call single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
 
