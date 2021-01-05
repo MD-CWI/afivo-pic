@@ -74,7 +74,7 @@ contains
           have_samples = .true.
           if (allocated(fld_samples)) deallocate(fld_samples)
           if (allocated(pos_samples)) deallocate(pos_samples)
-          allocate(fld_samples(NDIM, n_samples))
+          allocate(fld_samples(1, n_samples))
           allocate(pos_samples(NDIM, n_samples))
 
           do i = 1, n_samples
@@ -82,7 +82,7 @@ contains
              n = floor(rng%unif_01() * pc%n_part) + 1
              pos_samples(:,i) = pc%particles(n)%x(1:NDIM)
              fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
-                  i_E_all, success)
+                  [i_E], success)
           end do
        end if
 
@@ -94,7 +94,7 @@ contains
           avg_norm = norm2(fld_samples) / sqrt(1.0_dp * n_samples)
 
           do i = 1, n_samples
-             fld = af_interp1(tree, pos_samples(:,i), i_E_all, success)
+             fld = af_interp1(tree, pos_samples(:,i), [i_E], success)
              this_err = norm2(fld - fld_samples(:,i)) / &
                   max(norm2(fld), norm2(fld_samples(:,i)), avg_norm)
              fld_err  = max(fld_err, this_err)

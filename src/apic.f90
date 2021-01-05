@@ -61,14 +61,24 @@ program apic
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
   call CFG_write(cfg, trim(fname))
 
-  ! Initialize the tree (which contains all the mesh information)
-  call init_tree(tree)
-
   ! Set the multigrid options. First define the variables to use
   mg%i_phi = i_phi
-  mg%i_tmp = i_Ex
+  mg%i_tmp = i_residual
   mg%i_rhs = i_rhs
   if (GL_use_dielectric) mg%i_eps = i_eps
+
+  if (GL_use_electrode) then
+     if (any(field_rod_r0 <= -1.0_dp)) &
+          error stop "field_rod_r0 not set correctly"
+     if (any(field_rod_r1 <= -1.0_dp)) &
+          error stop "field_rod_r1 not set correctly"
+     if (field_rod_radius <= 0) &
+          error stop "field_rod_radius not set correctly"
+     ! print *, "AT YOUR SERVICE"
+     call af_set_cc_methods(tree, i_lsf, af_bc_neumann_zero, &
+          af_gc_prolong_copy, af_prolong_zeroth, funcval=field_rod_lsf)
+     mg%i_lsf = i_lsf
+  end if
 
   ! This automatically handles cylindrical symmetry
   mg%box_op => mg_auto_op
@@ -83,6 +93,9 @@ program apic
      call af_loop_box(tree, user_set_dielectric_eps)
   end if
 
+  ! Initialize the tree (which contains all the mesh information)
+  call init_tree(tree)
+
   ! This routine always needs to be called when using multigrid
   call mg_init(tree, mg)
 
@@ -90,11 +103,6 @@ program apic
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_Ex, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_Ey, af_bc_neumann_zero)
-#if NDIM == 3
-  call af_set_cc_methods(tree, i_Ez, af_bc_neumann_zero)
-#endif
 
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
