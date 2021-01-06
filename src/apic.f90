@@ -85,15 +85,15 @@ program apic
   mg%box_corr => mg_auto_corr
   mg%box_stencil => mg_auto_stencil
 
+  ! Initialize the tree (which contains all the mesh information)
+  call init_tree(tree)
+
   ! Set the dielectric permittivity before initializing multigrid
   if (GL_use_dielectric) then
      if (.not. associated(user_set_dielectric_eps)) &
           error stop "user_set_dielectric_eps not defined"
      call af_loop_box(tree, user_set_dielectric_eps)
   end if
-
-  ! Initialize the tree (which contains all the mesh information)
-  call init_tree(tree)
 
   ! This routine always needs to be called when using multigrid
   call mg_init(tree, mg)
