@@ -14,6 +14,9 @@ module m_transport_data
    integer, parameter :: max_num_cols   = 50
 
    integer, parameter :: lineLen        = 200
+   
+  ! The maximum number of rows per entry
+  integer, parameter :: table_max_rows   = 1500
 
    public :: TD_get_from_file
    public :: TD_get_from_file_2D
@@ -274,14 +277,14 @@ contains
     integer                   :: n_rows
     integer                   :: my_unit
     character(LEN=40)         :: line_fmt
-    character(LEN=string_len) :: line
+    character(LEN=200)        :: line
     real(dp)                  :: temp_table(2, table_max_rows)
     real(dp)                  :: factor
 
     nL = 0 ! Set the number of lines to 0
 
     ! Set the line format to read, only depends on string_len currently
-    write(line_fmt, FMT = "(I6)") string_len
+    write(line_fmt, FMT = "(I6)") 200
     line_fmt = "(A" // trim(adjustl(line_fmt)) // ")"
 
     ! Open 'file_name' (with error checking)

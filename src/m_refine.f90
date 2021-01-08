@@ -51,6 +51,9 @@ module m_refine
 
   ! Index of alpha transport data
   integer, parameter :: i_td_alpha = 1
+  
+  !> Whether old style transport data is used (alpha, eta, mu, D vs V/m)
+  logical, public, protected :: td_old_style = .true.
 
 contains
 
