@@ -52,8 +52,8 @@ contains
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
-          if (r(1)/domain_len(1) < 0.125_dp) then
-             box%cc(i, j, i_eps) = 100.0_dp
+          if (r(1)/domain_len(1) < 0.25_dp) then
+             box%cc(i, j, i_eps) = 10.0_dp
           else
              box%cc(i, j, i_eps) = 1.0_dp
           end if

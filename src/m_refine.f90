@@ -191,6 +191,7 @@ contains
   subroutine load_transport_data(cfg)
     use m_transport_data
     use m_config
+    use m_gas
 
     type(CFG_t), intent(inout) :: cfg
 
@@ -199,6 +200,8 @@ contains
     real(dp)                   :: max_electric_fld = 3e7_dp
     real(dp), allocatable      :: x_data(:), y_data(:)
     character(len=GL_slen)     :: data_name
+    ! Convert V/m to Townsend
+    real(dp), parameter        :: SI_to_Townsend = 1e21_dp
 
     call CFG_add_get(cfg, "gas%transport_data_file", td_file, &
          "Input file with transport data")
@@ -206,17 +209,29 @@ contains
          "The transport data table size in the fluid model")
     call CFG_add_get(cfg, "lookup_table_max_efield", max_electric_fld, &
          "The maximum electric field in the fluid model coefficients")
+    call CFG_add_get(cfg, "gas%transport_old_style", td_old_style, &
+         "Use old style transport data (alpha, eta, mu, D vs V/m)")
 
     ! Create a lookup table for the model coefficients
     td_tbl = LT_create(0.0_dp, max_electric_fld, table_size, 1)
-
-    ! Fill table with data
-    data_name = "efield[V/m]_vs_alpha[1/m]"
-    call CFG_add_get(cfg, "td_alpha_name", data_name, &
+    
+    if (td_old_style) then
+        ! Fill table with data
+        data_name = "efield[V/m]_vs_alpha[1/m]"
+        call CFG_add_get(cfg, "td_alpha_name", data_name, &
          "The name of the eff. ionization coeff.")
-    call TD_get_from_file(td_file, GL_gas_name, &
+        call TD_get_from_file(td_file, GL_gas_name, &
          trim(data_name), x_data, y_data)
-    call LT_set_col(td_tbl, i_td_alpha, x_data, y_data)
+        call LT_set_col(td_tbl, i_td_alpha, x_data, y_data)
+    
+    else
+        call table_from_file(td_file, "Townsend ioniz. coef. alpha/N (m2)", &
+            x_data, y_data)
+        x_data = x_data / SI_to_Townsend * GAS_number_dens
+        y_data = y_data * GAS_number_dens
+        call LT_set_col(td_tbl, i_td_alpha, x_data, y_data)
+    
+    end if
 
   end subroutine load_transport_data
 
