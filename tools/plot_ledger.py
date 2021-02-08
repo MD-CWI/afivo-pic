@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import argparse
-from tkinter.filedialog import askopenfilename
+# from tkinter.filedialog import askopenfilename
 from scipy.optimize import curve_fit
 
 #This is for later
@@ -35,6 +35,7 @@ class Ledger:
     def __init__(self, file, name=""):
 
         self.get_streamer_length(file+"streamer_length.txt")
+        self.get_streamer_radius(file+"streamer_radius.txt")
 
         file = file + "sim_cs_ledger.txt"
 
@@ -63,7 +64,15 @@ class Ledger:
         else:
             print("Cannot find file containing streamer length: " + file)
             print("First define streamer length by running write_streamer_length.py in the tools-directory")
-            1/0 #Laziest error message ever
+            input("No streamer length was found. Continue anyway?")
+
+    def get_streamer_radius(self, file):
+        if os.path.isfile(file):
+            self.R = np.loadtxt(file, dtype=np.dtype('float'))
+        else:
+            print("Cannot find file containing streamer radius: " + file)
+            print("First define streamer radius by running write_streamer_length.py in the tools-directory")
+            input("No streamer radius was found. Continue anyway?")
 
     def generic_grouping(self):
         self.i_N2_ion  = []
@@ -290,18 +299,75 @@ class Ledger:
         popt, pcov = curve_fit(lin_func, self.timesteps[skip:], np.log(np.squeeze(np.sum(self.ledger[skip:, index], 1))),  p0=(16, 11))
         print("(lambda, A) = " + str(popt))
 
+    def print_volume_weighted_species(self, volume):
+        for index in range(len(self.cIx)):
+            # print(index)
+            # print(self.ledger[-1, index]/volume)
+            print("cIx = " + str(index+1) + ":  " + str(self.ledger[-1, index]/volume))
+
+        # print("Total N2 ion")
+        # print(self.ledger[-1, self.i_N2_ion])
+        # a = np.sum(self.ledger[-1, self.i_N2_ion])
+        # print(a)
+        # print("Total O2 ion")
+        # b = np.sum(self.ledger[-1, self.i_O2_ion])
+        # print(b)
+        # print("Total CH4 ion")
+        # c = np.sum(self.ledger[-1, self.i_CH4_ion])
+        #
+        # print(c)
+        #
+        # print("sum pos ion")
+        # print(a + b + c)
+        #
+        #
+        # print("Total attach:")
+        # d = np.sum(self.ledger[-1, self.i_N2_attach]) + np.sum(self.ledger[-1, self.i_O2_attach]) + np.sum(self.ledger[-1, self.i_CH4_attach])
+        # # d = d/volume
+        # print(d)
+        # print("netto pos ion")
+        # print((a + b + c - d))
+
+        # print(self.i_N2_attach)
+        # print(self.i_O2_attach)
+        # print(self.i_CH4_attach)
 
 # ==============================
+fuel = Ledger("/home/dennis/codes/afivo-pic/programs/combustion_3d/output/")
+fuel.print_volume_weighted_species(volume=4.22e-11)
+# ========
 
-fuel = Ledger("/home/ddb/results/electrode_fat/fuel/")
-air = Ledger("/home/ddb/results/electrode_fat/air/")
+fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/fuel/")
+air = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/air/")
 
-fuel.set_grouping_all_repo()
-fuel.plot_all_repo()
 plt.figure()
-air.set_grouping_all_repo()
-air.plot_all_repo()
+plt.plot(air.L[-len(air.R):]*1e3, air.R*1e3, 'rd-', label='air')
+plt.plot(fuel.L[-len(fuel.R):]*1e3, fuel.R*1e3, 'ks-', label='fuel')
+plt.xlabel('length (mm)')
+plt.ylabel('radius (mm)')
+plt.legend()
 
+
+# fuel = Ledger("/home/ddb/results/electrode_fat/fuel/")
+# air = Ledger("/home/ddb/results/electrode_fat/air/")
+
+# fuel.set_grouping_all_repo()
+# fuel.plot_all_repo()
+# plt.figure()
+# air.set_grouping_all_repo()
+# air.plot_all_repo()
+#
+# xn_fuel = (fuel.L[:-1] + fuel.L[1:])/2
+# xn_air = (air.L[:-1] + air.L[1:])/2
+#
+# plt.figure()
+# plt.plot(xn_fuel/1e-3, np.diff(fuel.L)/np.diff(fuel.timesteps)/1e6, label='fuel')
+# plt.plot(xn_air/1e-3, np.diff(air.L)/np.diff(air.timesteps)/1e6, label='air')
+# plt.xlabel('length (mm)')
+# plt.ylabel('velocity (mm/ns)')
+# plt.legend()
+
+# =======
 # plt.figure()
 # plt.plot(fuel.timesteps/1e-9, fuel.L/1e-3, label='fuel')
 # plt.plot(air.timesteps/1e-9, air.L/1e-3, label='air')
@@ -309,15 +375,7 @@ air.plot_all_repo()
 # plt.ylabel('Length (mm)')
 # plt.legend()
 #
-xn_fuel = (fuel.L[:-1] + fuel.L[1:])/2
-xn_air = (air.L[:-1] + air.L[1:])/2
 
-plt.figure()
-plt.plot(xn_fuel/1e-3, np.diff(fuel.L)/np.diff(fuel.timesteps)/1e6, label='fuel')
-plt.plot(xn_air/1e-3, np.diff(air.L)/np.diff(air.timesteps)/1e6, label='air')
-plt.xlabel('length (mm)')
-plt.ylabel('velocity (mm/ns)')
-plt.legend()
 
 # lisbon.set_grouping_biagi_and_lisbon()
 # repo.set_grouping_biagi_and_repo()
