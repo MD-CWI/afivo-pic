@@ -18,9 +18,9 @@ contains
 
     user_initial_particles => init_particles
     ! user_generate_particles => init_electrons_only
-    user_set_dielectric_eps => set_epsilon
+    ! user_set_dielectric_eps => set_epsilon
     ! user_set_surface_charge => set_surface_charge
-    user_potential_bc => my_potential
+    ! user_potential_bc => my_potential
   end subroutine user_initialize
 
   subroutine init_particles(pc)
@@ -35,7 +35,7 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 3000
-       pos(1:2) = [0.5_dp, 0.02_dp] * domain_len
+       pos(1:2) = [0.5_dp, 0.5_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = particle_min_weight
        part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 2e-5_dp
