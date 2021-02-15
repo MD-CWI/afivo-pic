@@ -26,7 +26,7 @@ module m_refine
   real(dp), protected :: refine_adx = 1.0_dp
 
   ! Only refine if electron density is above this value
-  real(dp), protected :: refine_elec_dens = 1.0e13_dp
+  real(dp), protected :: refine_elec_dens = -1.0e13_dp
 
   ! Only derefine if grid spacing if smaller than this value
   real(dp), protected :: derefine_dx = 5e-5_dp
@@ -146,7 +146,7 @@ contains
        else
           cell_flags(IJK) = af_keep_ref
        end if
-
+       
        ! Refine around electrode
        if (box%tag == mg_lsf_box .and. max_dx > refine_electrode_dx) then
           if (box%cc(IJK, i_lsf) < 0) then
