@@ -48,12 +48,12 @@ program apic
 
   ! Initialize other modules
   call domain_init(cfg)
-  call refine_init(cfg, ndim)
   call time_step_init(cfg)
   call GL_initialize(cfg, ndim)
   call check_path_writable(trim(GL_output_dir))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
+  call refine_init(cfg, ndim)
   call photons_initialize(cfg)
 
   ! Write configuration to output
@@ -235,6 +235,13 @@ program apic
         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
         GL_time)
 
+        write(fname, "(A,I6.6)") trim(GL_output_dir) // "_log.txt"
+        
+        call output_log(tree, trim(GL_output_dir) // "/" // trim(GL_simulation_name) // &
+        &"_log.txt", output_cnt, wc_time)
+        call write_EEDF_txt(pc, trim(GL_output_dir) // "/" // trim(GL_simulation_name) // &
+        &"_EEDF.txt", output_cnt)
+
         if (GL_write_to_dat) then
           if (GL_write_to_dat_interval(1) .le. GL_time .and. GL_time .le. GL_write_to_dat_interval(2)) then
             call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
@@ -391,5 +398,181 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+
+   subroutine output_log(tree, filename, out_cnt, wc_time)
+    !use m_field, only: field_voltage
+    !use m_user_methods
+    !use m_chemistry
+    !use m_analysis
+    use m_gas
+    use m_domain
+    type(af_t), intent(in)       :: tree
+    character(len=*), intent(in) :: filename
+    integer, intent(in)          :: out_cnt !< Output number
+    real(dp), intent(in)         :: wc_time !< Wallclock time
+    character(len=50), save      :: fmt
+    integer                      :: my_unit
+    real(dp)                     :: velocity, dt
+    real(dp), save               :: prev_pos(NDIM) = 0
+    real(dp)                     :: sum_elec, sum_pos_ion
+    real(dp)                     :: max_elec, max_field, max_Er, min_Er
+    real(dp)                     :: sum_elem_charge
+    !real(dp)                     :: elecdens_threshold, max_field_tip
+    !real(dp)                     :: r0(NDIM), r1(NDIM)
+    type(af_loc_t)               :: loc_elec, loc_field, loc_Er
+    integer                      :: n_reals
+    !character(len=name_len)      :: var_names(user_max_log_vars)
+    !real(dp)                     :: var_values(user_max_log_vars)
+    logical, save                :: first_time     = .true.
+    !real(dp) :: density_threshold = 1e18_dp
+
+    my_unit= 888
+    call af_tree_sum_cc(tree, i_electron, sum_elec)
+    call af_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
+    call af_tree_max_cc(tree, i_electron, max_elec, loc_elec)
+    call af_tree_max_cc(tree, i_E, max_field, loc_field)
+    call af_tree_max_fc(tree, 1, ifc_E, max_Er, loc_Er)
+    call af_tree_min_fc(tree, 1, ifc_E, min_Er)
+
+    ! Scale threshold with gas number density
+    !elecdens_threshold = density_threshold * &
+    !     (GAS_number_dens/2.414e25_dp)**2
+    !call analysis_zmin_zmax_threshold(tree, i_electron, elecdens_threshold, &
+    !     [domain_len(NDIM), 0.0_dp], ne_zminmax)
+
+    ! Assume streamer tip is located at the farthest plasma density (above a
+    ! threshold) away from the electrode boundaries
+    !r0(:) = 0.0_dp
+    !r1 = r0 + domain_len
+
+    !if (ne_zminmax(1)-  r0 < &
+    !      r0  + domain_len(NDIM) - ne_zminmax(2)) then
+    !   r0(NDIM) = ne_zminmax(2) - 0.02_dp * domain_len(NDIM)
+    !   r1(NDIM) = ne_zminmax(2) + 0.02_dp * domain_len(NDIM)
+    !else
+    !   r0(NDIM) = ne_zminmax(1) - 0.02_dp * domain_len(NDIM)
+    !   r1(NDIM) = ne_zminmax(1) + 0.02_dp * domain_len(NDIM)
+    !end if
+
+    !call analysis_max_var_region(tree, i_E, r0, r1, &
+    !     max_field_tip, loc_tip)
+
+    sum_elem_charge = 0
+    call af_tree_sum_cc(tree, i_rhs, sum_elem_charge)
+
+    dt = GL_dt
+
+    if (first_time) then
+       first_time = .false.
+
+       open(newunit=my_unit, file=trim(filename), action="write")
+#if NDIM == 1
+       write(my_unit, "(A)", advance="no") "it time dt v sum(n_e) sum(n_i) &
+            &sum(charge) max(E) x max(n_e) x wc_time n_cells min(dx) &
+            &highest(lvl)"
+#elif NDIM == 2
+       write(my_unit, "(A)", advance="no") "it time dt v sum(n_e) sum(n_i) &
+            &sum(charge) max(E) x y max(n_e) x y max(E_r) x y min(E_r) &
+            &wc_time n_cells min(dx) highest(lvl)"
+#elif NDIM == 3
+       write(my_unit, "(A)", advance="no") "it time dt v sum(n_e) sum(n_i) &
+            &sum(charge) max(E) x y z max(n_e) x y z &
+            &wc_time n_cells min(dx) highest(lvl)"
+#endif
+       
+       write(my_unit, *) ""
+       close(my_unit)
+
+       ! Start with velocity zero
+       prev_pos = af_r_loc(tree, loc_field)
+    end if
+
+#if NDIM == 1
+    n_reals = 10
+#elif NDIM == 2
+    n_reals = 17
+#elif NDIM == 3
+    n_reals = 16
+#endif
+
+    write(fmt, "(A,I0,A)") "(I6,", n_reals, "E16.8,I12,1E16.8)"
+    
+    velocity = norm2(af_r_loc(tree, loc_field) - prev_pos) / GL_dt_output
+    prev_pos = af_r_loc(tree, loc_field)
+
+    open(newunit=my_unit, file=trim(filename), action="write", &
+         position="append")
+#if NDIM == 1
+    write(my_unit, fmt) out_cnt, GL_time, dt, velocity, sum_elec, &
+         sum_pos_ion, sum_elem_charge, &
+         max_field, af_r_loc(tree, loc_field), max_elec, &
+         af_r_loc(tree, loc_elec), &
+         wc_time, af_num_cells_used(tree), &
+         af_min_dr(tree),tree%highest_lvl
+         !var_values(1:n_user_vars)
+#elif NDIM == 2
+    write(my_unit, fmt) out_cnt, GL_time, dt, velocity, sum_elec, &
+         sum_pos_ion, sum_elem_charge, &
+         max_field, af_r_loc(tree, loc_field), max_elec, &
+         af_r_loc(tree, loc_elec), max_Er, af_r_loc(tree, loc_Er), min_Er, &
+         wc_time, af_num_cells_used(tree), af_min_dr(tree),tree%highest_lvl
+         !var_values(1:n_user_vars)
+#elif NDIM == 3
+    write(my_unit, fmt) out_cnt, GL_time, dt, velocity, sum_elec, &
+         sum_pos_ion, sum_elem_charge, &
+         max_field, af_r_loc(tree, loc_field), max_elec, &
+         af_r_loc(tree, loc_elec),&
+         wc_time, af_num_cells_used(tree), &
+         af_min_dr(tree),tree%highest_lvl
+         !var_values(1:n_user_vars)
+#endif
+    close(my_unit)
+
+  end subroutine output_log
+
+  subroutine write_EEDF_txt(pc, filename, out_cnt)
+    type(PC_t), intent(in)  :: pc
+    integer                      :: my_unit  
+    !character(len=50), save      :: fmt
+    character(len=*), intent(in) :: filename
+    integer                      :: n_reals, num_bins
+    integer, intent(in)          :: out_cnt !< Output number
+    real(dp)                     :: n_part, max_en, en_step = 0.75
+    logical, save                :: first_time     = .true.
+    real(dp), allocatable        :: EEDF_dat(:, :, :)
+    
+    my_unit= 888
+    
+    n_part = pc%get_num_real_part()
+    max_en = get_max_energy(pc)
+    num_bins = ceiling(max_en / en_step) ! Generate bins of en_step (eV) each up until max energy
+    if (num_bins < 1) num_bins = 1 ! At least one bin
+
+
+    allocate(EEDF_dat(1, 2, num_bins))
+    
+    
+    
+    EEDF_dat = write_EEDF_as_curve(pc)
+    if (first_time) then
+       first_time = .false.
+
+       open(newunit=my_unit, file=trim(filename), action="write")
+        
+       write(my_unit, "(A)", advance="no") "it time electron_energy distribution "
+       
+       write(my_unit, *) ""
+       close(my_unit)
+    end if
+    
+    n_reals = 1
+    
+    open(newunit=my_unit, file=trim(filename), action="write", &
+         position="append")
+         
+    write(my_unit, *) out_cnt, GL_time,EEDF_dat(1, 1, :), EEDF_dat(1, 2, :)
+    close(my_unit)
+  
+  end subroutine write_EEDF_txt
 
 end program apic
