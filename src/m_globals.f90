@@ -83,7 +83,7 @@ module m_globals
   character(len=GL_slen), protected :: GL_simulation_name = "sim"
 
   ! Output directory
-  character(len=GL_slen), protected :: GL_output_dir = "output"
+  character(len=GL_slen), protected :: GL_output_dir = "/export/scratch2/zhen/pos_electrode_pic/"
 
   ! Time between writing output
   real(dp), protected :: GL_dt_output = 1.0e-10_dp
