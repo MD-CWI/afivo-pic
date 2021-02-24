@@ -133,7 +133,7 @@ contains
     call af_add_cc_variable(tree, "E", .true., ix=i_E)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "residual", .false., ix=i_residual)
-    call af_add_cc_variable(tree, "ppc", .false., ix=i_ppc)
+    call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
@@ -180,6 +180,19 @@ contains
     call GL_rng%set_random_seed()
 
   end subroutine GL_initialize
+
+  !> Convert particle coordinates to desired format
+  pure function get_coordinates(my_part) result(coord)
+    type(PC_part_t), intent(in) :: my_part
+    real(dp)                    :: coord(NDIM)
+
+    if (GL_cylindrical) then
+       coord(1) = norm2(my_part%x([1, 3])) ! radius
+       coord(2) = my_part%x(2)
+    else
+       coord = my_part%x(1:NDIM)
+    end if
+  end function get_coordinates
 
     !> Impose a Dirichlet zero boundary condition for plasma species in the last
     !> dimension, which is supposed to have the electrodes. We use Neumann

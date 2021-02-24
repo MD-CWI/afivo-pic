@@ -80,7 +80,7 @@ contains
           do i = 1, n_samples
              ! Randomly select a particle
              n = floor(rng%unif_01() * pc%n_part) + 1
-             pos_samples(:,i) = pc%particles(n)%x(1:NDIM)
+             pos_samples(:,i) = get_coordinates(pc%particles(n))
              fld_samples(:,i) = af_interp1(tree, pos_samples(:,i), &
                   [i_E], success)
           end do

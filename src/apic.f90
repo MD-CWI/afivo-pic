@@ -353,7 +353,7 @@ contains
 
     !$omp parallel do
     do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:NDIM)
+       coords(:, n) = get_coordinates(pc%particles(n))
        weights(n) = 1.0_dp
        energy(n) = pc%particles(n)%w * &
             PC_v_to_en(pc%particles(n)%v, UC_elec_mass) / &

@@ -213,7 +213,7 @@ contains
 
     !$omp parallel do
     do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:NDIM)
+       coords(:, n) = get_coordinates(pc%particles(n))
        weights(n) = pc%particles(n)%w
        id_guess(n) = pc%particles(n)%id
     end do
@@ -240,12 +240,12 @@ contains
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           i = i + 1
-          coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
+          coords(:, i) = get_coordinates(pc%event_list(n)%part)
           weights(i) = pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
        else if (pc%event_list(n)%ctype == CS_attach_t) then
           i = i + 1
-          coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
+          coords(:, i) = get_coordinates(pc%event_list(n)%part)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
 
@@ -301,7 +301,7 @@ contains
     integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
-    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+    call dielectric_get_surface_cell(tree, diel, get_coordinates(my_part), &
          ix_surf, ix_cell)
     ! Update the charge in the surface cell
 #if NDIM == 2
@@ -319,31 +319,43 @@ contains
   function get_accel(my_part) result(accel)
     use m_units_constants
     type(PC_part_t), intent(inout) :: my_part
-    real(dp)                       :: accel(3)
+    real(dp)                       :: accel(3), coord(NDIM)
     logical                        :: success
 
-    accel(3) = 0.0_dp           ! for 2D cases
+    ! Set acceleration for extra dimensions to zero
+    accel(NDIM+1:) = 0.0_dp
+    coord = get_coordinates(my_part)
 
     ! Interpolation of face-centered fields
-    accel(1:NDIM) = af_interp1_fc(tree, my_part%x(1:NDIM), ifc_E, &
-         success, id_guess=my_part%id)
+    accel(1:NDIM) = af_interp1_fc(tree, coord, ifc_E, &
+         success, id_guess=my_part%id) * UC_elec_q_over_m
 
-    accel(:) = accel(:) * UC_elec_q_over_m
+    if (GL_cylindrical) then
+       ! Convert back to xyz coordinates
+       accel([1, 3]) = accel(1) * my_part%x([1, 3]) / coord(1)
+    end if
+
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)
     type(PC_part_t), intent(in) :: my_part
-    real(dp)                    :: weight, n_elec
+    real(dp)                    :: weight, n_elec, coord(NDIM)
     type(af_loc_t)              :: loc
     integer                     :: id, ix(NDIM)
 
-    loc = af_get_loc(tree, my_part%x(1:NDIM), my_part%id)
+    coord = get_coordinates(my_part)
+    loc = af_get_loc(tree, coord, my_part%id)
     id = loc%id
     ix = loc%ix
 
 #if NDIM == 2
-    n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * &
-         product(tree%boxes(id)%dr)
+    if (GL_cylindrical) then
+       n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * &
+            af_cyl_volume_cc(tree%boxes(id), ix(1))
+    else
+       n_elec = tree%boxes(id)%cc(ix(1), ix(2), i_electron) * &
+            product(tree%boxes(id)%dr)
+    end if
 #elif NDIM == 3
     n_elec = tree%boxes(id)%cc(ix(1), ix(2), ix(3), i_electron) * &
          product(tree%boxes(id)%dr)
