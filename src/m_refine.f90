@@ -231,10 +231,6 @@ contains
        y_data = y_data * gas_number_dens
     end if
 
-    print *, gas_number_dens
-    do i = 1, size(x_data)
-       print *, i, x_data(i), y_data(i)
-    end do
     call LT_set_col(td_tbl, i_td_alpha, x_data, y_data)
 
   end subroutine load_transport_data
