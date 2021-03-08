@@ -399,6 +399,9 @@ subroutine Ar2_radiative_decay(tree, pc)
           do m = 1, n_uv
              x_start = pc%event_list(n)%part%x
              x_stop  = get_x_stop(x_start, prng%rngs(tid))
+
+             x_stop(1:NDIM) = get_coordinates_x(x_stop)
+
              if (is_in_gas(tree, x_stop)) then
                call single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
 

@@ -185,14 +185,21 @@ contains
   pure function get_coordinates(my_part) result(coord)
     type(PC_part_t), intent(in) :: my_part
     real(dp)                    :: coord(NDIM)
+    coord = get_coordinates_x(my_part%x)
+  end function get_coordinates
+
+  !> Convert particle coordinates to desired format
+  pure function get_coordinates_x(x) result(coord)
+    real(dp), intent(in) :: x(3)
+    real(dp)             :: coord(NDIM)
 
     if (GL_cylindrical) then
-       coord(1) = norm2(my_part%x([1, 3])) ! radius
-       coord(2) = my_part%x(2)
+       coord(1) = norm2(x([1, 3])) ! radius
+       coord(2) = x(2)
     else
-       coord = my_part%x(1:NDIM)
+       coord = x(1:NDIM)
     end if
-  end function get_coordinates
+  end function get_coordinates_x
 
     !> Impose a Dirichlet zero boundary condition for plasma species in the last
     !> dimension, which is supposed to have the electrodes. We use Neumann
