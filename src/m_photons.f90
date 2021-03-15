@@ -24,6 +24,9 @@ real(dp)              :: pi_quench_fac
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
 real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
+! ignore photoionization in part of the field to speed up calculation 
+real(dp)              :: pi_ignore_rel_width = 1.0_dp
+
 !Default reaction rates for excited Ar and Ar2 pools
 real(dp)  :: k_Ar_decay_rad  = 0.0_dp
 real(dp)  :: k_Ar_quench     = 0.0_dp
@@ -72,7 +75,9 @@ contains
          "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
         "Whether photoionization is used")
-        call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
+    call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
+        "Whether photoionization is used")
+    call CFG_add_get(cfg, "photon%ion_ignore_rel_width", pi_ignore_rel_width, &
         "Whether photoionization is used")
 
     ! Initialize parameters and pointers according to the selected model
@@ -403,10 +408,12 @@ subroutine Ar2_radiative_decay(tree, pc)
              x_stop(1:NDIM) = get_coordinates_x(x_stop)
 
              if (is_in_gas(tree, x_stop)) then
+               if (.not. is_ignored(tree, x_stop)) then 
                call single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
 
                ! Make sure buffers are not getting too full
                call handle_buffer(pc, buffer, PC_advance_buf_size/2)
+               end if
              end if
           end do
        end if
@@ -557,7 +564,6 @@ subroutine Ar2_radiative_decay(tree, pc)
     type(PC_t), intent(inout)     :: pc
     real(dp), intent(inout)       :: photo_pos(:, :)
     real(dp), intent(inout)       :: photo_w(:)
-
     type(PC_part_t)         :: new_part
     integer, intent(inout)  :: i
     integer                 :: i_cpy
@@ -635,6 +641,22 @@ subroutine Ar2_radiative_decay(tree, pc)
       end if
     end if
   end function is_in_gas
+  
+  ! Check if the photon is in the ignore area
+  logical function is_ignored(tree, x_stop)
+    type(af_t), intent(in)         :: tree
+    real(dp), intent(in)           :: x_stop(NDIM)
+    real(dp)                       :: ignored_boundary
+    
+    ignored_boundary = domain_len(1) * pi_ignore_rel_width
+    
+    if ( x_stop(1) > ignored_boundary) then
+       is_ignored     = .true.
+    else
+        is_ignored     = .false.
+    end if
+   
+  end function is_ignored
 
   ! Determine if an emitted photon is absorbed by the gas or dielectric surface
   ! Return coordinates of gas/diel points nearest to intersection
