@@ -9,6 +9,9 @@ module m_particles
 
   real(dp) :: min_merge_increase = 1.25_dp
 
+  !> Maximum number of iterations between calling adapt_weights
+  integer :: iterations_between_merge_split = 1000
+
   real(dp), parameter :: array_incr_fac = 1.25_dp
 
   real(dp), protected :: steps_per_period = 30.0_dp
@@ -55,6 +58,15 @@ contains
          "Maximum number of particles")
     call CFG_add_get(cfg, "particle%min_merge_increase", min_merge_increase, &
          "Minimum increase in particle count before merging")
+
+    if (GL_cylindrical) then
+       ! Adapt weights more frequently to prevent fluctuations near the axis
+       iterations_between_merge_split = 10
+    end if
+    call CFG_add_get(cfg, "particle%iterations_between_merge_split", &
+         iterations_between_merge_split, &
+         "Maximum number of iterations between calling adapt_weights")
+
     call CFG_add(cfg, "particle%lkptbl_size", 1000, &
          "The size of the lookup table for the collision rates")
     call CFG_add(cfg, "particle%max_energy_ev", 500.0_dp, &

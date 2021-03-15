@@ -23,7 +23,7 @@ program apic
   real(dp)               :: dt
   real(dp)               :: wc_time, inv_count_rate
   real(dp)               :: time_last_print, time_last_generate
-  integer                :: it
+  integer                :: it, it_last_merge
   integer                :: n_part, n_prev_merge, n_samples
   integer, allocatable   :: ref_links(:, :)
   character(len=GL_slen) :: fname
@@ -158,6 +158,7 @@ program apic
   call system_clock(t_start, count_rate)
   inv_count_rate = 1.0_dp / count_rate
   time_last_print = -1e10_dp
+  it_last_merge = 0
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
 
@@ -204,9 +205,11 @@ program apic
      call particles_to_density_and_events(tree, pc, .false.)
 
      n_part = pc%get_num_sim_part()
-     if (n_part > n_prev_merge * min_merge_increase) then
+     if (n_part > n_prev_merge * min_merge_increase .or. &
+          it - it_last_merge >= iterations_between_merge_split) then
         call adapt_weights(tree, pc)
         n_prev_merge = pc%get_num_sim_part()
+        it_last_merge = it
      end if
 
      ! Compute field with new density
@@ -261,6 +264,8 @@ program apic
            call particles_to_density_and_events(tree, pc, .false.)
            call field_compute(tree, mg, .true.)
            call adapt_weights(tree, pc)
+           n_prev_merge = pc%get_num_sim_part()
+           it_last_merge = it
         end if
      end if
   end do
