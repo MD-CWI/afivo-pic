@@ -74,7 +74,7 @@ module m_globals
   logical, protected :: GL_write_to_dat = .false.
 
   ! Interval for writing to .dat file
-  real(dp), protected :: GL_write_to_dat_interval(2)
+  real(dp), protected :: GL_write_to_dat_interval(2) = 1e100_dp
 
   ! Random number generator
   type(rng_t) :: GL_rng
