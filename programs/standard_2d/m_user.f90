@@ -38,7 +38,7 @@ contains
     use m_particle_core
     type(PC_t), intent(inout) :: pctest
     integer                   :: n
-    real(dp)                  :: pos(3)
+    real(dp)                  :: tmp_vec(2)
     type(PC_part_t)           :: part
 
     part%v      = 0.0_dp
@@ -46,10 +46,20 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, seed_num_particles
-       pos(1:2) = seed_pos * domain_len
-       pos(3)   = 0.0_dp
-       part%w   = seed_particle_weight
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * seed_sigma
+       if (GL_cylindrical) then
+          tmp_vec = GL_rng%two_normals() * seed_sigma
+          part%x(1) = norm2(tmp_vec)
+          tmp_vec = GL_rng%two_normals() * seed_sigma
+          part%x(2) = tmp_vec(1)
+          part%x(1:2) = part%x(1:2) + seed_pos * domain_len
+          part%x(3) = 0.0_dp
+       else
+          part%x(1:2) = GL_rng%two_normals() * seed_sigma
+          part%x(1:2) = part%x(1:2) + seed_pos * domain_len
+          part%x(3) = 0.0_dp
+       end if
+
+       part%w = seed_particle_weight
 
        if (outside_check(part) <= 0) then
           call pctest%add_part(part)
