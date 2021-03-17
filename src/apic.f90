@@ -14,6 +14,7 @@ program apic
   use m_user
   use m_user_methods
   use m_cross_sec
+  use m_init_cond
 
   implicit none
 
@@ -25,6 +26,7 @@ program apic
   real(dp)               :: time_last_print, time_last_generate
   integer                :: it, it_last_merge
   integer                :: n_part, n_prev_merge, n_samples
+  integer                :: lvl, i, id
   integer, allocatable   :: ref_links(:, :)
   character(len=GL_slen) :: fname
   logical                :: write_out
@@ -55,6 +57,7 @@ program apic
   call init_particle(cfg, pc)
   call refine_init(cfg, ndim)
   call photons_initialize(cfg)
+  call init_cond_initialize(cfg)
 
   ! Write configuration to output
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
@@ -114,9 +117,8 @@ program apic
   time_last_generate = GL_time
 
   ! Set up the initial conditions
-  if (.not. associated(user_initial_particles)) &
-       error stop "user_initial_particles not defined"
-  call user_initial_particles(pc)
+  if (associated(user_initial_particles)) &
+       call user_initial_particles(pc)
 
   ! Perform additional refinement
   do
@@ -140,6 +142,20 @@ program apic
      end if
      if (ref_info%n_add == 0) exit
   end do
+
+  ! Add particles from the initial condition. Note that this cannot be done in
+  ! parallel at the moment
+  if (any(init_conds%seed_density > 0)) then
+     do lvl = 1, tree%highest_lvl
+        do i = 1, size(tree%lvls(lvl)%leaves)
+           id = tree%lvls(lvl)%leaves(i)
+           call init_cond_set_box(tree%boxes(id))
+        end do
+     end do
+
+     call af_tree_clear_cc(tree, i_pos_ion)
+     call particles_to_density_and_events(tree, pc, .true.)
+  end if
 
   ! Set an initial surface charge
   if (associated(user_set_surface_charge)) then
