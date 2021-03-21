@@ -253,7 +253,15 @@ program apic
         call CS_write_ledger(pc%coll_ledger, &
         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
         GL_time)
-
+        
+        ! output the log file
+        write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_log.txt"
+        if (associated(user_write_log)) then
+          call user_write_log(tree, fname, output_cnt)
+        else
+          call output_log(tree, fname, output_cnt, wc_time)
+        end if
+        
         if (GL_write_to_dat) then
           if (GL_write_to_dat_interval(1) .le. GL_time .and. GL_time .le. GL_write_to_dat_interval(2)) then
             call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
