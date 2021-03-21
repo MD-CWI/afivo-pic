@@ -133,9 +133,9 @@ contains
           ! @todo fix this with some complex formula in the future
           do ix = 1, n_particles
              pos(1, ix) = rr(1) + box%dr(1) * &
-                  (GL_rng%unif_01() - 0.5) ! Not fully correct!
+                  (sqrt(GL_rng%unif_01()) - 0.5) ! Not fully correct!
              pos(2, ix) = rr(2) + box%dr(2) * &
-                  (GL_rng%unif_01() - 0.5_dp)
+                  (sqrt(GL_rng%unif_01()) - 0.5_dp)
           end do
        else
           do ix = 1, n_particles
