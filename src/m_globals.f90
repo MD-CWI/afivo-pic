@@ -231,7 +231,7 @@ contains
   end subroutine bc_species_dirichlet_zero
     
   subroutine output_log(tree, filename, out_cnt, wc_time)
-    use m_field
+    !use m_field
     use m_user_methods
     use m_pc_all
     
