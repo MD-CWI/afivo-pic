@@ -244,6 +244,8 @@ program apic
           end if
         end if
 
+        ! Reset the power-deposition here, only after output of the power in previous timestep
+        call af_tree_clear_cc(tree, i_P_dep)
      end if
 
      if (mod(it, refine_per_steps) == 0) then

@@ -265,14 +265,16 @@ contains
             weights(1:n_part), n_part, interpolation_order_to_density, &
             id_guess(1:n_part))
     else
-       call af_tree_clear_cc(tree, i_electron)
-       call af_tree_clear_cc(tree, i_P_dep)
-       call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part))
-       call af_particles_to_grid(tree, i_P_dep, coords(:, 1:n_part), &
-            weights(1:n_part)*energy_lost(1:n_part)/dt, n_part, 1, &
-            id_guess(1:n_part))
+      ! We dont reset i_P_dep here. Only after writing output
+      call af_tree_clear_cc(tree, i_electron)
+      call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
+          weights(1:n_part), n_part, interpolation_order_to_density, &
+          id_guess(1:n_part))
+      if (dt > 0.0_dp) then ! In the very first iteration this function can be called while dt = 0. In that case skip power deposition
+          call af_particles_to_grid(tree, i_P_dep, coords(:, 1:n_part), &
+              weights(1:n_part)*energy_lost(1:n_part)/dt, n_part, 1, &
+              id_guess(1:n_part))
+      end if
     end if
 
     pc%particles(1:n_part)%id = id_guess(1:n_part)
@@ -285,7 +287,7 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
-          energy_lost(i) = 0.0_dp ! Energy loss for this collision is stored in the particles
+          energy_lost(i) = 0.0_dp ! Energy loss for this collision is already stored in the particles
        else if (pc%event_list(n)%ctype == CS_attach_t) then
           i = i + 1
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
@@ -376,7 +378,6 @@ contains
          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) + &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
-!FLAG
     diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) = &
          diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) + &
          my_part%w / product(diel%surfaces(ix_surf)%dr)
