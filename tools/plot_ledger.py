@@ -124,7 +124,7 @@ class Ledger:
 
     def plot_all_repo(self):
         # plt.figure()
-        # self.plot_single_species_weighted(self.i_O_rad, "O rad"+self.name, [2, 2, 2, 2])
+        self.plot_single_species_weighted(self.i_O_rad, "O rad"+self.name, [2, 2, 2, 2])
         self.plot_single_species_weighted(self.i_H2, "H2"+self.name, [1, 0.5, 1, 2, 1, 1, 2, 1])
         self.plot_single_species_weighted(self.i_H_rad, "H rad"+self.name, [1, 1, 1, 1, 1, 1, 1])
 
@@ -333,19 +333,24 @@ class Ledger:
         # print(self.i_CH4_attach)
 
 # ==============================
-fuel = Ledger("/home/dennis/codes/afivo-pic/programs/combustion_3d/output/")
-fuel.print_volume_weighted_species(volume=4.22e-11)
+fuel = Ledger("/home/dennis/codes/afivo-pic/programs/combustion_3d/output/archive/maybe_sim_thijs/")
+# fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/bigboy/fuel/")
+fuel.print_volume_weighted_species(volume=1)
+
+fuel.set_grouping_all_repo()
+fuel.plot_all_repo()
+
 # ========
 
-fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/fuel/")
-air = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/air/")
-
-plt.figure()
-plt.plot(air.L[-len(air.R):]*1e3, air.R*1e3, 'rd-', label='air')
-plt.plot(fuel.L[-len(fuel.R):]*1e3, fuel.R*1e3, 'ks-', label='fuel')
-plt.xlabel('length (mm)')
-plt.ylabel('radius (mm)')
-plt.legend()
+# fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/fuel/")
+# air = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/air/")
+#
+# plt.figure()
+# plt.plot(air.L[-len(air.R):]*1e3, air.R*1e3, 'rd-', label='air')
+# plt.plot(fuel.L[-len(fuel.R):]*1e3, fuel.R*1e3, 'ks-', label='fuel')
+# plt.xlabel('length (mm)')
+# plt.ylabel('radius (mm)')
+# plt.legend()
 
 
 # fuel = Ledger("/home/ddb/results/electrode_fat/fuel/")

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 def convert_to_length(z_coord):
     return (z_tip - z_coord)
 
-output_path = "/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/air/"
+output_path = "/home/dennis/codes/afivo-pic/programs/combustion_3d/output/"
 
 visit.Launch()
 
@@ -23,7 +23,7 @@ visit.DeleteAllPlots()
 visit.OpenDatabase(output_path + "sim_*.silo database") # <- Path your results
 
 # Make plots
-visit.AddPlot("Pseudocolor", "E_v2")
+visit.AddPlot("Pseudocolor", "E")
 visit.DrawPlots()
 
 L = []
