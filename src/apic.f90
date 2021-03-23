@@ -97,8 +97,7 @@ program apic
   call mg_init(tree, mg)
 
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
-       prolong=af_prolong_limit)
+  call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_P_dep, af_bc_neumann_zero)
 

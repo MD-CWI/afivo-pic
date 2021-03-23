@@ -211,8 +211,7 @@ contains
 
       do ii = 1, num_cIx_to_track
         call af_add_cc_variable(tree, trim(GL_cIx_labels(ii)), .true., ix=i_tracked_cIx(ii))
-        call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero, &
-            prolong=af_prolong_limit)
+        call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero)
       end do
     end if
 
