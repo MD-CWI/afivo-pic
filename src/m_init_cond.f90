@@ -101,7 +101,7 @@ contains
     integer                    :: IJK, n, nc, ix, n_particles
     real(dp)                   :: rr(NDIM), w
     real(dp)                   :: density, pos(NDIM, ceiling(particle_per_cell))
-    real(dp)                   :: volume
+    real(dp)                   :: volume, r0, r1
     type(PC_part_t)            :: new_part
 
     nc = box%n_cell
@@ -130,12 +130,14 @@ contains
 
        ! Sample particle positions within the cell
        if (GL_cylindrical) then
-          ! @todo fix this with some complex formula in the future
+          r0 = rr(1) - 0.5_dp * box%dr(1)
+          r1 = rr(1) + 0.5_dp * box%dr(1)
           do ix = 1, n_particles
-             pos(1, ix) = rr(1) + box%dr(1) * &
-                  (sqrt(GL_rng%unif_01()) - 0.5) ! Not fully correct!
-             pos(2, ix) = rr(2) + box%dr(2) * &
-                  (sqrt(GL_rng%unif_01()) - 0.5_dp)
+             ! Invert the CDF, assuming f(r) = c * r, which gives
+             ! F(r) = (r^2 - r0^2)/(r1^2 - r0^2), where r0 and r1 are the
+             ! boundaries of the cell
+             pos(1, ix) = sqrt(r0**2 + (r1**2 - r0**2) * GL_rng%unif_01())
+             pos(2, ix) = rr(2) + box%dr(2) * (GL_rng%unif_01() - 0.5_dp)
           end do
        else
           do ix = 1, n_particles
