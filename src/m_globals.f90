@@ -44,7 +44,7 @@ module m_globals
   integer, protected :: i_ppc      = -1 ! Particles per cell
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
-  integer, protected :: i_P_dep    = -1 ! Density of deposited power
+  integer, protected :: i_energy_dep  = -1 ! Density of deposited power
   integer, protected, allocatable :: i_tracked_cIx(:) ! CAS that will be tracked
   integer, protected :: i_lsf      = -1 ! level set function (for electrode)
 
@@ -151,7 +151,7 @@ contains
     call af_add_cc_variable(tree, "residual", .false., ix=i_residual)
     call af_add_cc_variable(tree, "ppc", .false., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
-    call af_add_cc_variable(tree, "power_deposition", .true., ix=i_P_dep)
+    call af_add_cc_variable(tree, "energy_deposition", .true., ix=i_energy_dep)
 
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &

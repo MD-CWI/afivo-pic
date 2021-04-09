@@ -99,7 +99,7 @@ program apic
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_P_dep, af_bc_neumann_zero)
+  call af_set_cc_methods(tree, i_energy_dep, af_bc_neumann_zero)
 
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
@@ -242,9 +242,6 @@ program apic
             call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
           end if
         end if
-
-        ! Reset the power-deposition here, only after output of the power in previous timestep
-        call af_tree_clear_cc(tree, i_P_dep)
      end if
 
      if (mod(it, refine_per_steps) == 0) then

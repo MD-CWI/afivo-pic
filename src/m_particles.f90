@@ -265,16 +265,13 @@ contains
             weights(1:n_part), n_part, interpolation_order_to_density, &
             id_guess(1:n_part))
     else
-      ! We dont reset i_P_dep here. Only after writing output
       call af_tree_clear_cc(tree, i_electron)
       call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
           weights(1:n_part), n_part, interpolation_order_to_density, &
           id_guess(1:n_part))
-      if (dt > 0.0_dp) then ! In the very first iteration this function can be called while dt = 0. In that case skip power deposition
-          call af_particles_to_grid(tree, i_P_dep, coords(:, 1:n_part), &
-              weights(1:n_part)*energy_lost(1:n_part)/dt, n_part, 1, &
-              id_guess(1:n_part))
-      end if
+      call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:n_part), &
+          weights(1:n_part)*energy_lost(1:n_part), n_part, 1, &
+          id_guess(1:n_part))
     end if
 
     pc%particles(1:n_part)%id = id_guess(1:n_part)
@@ -293,7 +290,7 @@ contains
           coords(:, i) = pc%event_list(n)%part%x(1:NDIM)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
-          energy_lost(i) = PC_v_to_en(pc%event_list(n)%part%v, UC_elec_mass) + pc%event_list(n)%part%en_loss! All of the particles energy is deposited in the gas
+          energy_lost(i) = PC_v_to_en(pc%event_list(n)%part%v, UC_elec_mass) ! All of the particles energy is deposited in the gas
 
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
@@ -317,8 +314,8 @@ contains
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order_to_density, &
             id_guess(1:i))
-       call af_particles_to_grid(tree, i_P_dep, coords(:, 1:i), &
-           abs(weights(1:i)*energy_lost(1:i))/dt, i, 1, &
+       call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:i), &
+           abs(weights(1:i)*energy_lost(1:i)), i, 1, &
            id_guess(1:i))
     end if
 
@@ -449,7 +446,7 @@ contains
     call pc%histogram(calc_elec_energy, is_alive, [0.0_dp], bins, bin_values)
     ! Convert histogram to density and save as curve-object
     curve_dat(1, 1, :) = bins
-    curve_dat(1, 2, :) = bin_values/(n_part * en_step) + 1e-9 ! Add regularization parameter to prevent errors when converting to semilogy plots
+    curve_dat(1, 2, :) = bin_values/(n_part * en_step)
   end function write_EEDF_as_curve
 
   function calc_elec_energy(part) result(energy)
