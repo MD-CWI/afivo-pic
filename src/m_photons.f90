@@ -408,6 +408,7 @@ subroutine Ar2_radiative_decay(tree, pc)
              x_stop(1:NDIM) = get_coordinates_x(x_stop)
 
              if (is_in_gas(tree, x_stop)) then
+#if NDIM == 2
                 if (.not. GL_cylindrical .or. &
                      .not. ignore_photon(tree, x_stop)) then
                    call single_photoionization_event_OMP(tree, pc, buffer, &
@@ -416,6 +417,15 @@ subroutine Ar2_radiative_decay(tree, pc)
                    ! Make sure buffers are not getting too full
                    call handle_buffer(pc, buffer, PC_advance_buf_size/2)
                 end if
+#elif NDIM ==3
+                if (.not. ignore_photon(tree, x_stop)) then
+                   call single_photoionization_event_OMP(tree, pc, buffer, &
+                        ppos_array, pw_array, pindex, tid, x_stop)
+
+                   ! Make sure buffers are not getting too full
+                   call handle_buffer(pc, buffer, PC_advance_buf_size/2)
+                end if
+#endif
              end if
           end do
        end if
@@ -648,8 +658,9 @@ subroutine Ar2_radiative_decay(tree, pc)
   logical function ignore_photon(tree, x_stop)
     type(af_t), intent(in)         :: tree
     real(dp), intent(in)           :: x_stop(NDIM)
-    real(dp)                       :: ignored_boundary
-
+    real(dp)                       :: ignored_boundary(1:NDIM-1)
+    real(dp)                       :: ignored_boundary2
+#if NDIM ==2
     ignored_boundary = domain_len(1) * pi_ignore_rel_radius
 
     if ( x_stop(1) > ignored_boundary) then
@@ -657,7 +668,17 @@ subroutine Ar2_radiative_decay(tree, pc)
     else
         ignore_photon     = .false.
     end if
-
+#elif NDIM == 3
+    ignored_boundary(1) = domain_len(1) * (0.5 - pi_ignore_rel_radius)   
+    ignored_boundary(2)= domain_len(1) * (0.5 + pi_ignore_rel_radius)
+    
+    if ( x_stop(1) < ignored_boundary(1) .or. x_stop(1) > ignored_boundary(2) &
+    & .or. x_stop(2) < ignored_boundary(1) .or. x_stop(2) > ignored_boundary(2)) then
+       ignore_photon     = .true.
+    else
+       ignore_photon     = .false.
+    end if
+#endif
   end function ignore_photon
 
   ! Determine if an emitted photon is absorbed by the gas or dielectric surface
