@@ -661,10 +661,10 @@ subroutine Ar2_radiative_decay(tree, pc)
     real(dp)                       :: ignored_boundary(1:NDIM-1)
     real(dp)                       :: ignored_boundary2
 #if NDIM ==2
-    ignored_boundary = domain_len(1) * pi_ignore_rel_radius
+    ignored_boundary(1) = domain_len(1) * pi_ignore_rel_radius
 
-    if ( x_stop(1) > ignored_boundary) then
-       ignore_photon     = .true.
+    if ( x_stop(1) > ignored_boundary(1)) then
+        ignore_photon     = .true.
     else
         ignore_photon     = .false.
     end if
