@@ -27,6 +27,9 @@ real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 ! ignore photoionization above this relative radius to speed up calculation
 real(dp)              :: pi_ignore_rel_radius = 1.0_dp
 
+! the proportional factor for photoionization
+real(dp)              :: pi_eff = 0.075_dp
+
 !Default reaction rates for excited Ar and Ar2 pools
 real(dp)  :: k_Ar_decay_rad  = 0.0_dp
 real(dp)  :: k_Ar_quench     = 0.0_dp
@@ -79,6 +82,8 @@ contains
         "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%ion_ignore_rel_radius", pi_ignore_rel_radius, &
         "Ignore photoionization above this relative radius")
+    call CFG_add_get(cfg, "photon%ion_eff", pi_eff, &
+        "the proportional factor for photoionization")
 
     ! Initialize parameters and pointers according to the selected model
     select case (model)
@@ -513,7 +518,7 @@ subroutine Ar2_radiative_decay(tree, pc)
   real(dp) function get_photoi_eff(fld)
     use m_lookup_table
     real(dp), intent(in) :: fld
-    get_photoi_eff = 0.075_dp
+    get_photoi_eff = pi_eff
     ! call LT_lin_interp_list(pi_photo_eff_table1, &
          ! pi_photo_eff_table2, fld, get_photoi_eff)
   end function get_photoi_eff
