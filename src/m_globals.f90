@@ -46,6 +46,7 @@ module m_globals
   integer, protected :: i_energy   = -1 ! Energy density
   integer, protected :: i_eps      = -1 ! Dielectric permittivity
   integer, protected :: i_lsf      = -1 ! level set function (for electrode)
+  integer, protected :: i_tmp_dens = -1 ! used in cylindrical coordinate system
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -168,7 +169,11 @@ contains
     call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, &
           "The time interval that is written to a .dat file")
     call CFG_add_get(cfg, "use_electrode", GL_use_electrode, &
-             "Whether to include an electrode")
+         "Whether to include an electrode")
+
+    if (GL_cylindrical) then
+       call af_add_cc_variable(tree, "tmp_dens", .false., ix=i_tmp_dens)
+    end if
 
     if (GL_use_dielectric) then
        interpolation_order_field = 1

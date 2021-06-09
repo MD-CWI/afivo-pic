@@ -400,7 +400,7 @@ contains
     call af_tree_clear_cc(tree, i_energy)
     call af_particles_to_grid(tree, i_energy, coords(:, 1:n_part), &
          energy(1:n_part), n_part, 1, id_guess(1:n_part), &
-         fill_gc=.false.)
+         fill_gc=.false., iv_tmp=i_tmp_dens)
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output

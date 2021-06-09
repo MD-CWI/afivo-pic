@@ -235,15 +235,15 @@ contains
        call af_tree_clear_cc(tree, i_electron)
        call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part))
+            id_guess(1:n_part), iv_tmp=i_tmp_dens)
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
             weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part))
+            id_guess(1:n_part), iv_tmp=i_tmp_dens)
     else
        call af_tree_clear_cc(tree, i_electron)
        call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
             weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part))
+            id_guess(1:n_part), iv_tmp=i_tmp_dens)
     end if
 
     pc%particles(1:n_part)%id = id_guess(1:n_part)
@@ -272,14 +272,14 @@ contains
     if (i > 0) then ! only for the events that created an ion
        call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
             weights(1:i), i, interpolation_order_to_density, &
-            id_guess(1:i))
+            id_guess(1:i), iv_tmp=i_tmp_dens)
     end if
 
     if (photoi_enabled) then
       call photoionization(tree, pc, coords, weights, n_photons)
       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
            weights(1:n_photons), n_photons, interpolation_order_to_density, &
-           id_guess(1:n_photons))
+           id_guess(1:n_photons), iv_tmp=i_tmp_dens)
     end if
     if (photoe_enabled) then
       call photoemission(tree, pc)
