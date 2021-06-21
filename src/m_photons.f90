@@ -561,7 +561,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
-    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+    call surface_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
          ix_surf, ix_cell)
 
     ! Update the charge in the surface cell

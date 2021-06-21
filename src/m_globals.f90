@@ -18,7 +18,7 @@ module m_globals
   type(af_t)  :: tree ! This contains the full grid information
   type(mg_t)  :: mg   ! Multigrid option struct
   type(PC_t)  :: pc
-  type(dielectric_t) :: diel ! To store dielectric surface
+  type(surfaces_t) :: diel ! To store dielectric surface
 
   ! Default length of strings
   integer, parameter :: GL_slen = 200
@@ -245,12 +245,12 @@ contains
     integer, intent(in)          :: out_cnt !< Output number
     real(dp), intent(in)         :: wc_time !< Wallclock time
     character(len=50), save      :: fmt
-    integer                      :: my_unit, n
+    integer                      :: my_unit
     real(dp)                     :: velocity, dt
     real(dp), save               :: prev_pos(NDIM) = 0
     real(dp)                     :: sum_elec, sum_pos_ion
     real(dp)                     :: max_elec, max_field, max_Er, min_Er
-    real(dp)                     :: sum_elem_charge, tmp, ne_zminmax(2)
+    real(dp)                     :: ne_zminmax(2)
     real(dp)                     :: elecdens_threshold, max_field_tip, field_voltage
     real(dp)                     :: r0(NDIM), r1(NDIM)
     type(af_loc_t)               :: loc_elec, loc_field, loc_Er, loc_tip

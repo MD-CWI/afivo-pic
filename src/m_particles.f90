@@ -290,12 +290,12 @@ contains
     if (GL_use_dielectric) then
        ! Map densities inside the first dielectric layers to surface charge.
        ! Electrons can still move away from the dielectric.
-       call dielectric_inside_layer_to_surface(tree, diel, i_electron, &
+       call surface_inside_layer_to_surface(tree, diel, i_electron, &
             i_surf_elec_close, 1.0_dp, clear_cc=.true., clear_surf=.true.)
-       call dielectric_inside_layer_to_surface(tree, diel, i_pos_ion, &
+       call surface_inside_layer_to_surface(tree, diel, i_pos_ion, &
             i_surf_pos_ion, 1.0_dp, clear_cc=.true., clear_surf=.false.)
        ! Sum densities together
-       call dielectric_set_weighted_sum(diel, i_surf_sum_dens, &
+       call surface_set_weighted_sum(diel, i_surf_sum_dens, &
             [i_surf_elec, i_surf_elec_close, i_surf_pos_ion], &
             [-1.0_dp, -1.0_dp, 1.0_dp])
     end if
@@ -313,7 +313,7 @@ contains
     integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
-    call dielectric_get_surface_cell(tree, diel, get_coordinates(my_part), &
+    call surface_get_surface_cell(tree, diel, get_coordinates(my_part), &
          ix_surf, ix_cell)
     ! Update the charge in the surface cell
 #if NDIM == 2

@@ -123,7 +123,7 @@ contains
     ! Refinement flags for the cells of the box
     integer, intent(out)     :: &
          cell_flags(DTIMES(box%n_cell))
-    integer                  :: IJK, n, nc
+    integer                  :: IJK, n, nc, id
     real(dp)                 :: max_dx, fld, alpha, adx, elec_dens
     real(dp)                 :: rmin(NDIM), rmax(NDIM)
 
@@ -170,12 +170,12 @@ contains
     end do
 
     ! Ensure that the minimum refinement for boxes on the surface are satisfied
-    if (GL_use_dielectric) then
-      if (is_box_on_surface(tree, diel, box)) then
-        if (max_dx > refine_surface_max_dx) then
+    if (GL_use_dielectric .and. max_dx > refine_surface_max_dx) then
+       id = box%neighbor_mat(DTIMES(0))
+       if (diel%box_id_in_to_surface_ix(id) /= surface_none .or. &
+            diel%box_id_out_to_surface_ix(id) /= surface_none) then
           cell_flags = af_do_ref
-        end if
-      end if
+       end if
     end if
 
     ! Make sure we don't have or get a too fine or too coarse grid
@@ -196,7 +196,7 @@ contains
 
     character(len=GL_slen)     :: td_file = "input/transport_data.txt"
     logical                    :: td_old_style = .true.
-    integer                    :: table_size       = 500, i
+    integer                    :: table_size       = 500
     real(dp)                   :: max_electric_fld = 3e7_dp
     real(dp), allocatable      :: x_data(:), y_data(:)
     character(len=GL_slen)     :: data_name

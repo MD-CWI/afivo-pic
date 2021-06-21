@@ -109,7 +109,7 @@ program apic
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
-     call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
+     call surface_initialize(tree, i_eps, diel, n_surf_vars)
   end if
 
   output_cnt         = 0 ! Number of output files written
@@ -132,10 +132,10 @@ program apic
 
      if (GL_use_dielectric) then
         ! Make sure there are no refinement jumps across the dielectric
-        call dielectric_get_refinement_links(diel, ref_links)
+        call surface_get_refinement_links(diel, ref_links)
         call af_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width, ref_links)
-        call dielectric_update_after_refinement(tree, diel, ref_info)
+        call surface_update_after_refinement(tree, diel, ref_info)
      else
         call af_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width)
@@ -159,7 +159,7 @@ program apic
 
   ! Set an initial surface charge
   if (associated(user_set_surface_charge)) then
-     call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_surface_charge)
+     call surface_set_values(tree, diel, i_surf_pos_ion, user_set_surface_charge)
   end if
 
   call pc%set_accel()
@@ -245,15 +245,16 @@ program apic
      if (write_out) then
         call set_output_variables()
 
-        write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
+        write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // &
+             trim(GL_simulation_name) // "_", output_cnt
         call af_write_silo(tree, fname, output_cnt, GL_time, &
-             dir=GL_output_dir, add_curve_names = ["EEDF"], &
+             add_curve_names = ["EEDF"], &
              add_curve_dat = write_EEDF_as_curve(pc))
         call print_info()
         call CS_write_ledger(pc%coll_ledger, &
         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
         GL_time)
-        
+
         ! output the log file
         write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_log.txt"
         if (associated(user_write_log)) then
@@ -261,7 +262,7 @@ program apic
         else
           call output_log(tree, fname, output_cnt, wc_time)
         end if
-        
+
         if (GL_write_to_dat) then
           if (GL_write_to_dat_interval(1) .le. GL_time .and. GL_time .le. GL_write_to_dat_interval(2)) then
             call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
@@ -274,10 +275,10 @@ program apic
         t0 = omp_get_wtime()
         if (GL_use_dielectric) then
            ! Make sure there are no refinement jumps across the dielectric
-           call dielectric_get_refinement_links(diel, ref_links)
+           call surface_get_refinement_links(diel, ref_links)
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width, ref_links)
-           call dielectric_update_after_refinement(tree, diel, ref_info)
+           call surface_update_after_refinement(tree, diel, ref_info)
         else
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width)
@@ -355,7 +356,7 @@ contains
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
     write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
-    call dielectric_get_integral(diel, i_surf_sum_dens, surf_int)
+    call surface_get_integral(diel, i_surf_sum_dens, surf_int)
     write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
