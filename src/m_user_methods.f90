@@ -29,7 +29,7 @@ module m_user_methods
   procedure(af_subr_bc), pointer :: user_potential_bc => null()
 
   procedure(log_subr), pointer :: user_write_log => null()
-  
+
   integer, parameter :: user_max_log_vars = 20
 
   !> To add entries to the log file
@@ -67,7 +67,7 @@ module m_user_methods
        character(len=*), intent(inout)        :: var_names(user_max_log_vars)
        real(dp), intent(inout)                :: var_values(user_max_log_vars)
      end subroutine log_vars
-     
+
      real(dp) function sigma_func(r)
        import
        real(dp), intent(in) :: r(NDIM)

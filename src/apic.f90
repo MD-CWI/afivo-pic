@@ -369,39 +369,18 @@ contains
 
   subroutine set_output_variables()
     use m_units_constants
-    integer :: n, n_part
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: weights(:)
-    real(dp), allocatable :: energy(:)
-    integer, allocatable  :: id_guess(:)
+    integer :: n_part
 
     n_part = pc%get_num_sim_part()
-    allocate(coords(NDIM, n_part))
-    allocate(weights(n_part))
-    allocate(energy(n_part))
-    allocate(id_guess(n_part))
-
-    !$omp parallel do
-    do n = 1, n_part
-       coords(:, n) = get_coordinates(pc%particles(n))
-       weights(n) = 1.0_dp
-       energy(n) = pc%particles(n)%w * &
-            PC_v_to_en(pc%particles(n)%v, UC_elec_mass) / &
-            UC_elec_volt
-       id_guess(n) = pc%particles(n)%id
-    end do
-    !$omp end parallel do
 
     call af_tree_clear_cc(tree, i_ppc)
     ! Don't divide by cell volume (last .false. argument)
-    call af_particles_to_grid(tree, i_ppc, coords(:, 1:n_part), &
-         weights(1:n_part), n_part, 0, id_guess(1:n_part), &
-         density=.false., fill_gc=.false.)
+    call af_particles_to_grid(tree, i_ppc, n_part, get_id, get_r_unit_dens, &
+         0, density=.false., fill_gc=.false.)
 
     call af_tree_clear_cc(tree, i_energy)
-    call af_particles_to_grid(tree, i_energy, coords(:, 1:n_part), &
-         energy(1:n_part), n_part, 1, id_guess(1:n_part), &
-         fill_gc=.false., iv_tmp=i_tmp_dens)
+    call af_particles_to_grid(tree, i_energy, n_part, get_id, &
+         get_r_energy, 1, fill_gc=.false., iv_tmp=i_tmp_dens)
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output

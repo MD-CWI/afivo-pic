@@ -24,8 +24,10 @@ real(dp)              :: pi_quench_fac
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
 real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
-! ignore photoionization above this relative radius to speed up calculation
-real(dp)              :: pi_ignore_rel_radius = 1.0_dp
+!> Ignore photoionization below this coordinate
+real(dp)              :: pi_photon_rmin(NDIM) = -1e10_dp
+!> Ignore photoionization above this coordinate
+real(dp)              :: pi_photon_rmax(NDIM) = 1e10_dp
 
 ! the proportional factor for photoionization
 real(dp)              :: pi_eff = 0.075_dp
@@ -71,8 +73,10 @@ contains
         "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
         "Whether photoionization is used")
-    call CFG_add_get(cfg, "photon%ion_ignore_rel_radius", pi_ignore_rel_radius, &
-        "Ignore photoionization above this relative radius")
+    call CFG_add_get(cfg, "photon%rmin", pi_photon_rmin, &
+         "Ignore photoionization below this coordinate")
+    call CFG_add_get(cfg, "photon%rmax", pi_photon_rmax, &
+        "Ignore photoionization above this coordinate")
     call CFG_add_get(cfg, "photon%ion_eff", pi_eff, &
         "the proportional factor for photoionization")
 
@@ -162,7 +166,10 @@ contains
           do m = 1, n_uv
              x_start = pc%event_list(n)%part%x
              x_stop  = get_x_stop(x_start, prng%rngs(tid))
-             if (is_in_gas(tree, x_stop)) then
+             x_stop(1:NDIM) = get_coordinates_x(x_stop)
+
+             if (is_in_gas(tree, x_stop) .and. .not. &
+                  ignore_photon(x_stop)) then
                call single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
              end if
           end do
@@ -352,30 +359,9 @@ contains
   end function is_in_gas
 
   ! Check if the photon is in the ignore area
-  logical function ignore_photon(tree, x_stop)
-    type(af_t), intent(in)         :: tree
-    real(dp), intent(in)           :: x_stop(NDIM)
-    real(dp)                       :: ignored_boundary(1:NDIM-1)
-    real(dp)                       :: ignored_boundary2
-#if NDIM ==2
-    ignored_boundary(1) = domain_len(1) * pi_ignore_rel_radius
-
-    if ( x_stop(1) > ignored_boundary(1)) then
-        ignore_photon     = .true.
-    else
-        ignore_photon     = .false.
-    end if
-#elif NDIM == 3
-    ignored_boundary(1) = domain_len(1) * (0.5 - pi_ignore_rel_radius)   
-    ignored_boundary(2)= domain_len(1) * (0.5 + pi_ignore_rel_radius)
-    
-    if ( x_stop(1) < ignored_boundary(1) .or. x_stop(1) > ignored_boundary(2) &
-    & .or. x_stop(2) < ignored_boundary(1) .or. x_stop(2) > ignored_boundary(2)) then
-       ignore_photon     = .true.
-    else
-       ignore_photon     = .false.
-    end if
-#endif
+  logical function ignore_photon(x_stop)
+    real(dp), intent(in) :: x_stop(NDIM)
+    ignore_photon = any(x_stop < pi_photon_rmin) .or. any(x_stop > pi_photon_rmax)
   end function ignore_photon
 
   ! Determine if an emitted photon is absorbed by the gas or dielectric surface

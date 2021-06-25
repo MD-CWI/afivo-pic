@@ -11,6 +11,7 @@ m_field.o: m_user_methods.mod
 m_globals.o: m_config.mod
 m_globals.o: m_user_methods.mod
 m_init_cond.o: m_config.mod
+m_init_cond.o: m_domain.mod
 m_init_cond.o: m_geometry.mod
 m_init_cond.o: m_globals.mod
 m_init_cond.o: m_user_methods.mod

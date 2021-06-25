@@ -121,12 +121,31 @@ contains
 
   !> Adjust the weights of the particles
   subroutine adapt_weights(tree, pc)
-    type(af_t), intent(in)   :: tree
+    type(af_t), intent(in)    :: tree
     type(PC_t), intent(inout) :: pc
-    integer                   :: id, n_part_id
-    integer, allocatable      :: id_ipart(:)
+    integer                   :: id, n, n_part_id
+    integer, allocatable      :: id_count(:), id_ipart(:)
 
-    call sort_by_id(tree, pc, id_ipart)
+    call pc%sort_in_place(particle_sort_function)
+
+    allocate(id_ipart(tree%highest_id+1))
+    allocate(id_count(tree%highest_id))
+
+    ! Count how many particles there are per box id
+    id_count(:) = 0
+    do n = 1, pc%n_part
+       id           = pc%particles(n)%id
+       id_count(id) = id_count(id) + 1
+    end do
+
+    ! Now id_ipart(id) should be the index of the first particle in box id (even
+    ! when none are present), and the number of particles in the box is
+    ! id_ipart(id+1) - id_ipart(id)
+    id_ipart(1) = 1
+    do id = 2, tree%highest_id+1
+       id_ipart(id) = id_ipart(id-1) + id_count(id-1)
+    end do
+
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
     !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
@@ -144,51 +163,13 @@ contains
     ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
   end subroutine adapt_weights
 
-  !> Sort the particles by their id
-  subroutine sort_by_id(tree, pc, id_ipart)
-    type(af_t), intent(in)              :: tree
-    type(PC_t), intent(inout)           :: pc
-    integer, intent(inout), allocatable :: id_ipart(:)
+  !> Used to sort particles, first by id and then by tag
+  logical function particle_sort_function(a, b) result(less_than)
+    integer, intent(in) :: a, b
 
-    integer                      :: n, id, new_ix
-    integer, allocatable         :: id_count(:)
-    integer, allocatable         :: id_ix(:)
-    type(PC_part_t), allocatable, save :: p_copy(:)
-
-    if (allocated(id_ipart)) deallocate(id_ipart)
-    allocate(id_ipart(tree%highest_id+1))
-    allocate(id_ix(tree%highest_id+1))
-    allocate(id_count(tree%highest_id))
-
-    if (.not. allocated(p_copy)) then
-       allocate(p_copy(nint(pc%n_part * array_incr_fac)))
-    else if (size(p_copy) < pc%n_part) then
-       deallocate(p_copy)
-       allocate(p_copy(nint(pc%n_part * array_incr_fac)))
-    end if
-
-    id_count(:) = 0
-
-    do n = 1, pc%n_part
-       id           = pc%particles(n)%id
-       id_count(id) = id_count(id) + 1
-       p_copy(n)    = pc%particles(n)
-    end do
-
-    id_ix(1) = 1
-    do id = 2, tree%highest_id+1
-       id_ix(id) = id_ix(id-1) + id_count(id-1)
-    end do
-
-    id_ipart(:) = id_ix(:)
-
-    do n = 1, pc%n_part
-       id                   = p_copy(n)%id
-       new_ix               = id_ix(id)
-       id_ix(id)            = id_ix(id) + 1
-       pc%particles(new_ix) = p_copy(n)
-    end do
-  end subroutine sort_by_id
+    less_than = pc%particles(a)%id < pc%particles(b)%id
+    ! TODO: sort by cell
+  end function particle_sort_function
 
   subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
@@ -206,47 +187,31 @@ contains
 
 
     n_part = pc%get_num_sim_part()
-    n = max(n_part, pc%n_events)
+    n = pc%n_events
 
     if (.not. allocated(weights)) then
        n = nint(n * array_incr_fac)
-       allocate(coords(NDIM, n))
-       allocate(weights(n))
-       allocate(id_guess(n))
+       allocate(coords(NDIM, n), weights(n), id_guess(n))
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
-       deallocate(coords)
-       deallocate(weights)
-       deallocate(id_guess)
-       allocate(coords(NDIM, n))
-       allocate(weights(n))
-       allocate(id_guess(n))
+       deallocate(coords, weights, id_guess)
+       allocate(coords(NDIM, n), weights(n), id_guess(n))
     end if
-
-    !$omp parallel do
-    do n = 1, n_part
-       coords(:, n) = get_coordinates(pc%particles(n))
-       weights(n) = pc%particles(n)%w
-       id_guess(n) = pc%particles(n)%id
-    end do
-    !$omp end parallel do
 
     if (init_cond) then
        call af_tree_clear_cc(tree, i_electron)
-       call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part), iv_tmp=i_tmp_dens)
-       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part), iv_tmp=i_tmp_dens)
+       call af_particles_to_grid(tree, i_electron, n_part, &
+            get_id, get_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens)
+       call af_particles_to_grid(tree, i_pos_ion, n_part, &
+            get_id, get_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens)
     else
        call af_tree_clear_cc(tree, i_electron)
-       call af_particles_to_grid(tree, i_electron, coords(:, 1:n_part), &
-            weights(1:n_part), n_part, interpolation_order_to_density, &
-            id_guess(1:n_part), iv_tmp=i_tmp_dens)
+       call af_particles_to_grid(tree, i_electron, n_part, &
+            get_id, get_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens)
     end if
-
-    pc%particles(1:n_part)%id = id_guess(1:n_part)
 
     i = 0
     do n = 1, pc%n_events
@@ -260,7 +225,6 @@ contains
           coords(:, i) = get_coordinates(pc%event_list(n)%part)
           weights(i) = -pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
-
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
@@ -270,19 +234,21 @@ contains
     end do
 
     if (i > 0) then ! only for the events that created an ion
-       call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:i), &
-            weights(1:i), i, interpolation_order_to_density, &
-            id_guess(1:i), iv_tmp=i_tmp_dens)
+       call af_particles_to_grid(tree, i_pos_ion, i, &
+            get_event_id, get_event_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens)
     end if
 
     if (photoi_enabled) then
-      call photoionization(tree, pc, coords, weights, n_photons)
-      call af_particles_to_grid(tree, i_pos_ion, coords(:, 1:n_photons), &
-           weights(1:n_photons), n_photons, interpolation_order_to_density, &
-           id_guess(1:n_photons), iv_tmp=i_tmp_dens)
+       call photoionization(tree, pc, coords, weights, n_photons)
+       id_guess(1:n_photons) = af_no_box
+       call af_particles_to_grid(tree, i_pos_ion, n_photons, &
+            get_event_id, get_event_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens)
     end if
+
     if (photoe_enabled) then
-      call photoemission(tree, pc)
+       call photoemission(tree, pc)
     end if
 
     pc%n_events = 0
@@ -299,6 +265,25 @@ contains
             [i_surf_elec, i_surf_elec_close, i_surf_pos_ion], &
             [-1.0_dp, -1.0_dp, 1.0_dp])
     end if
+
+  contains
+
+    subroutine get_event_id(n, id)
+      integer, intent(in)  :: n
+      integer, intent(out) :: id
+
+      id = af_get_id_at(tree, coords(:, n), guess=id_guess(n))
+    end subroutine get_event_id
+
+    !> Get particle position and weight
+    subroutine get_event_rw(n, r, w)
+      integer, intent(in)   :: n
+      real(dp), intent(out) :: r(NDIM)
+      real(dp), intent(out) :: w
+
+      r = coords(:, n)
+      w = weights(n)
+    end subroutine get_event_rw
 
   end subroutine particles_to_density_and_events
 
@@ -321,7 +306,7 @@ contains
          diel%surfaces(ix_surf)%sd(ix_cell(1), i_surf) + &
          my_part%w / diel%surfaces(ix_surf)%dr(1)
 #elif NDIM == 3
-!FLAG
+    !FLAG
     diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) = &
          diel%surfaces(ix_surf)%sd(ix_cell(1), ix_cell(2), i_surf) + &
          my_part%w / product(diel%surfaces(ix_surf)%dr)
@@ -395,7 +380,7 @@ contains
     allocate(curve_dat(1, 2, num_bins))
 
     do i = 1, num_bins
-      bins(i) = en_step * (i-1)
+       bins(i) = en_step * (i-1)
     end do
 
     call pc%histogram(calc_elec_energy, is_alive, [0.0_dp], bins, bin_values)
@@ -426,11 +411,51 @@ contains
     integer                 :: ll
     max_en = 0.0_dp
     do ll = 1, pc%n_part
-      if (pc%particles(ll)%w > 0.0_dp) then
-        max_en = max(max_en, PC_v_to_en(pc%particles(ll)%v, UC_elec_mass))
-      end if
+       if (pc%particles(ll)%w > 0.0_dp) then
+          max_en = max(max_en, PC_v_to_en(pc%particles(ll)%v, UC_elec_mass))
+       end if
     end do
     max_en = max_en / UC_elec_volt
   end function get_max_energy
+
+  !> Get particle id
+  subroutine get_id(n, id)
+    integer, intent(in)  :: n
+    integer, intent(out) :: id
+
+    id = af_get_id_at(tree, get_coordinates(pc%particles(n)), &
+         guess=pc%particles(n)%id)
+  end subroutine get_id
+
+  !> Get particle position and weight
+  subroutine get_rw(n, r, w)
+    integer, intent(in)   :: n
+    real(dp), intent(out) :: r(NDIM)
+    real(dp), intent(out) :: w
+
+    r = get_coordinates(pc%particles(n))
+    w = pc%particles(n)%w
+  end subroutine get_rw
+
+  !> Get particle position and energy
+  subroutine get_r_energy(n, r, w)
+    integer, intent(in)   :: n
+    real(dp), intent(out) :: r(NDIM)
+    real(dp), intent(out) :: w
+
+    r = get_coordinates(pc%particles(n))
+    w = pc%particles(n)%w * PC_v_to_en(pc%particles(n)%v, UC_elec_mass) / &
+            UC_elec_volt
+  end subroutine get_r_energy
+
+  !> Get particle position and unit density (for particle-per-cell computation)
+  subroutine get_r_unit_dens(n, r, w)
+    integer, intent(in)   :: n
+    real(dp), intent(out) :: r(NDIM)
+    real(dp), intent(out) :: w
+
+    r = get_coordinates(pc%particles(n))
+    w = 1.0_dp
+  end subroutine get_r_unit_dens
 
 end module m_particles
