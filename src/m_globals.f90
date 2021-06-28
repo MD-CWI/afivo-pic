@@ -56,6 +56,12 @@ module m_globals
   integer, parameter :: i_surf_elec = 3
   integer, parameter :: i_surf_pos_ion = 4
 
+  !> How many gigabytes of memory to use for afivo
+  real(dp), protected :: GL_memory_afivo_GB = 2.0_dp
+
+  !> How many gigabytes of memory to use for particles
+  real(dp), protected :: GL_memory_particles_GB = 4.0_dp
+
   ! Whether cylindrical coordinates are used
   logical, protected :: GL_cylindrical = .false.
 
@@ -170,6 +176,15 @@ contains
           "The time interval that is written to a .dat file")
     call CFG_add_get(cfg, "use_electrode", GL_use_electrode, &
          "Whether to include an electrode")
+
+    call CFG_add_get(cfg, "memory_afivo_GB", GL_memory_afivo_GB, &
+         "How many gigabytes of memory to use for afivo")
+    call CFG_add_get(cfg, "memory_particles_GB", GL_memory_particles_GB, &
+         "How many gigabytes of memory to use for particles")
+
+    write(*, "(A,F12.2)") " memory_particles_GB:     ", GL_memory_particles_GB
+    write(*, "(A,F12.2)") " memory_afivo_GB:         ", GL_memory_afivo_GB
+
 
     if (GL_cylindrical) then
        call af_add_cc_variable(tree, "tmp_dens", .false., ix=i_tmp_dens)

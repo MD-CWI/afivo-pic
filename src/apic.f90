@@ -164,7 +164,7 @@ program apic
 
   call pc%set_accel()
 
-  print *, "Number of threads", af_get_max_threads()
+  write(*, "(A,I12)") " Number of threads:       ", af_get_max_threads()
   call af_print_info(tree)
 
   ! Start from small time step
@@ -300,16 +300,17 @@ contains
   !> Initialize the AMR tree
   subroutine init_tree(tree)
     type(af_t), intent(inout) :: tree
+    integer                   :: coord
 
-    ! Initialize tree
     if (GL_cylindrical) then
-       call af_init(tree, box_size, domain_len, &
-            coarse_grid_size, coord=af_cyl)
+       coord = af_cyl
     else
-       call af_init(tree, box_size, domain_len, &
-            coarse_grid_size)
+       coord = af_xyz
     end if
 
+    ! Initialize tree
+    call af_init(tree, box_size, domain_len, coarse_grid_size, &
+         coord=coord, mem_limit_gb=GL_memory_afivo_GB)
   end subroutine init_tree
 
   subroutine print_status()

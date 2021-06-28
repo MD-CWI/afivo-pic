@@ -30,11 +30,13 @@ contains
 
     integer                        :: nn, tbl_size, max_num_part
     integer                        :: n_gas_comp, n_gas_frac
+    integer                        :: particle_bytes
     real(dp)                       :: temperature, max_ev
     character(len=200)             :: cs_file
     character(len=20), allocatable :: gas_names(:)
     real(dp), allocatable          :: gas_fracs(:)
     type(CS_t), allocatable        :: cross_secs(:)
+    type(PC_part_t)                :: dummy_part
 
     ! Gas parameters
     call CFG_add(cfg, "gas%temperature", 300.0_dp, &
@@ -54,8 +56,6 @@ contains
     call CFG_add_get(cfg, "particle%max_weight", particle_max_weight, &
          "Maximum weight for simulation particles")
 
-    call CFG_add(cfg, "particle%max_number", 15*1000*1000, &
-         "Maximum number of particles")
     call CFG_add_get(cfg, "particle%min_merge_increase", min_merge_increase, &
          "Minimum increase in particle count before merging")
 
@@ -87,7 +87,6 @@ contains
 
     call CFG_get(cfg, "gas%file", cs_file)
     call CFG_get(cfg, "particle%max_energy_ev", max_ev)
-    call CFG_get(cfg, "particle%max_number", max_num_part)
 
     ! Initialize gas and electric field module
     call GAS_initialize(gas_names, gas_fracs, GL_gas_pressure, temperature)
@@ -105,6 +104,12 @@ contains
 
     pc%particle_mover => PC_verlet_advance
     pc%after_mover => PC_verlet_correct_accel
+
+    ! How many bytes are required per particle (accounting for overhead, for
+    ! example when they are mapped to a grid)
+    particle_bytes = (storage_size(dummy_part) + 2 * storage_size(0)) / 8
+    max_num_part = nint(GL_memory_particles_GB * 2.0_dp**30 / particle_bytes)
+    write(*, "(A,I12)")   " Max number of particles: ", max_num_part
 
     call pc%initialize(UC_elec_mass, max_num_part)
     call pc%use_cross_secs(max_ev, tbl_size, cross_secs)
