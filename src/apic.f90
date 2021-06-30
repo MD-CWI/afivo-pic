@@ -145,7 +145,8 @@ program apic
 
   ! Add particles from the initial condition. Note that this cannot be done in
   ! parallel at the moment
-  if (any(init_conds%seed_density > 0)) then
+  if (any(init_conds%seed_density > 0) .or. &
+       init_conds%background_density > 0) then
      do lvl = 1, tree%highest_lvl
         do i = 1, size(tree%lvls(lvl)%leaves)
            id = tree%lvls(lvl)%leaves(i)
@@ -272,7 +273,6 @@ program apic
      end if
 
      if (mod(it, refine_per_steps) == 0) then
-        t0 = omp_get_wtime()
         if (GL_use_dielectric) then
            ! Make sure there are no refinement jumps across the dielectric
            call surface_get_refinement_links(diel, ref_links)
