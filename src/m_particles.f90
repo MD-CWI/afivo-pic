@@ -172,8 +172,13 @@ contains
   logical function particle_sort_function(a, b) result(less_than)
     integer, intent(in) :: a, b
 
-    less_than = pc%particles(a)%id < pc%particles(b)%id
-    ! TODO: sort by cell
+    if (pc%particles(a)%id == pc%particles(b)%id) then
+       ! Sort by x-coordinate
+       less_than = pc%particles(a)%x(1) < pc%particles(b)%x(1)
+    else
+       ! Sort by id
+       less_than = pc%particles(a)%id < pc%particles(b)%id
+    end if
   end function particle_sort_function
 
   subroutine particles_to_density_and_events(tree, pc, init_cond)
