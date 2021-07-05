@@ -101,7 +101,7 @@ contains
     integer                    :: IJK, n, nc, ix, n_particles
     real(dp)                   :: rr(NDIM), w
     real(dp)                   :: density, pos(NDIM, ceiling(particle_per_cell))
-    real(dp)                   :: volume, r0, r1
+    real(dp)                   :: volume, r0, r1, n_expected
     type(PC_part_t)            :: new_part
 
     nc = box%n_cell
@@ -123,10 +123,22 @@ contains
        end do
 
        ! Determine number of particles to generate
-       n_particles = nint(min(density * volume / particle_min_weight, &
-            particle_per_cell))
-       ! Determine weight
-       w = density * volume / n_particles
+       n_expected = min(density * volume / particle_min_weight, &
+            particle_per_cell)
+
+       ! The most physical would be to sample particle counts from the Poisson
+       ! distribution, but this is difficult to sample from for large N, and
+       ! sometimes it is useful to have less noise in the initial conditions.
+       n_particles = floor(n_expected)
+       if (n_expected - n_particles > GL_rng%unif_01()) then
+          n_particles = n_particles + 1
+       end if
+
+       ! Determine weight. Note that this will not give exactly the required
+       ! density when linear weighting is used, since particles are also mapped
+       ! to nearby cells.
+       w = nint(max(particle_min_weight, &
+            density * volume / max(n_particles, 1)))
 
        ! Sample particle positions within the cell
        if (GL_cylindrical) then
