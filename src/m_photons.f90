@@ -41,12 +41,10 @@ public  :: photoionization
 public  :: photoemission
 
 abstract interface
-  subroutine photoi(tree, pc, photo_pos, photo_w, n_photons)
+  subroutine photoi(tree, pc, n_photons)
     import
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
   end subroutine photoi
 
@@ -141,21 +139,21 @@ contains
   end subroutine Zheleznyak_initialize
 
   ! Perform photon generation and ionization according to the Zheleznyak model
-  subroutine photoi_Zheleznyak(tree, pc, photo_pos, photo_w, n_photons)
+  subroutine photoi_Zheleznyak(tree, pc, n_photons)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
     type(prng_t)                  :: prng
 
-    integer         :: i, n, m, n_uv, tid
-    real(dp)        :: x_start(3), x_stop(3)
+    integer  :: n, m, n_uv, tid
+    integer  :: n_part_before
+    real(dp) :: x_start(3), x_stop(3)
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
-    i = 0
+    n_part_before = pc%n_part
+
     !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
     tid = omp_get_thread_num() + 1
     !$omp do
@@ -170,14 +168,15 @@ contains
 
              if (is_in_gas(tree, x_stop) .and. .not. &
                   ignore_photon(x_stop)) then
-               call single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
+               call single_photoionization_event(tree, pc, x_stop)
              end if
           end do
        end if
     end do
     !$omp end do
     !$omp end parallel
-    n_photons = i
+
+    n_photons = pc%n_part - n_part_before
     call prng%update_seed(GL_rng)
   end subroutine photoi_Zheleznyak
 
@@ -304,25 +303,11 @@ contains
 #endif
   end subroutine surface_charge_to_particle
 
-  subroutine single_photoionization_event(tree, pc, i, photo_pos, photo_w, x_stop)
-    type(af_t), intent(inout)     :: tree!
-    type(PC_t), intent(inout)     :: pc
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
-    type(PC_part_t)         :: new_part
-    integer, intent(inout)  :: i
-    integer                 :: i_cpy
-    real(dp)                :: x_stop(3)
-
-    !$omp critical(photoi_critical)
-    i = i + 1
-    i_cpy = i
-    !$omp end critical(photoi_critical)
-
-    if (i_cpy > size(photo_w)) error stop "Too many photons were generated"
-    ! Return coordinates and weights for ion production
-    photo_pos(:, i_cpy) = x_stop(1:NDIM)
-    photo_w(i_cpy)      = particle_min_weight
+  subroutine single_photoionization_event(tree, pc, x_stop)
+    type(af_t), intent(inout) :: tree !
+    type(PC_t), intent(inout) :: pc
+    real(dp), intent(in)      :: x_stop(3)
+    type(PC_part_t)           :: new_part
 
     ! Create new particle
     new_part%x = 0
@@ -332,6 +317,7 @@ contains
     new_part%w = particle_min_weight
     new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
 
+    ! It is key that the photons are added at the end of the list
     call pc%add_part(new_part)
   end subroutine single_photoionization_event
 

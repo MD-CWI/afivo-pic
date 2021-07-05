@@ -190,11 +190,10 @@ contains
     logical, intent(in)              :: init_cond
 
     integer                     :: n, i, n_part, n_photons
-    ! type(PC_part_t)             :: new_part
+    integer                     :: n_part_before
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
     integer, allocatable, save  :: id_guess(:)
-
 
     n_part = pc%get_num_sim_part()
     n = pc%n_events
@@ -250,11 +249,12 @@ contains
     end if
 
     if (photoi_enabled) then
-       call photoionization(tree, pc, coords, weights, n_photons)
-       id_guess(1:n_photons) = af_no_box
+       ! Photo-electrons are added to the end of the particle list
+       n_part_before = pc%n_part
+       call photoionization(tree, pc, n_photons)
        call af_particles_to_grid(tree, i_pos_ion, n_photons, &
-            get_event_id, get_event_rw, interpolation_order_to_density, &
-            iv_tmp=i_tmp_dens)
+            get_id, get_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens, offset_particles=n_part_before)
     end if
 
     if (photoe_enabled) then
