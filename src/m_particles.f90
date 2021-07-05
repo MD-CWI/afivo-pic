@@ -327,6 +327,7 @@ contains
     use m_units_constants
     type(PC_part_t), intent(inout) :: my_part
     real(dp)                       :: accel(3), coord(NDIM)
+    real(dp), parameter            :: min_radius = 1e-50_dp
     logical                        :: success
 
     ! Set acceleration for extra dimensions to zero
@@ -339,7 +340,7 @@ contains
 
     if (GL_cylindrical) then
        ! Convert back to xyz coordinates
-       accel([1, 3]) = accel(1) * my_part%x([1, 3]) / coord(1)
+       accel([1, 3]) = accel(1) * my_part%x([1, 3]) / max(coord(1), min_radius)
     end if
 
   end function get_accel
