@@ -28,7 +28,7 @@ module m_field
   real(dp) :: field_amplitude = 1.0e6_dp
 
   !> The applied voltage (vertical direction)
-  real(dp) :: field_voltage
+  real(dp), public, protected :: field_voltage
 
   !> Drop-off radius
   real(dp) :: field_dropoff_radius = 1e-3_dp

@@ -15,6 +15,7 @@ program apic
   use m_user_methods
   use m_cross_sec
   use m_init_cond
+  use m_output
 
   implicit none
 
