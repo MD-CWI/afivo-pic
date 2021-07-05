@@ -74,7 +74,10 @@ contains
 
     eps = af_interp0(tree, get_coordinates(my_part), &
          [i_eps], success, my_part%id)
-    if (.not. success) error stop "unexpected particle outside domain"
+    if (.not. success) then
+       print *, "coordinates: ", get_coordinates(my_part)
+       error stop "unexpected particle outside domain"
+    end if
     is_in_dielectric = (eps(1) > 1)
   end function is_in_dielectric
 
@@ -85,7 +88,10 @@ contains
 
     lsf = af_interp1(tree, get_coordinates(my_part), &
          [i_lsf], success, my_part%id)
-    if (.not. success) error stop "unexpected particle outside domain"
+    if (.not. success) then
+       print *, "coordinates: ", get_coordinates(my_part)
+       error stop "unexpected particle outside domain"
+    end if
     is_in_electrode = (lsf(1) < 0)
   end function is_in_electrode
 end module m_domain
