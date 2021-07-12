@@ -152,7 +152,6 @@ contains
     end do
 
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
-    !$omp parallel do private(id, n_part_id) schedule(dynamic)
     do id = 1, tree%highest_id
        n_part_id = id_ipart(id+1) - id_ipart(id)
        if (n_part_id > 0) then
@@ -162,7 +161,6 @@ contains
                PC_merge_part_rxv, PC_split_part)
        end if
     end do
-    !$omp end parallel do
 
     call pc%clean_up()
     ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
