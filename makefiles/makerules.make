@@ -22,6 +22,8 @@ else ifeq ($(COMPILER), ifort)
 	endif
 endif
 
+FFLAGS += $(USR_FLAGS)
+
 # How to get .o object files from .f90 source files
 %.o: %.f90
 	$(FC) -c -o $@ $< $(FFLAGS) $(addprefix -I,$(INCDIRS))
