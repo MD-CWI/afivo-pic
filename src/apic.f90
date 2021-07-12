@@ -35,13 +35,17 @@ program apic
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
 
-  real(dp) :: t0
+  real(dp) :: t0, t1
   real(dp) :: wtime_start
   real(dp) :: wtime_run = 0.0_dp
   real(dp) :: wtime_advance = 0.0_dp
+  real(dp) :: wtime_mergesplit = 0.0_dp
+  real(dp) :: wtime_todensity = 0.0_dp
+  real(dp) :: wtime_field = 0.0_dp
+  real(dp) :: wtime_io = 0.0_dp
+  real(dp) :: wtime_accel = 0.0_dp
+  real(dp) :: wtime_amr = 0.0_dp
   integer :: output_cnt = 0 ! Number of output files written
-
-  wtime_start = omp_get_wtime()
 
   ! Read command line arguments and configuration files
   call CFG_update_from_arguments(cfg)
@@ -122,7 +126,7 @@ program apic
        call user_initial_particles(pc)
 
   ! Perform additional refinement
-  do
+  do i = 1, 100
      call af_tree_clear_cc(tree, i_pos_ion)
      call particles_to_density_and_events(tree, pc, .true.)
 
@@ -180,6 +184,8 @@ program apic
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
 
+  wtime_start = omp_get_wtime()
+
   ! Start of time integration
   do it = 1, huge(1)-1
      if (GL_time >= GL_end_time) exit
@@ -216,11 +222,14 @@ program apic
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt)
      call pc%after_mover(dt)
-     wtime_advance = wtime_advance + omp_get_wtime() - t0
+     t1 = omp_get_wtime()
+     wtime_advance = wtime_advance + (t1 - t0)
 
      GL_time = GL_time + dt
 
      call particles_to_density_and_events(tree, pc, .false.)
+     t0 = omp_get_wtime()
+     wtime_todensity = wtime_todensity + (t0 - t1)
 
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase .or. &
@@ -228,12 +237,19 @@ program apic
         call adapt_weights(tree, pc)
         n_prev_merge = pc%get_num_sim_part()
         it_last_merge = it
+        t1 = omp_get_wtime()
+        wtime_mergesplit = wtime_mergesplit + (t1 - t0)
      end if
 
      ! Compute field with new density
+     t0 = omp_get_wtime()
      call field_compute(tree, mg, .true.)
+     t1 = omp_get_wtime()
+     wtime_field = wtime_field + (t1 - t0)
 
      call pc%set_accel()
+     t0 = omp_get_wtime()
+     wtime_accel = wtime_accel + (t0 - t1)
 
      n_samples = min(n_part, 1000)
      call af_tree_max_cc(tree, i_electron, max_elec_dens)
@@ -245,6 +261,7 @@ program apic
      n_elec_prev = n_elec
 
      if (write_out) then
+        t0 = omp_get_wtime()
         call set_output_variables()
 
         write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // &
@@ -270,10 +287,12 @@ program apic
             call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
           end if
         end if
-
+        t1 = omp_get_wtime()
+        wtime_io = wtime_io + (t1 - t0)
      end if
 
      if (mod(it, refine_per_steps) == 0) then
+        t0 = omp_get_wtime()
         if (GL_use_dielectric) then
            ! Make sure there are no refinement jumps across the dielectric
            call surface_get_refinement_links(diel, ref_links)
@@ -293,6 +312,8 @@ program apic
            n_prev_merge = pc%get_num_sim_part()
            it_last_merge = it
         end if
+        t1 = omp_get_wtime()
+        wtime_amr = wtime_amr + (t1 - t0)
      end if
   end do
 
@@ -365,8 +386,11 @@ contains
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
 
     wtime_run = omp_get_wtime() - wtime_start
-    write(*, "(A20,F8.2,A)") "cost of advance", &
-         1e2 * wtime_advance / wtime_run, "%"
+    write(*, "(7A10)") "advance", "to_grid", "weights", &
+         "field", "accel", "amr", "io"
+    write(*, "(7F10.2)") 1e2 * [wtime_advance, wtime_todensity, &
+         wtime_mergesplit, wtime_field, wtime_accel, wtime_amr, &
+         wtime_io] / wtime_run
   end subroutine print_info
 
   subroutine set_output_variables()
