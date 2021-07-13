@@ -129,17 +129,38 @@ contains
   subroutine set_particle_tags(tree, pc)
     type(af_t), intent(in)    :: tree
     type(PC_t), intent(inout) :: pc
-    integer                   :: n, ix(NDIM), mapping(NDIM)
+    integer                   :: n, nc, ix(NDIM), mapping(NDIM)
+    integer                   :: max_ix_tag, n_velocity_bins, v_to_int
+    real(dp)                  :: inv_max_vel
+
+    nc = tree%n_cell
+    inv_max_vel = 1 / pc%max_vel
 
     do n = 1, NDIM
-       mapping(n) = tree%n_cell**(n-1)
+       mapping(n) = nc**(n-1)
     end do
 
-    !$omp parallel do private(ix)
+    ! Maximal tag due to cell index
+    max_ix_tag = sum((nc-1) * mapping + 1)
+
+    ! Determine number of bins for velocity
+    n_velocity_bins = huge(pc%particles(1)%tag)/(max_ix_tag + 1)
+
+    !$omp parallel do private(ix, v_to_int)
     do n = 1, pc%n_part
        ix = af_cc_ix(tree%boxes(pc%particles(n)%id), &
             get_coordinates(pc%particles(n)))
+
+       ! Convert cell index to number
        pc%particles(n)%tag = sum((ix-1) * mapping) + 1
+
+       ! Then the velocity is mapped to an integer
+       v_to_int = floor((n_velocity_bins - 1) * &
+            min(1.0_dp, norm2(pc%particles(n)%v) * inv_max_vel))
+
+       ! Combine the two pieces into one number
+       pc%particles(n)%tag = pc%particles(n)%tag * n_velocity_bins + &
+            v_to_int
     end do
     !$omp end parallel do
 
@@ -166,8 +187,9 @@ contains
     call set_particle_tags(tree, pc)
 
     t0 = omp_get_wtime()
-    call pc%sort_in_place(particle_sort_function)
+    call pc%sort_in_place_by_id_tag()
     t1 = omp_get_wtime()
+    print *, pc%n_part, (t1 - t0)/pc%n_part
 
     n_threads = af_get_max_threads()
     allocate(ix_thread(0:n_threads))
@@ -306,79 +328,6 @@ contains
     ! print *, "after: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
          ! pc%get_mean_energy() / UC_elec_volt
   end subroutine adapt_weights
-
-  ! !> Adjust the weights of the particles
-  ! subroutine adapt_weights_old(tree, pc, t_sort, t_rest)
-  !   use omp_lib
-  !   type(af_t), intent(in)    :: tree
-  !   type(PC_t), intent(inout) :: pc
-  !   real(dp), intent(out)     :: t_sort, t_rest
-  !   real(dp)                  :: t0, t1, t2
-  !   integer                   :: id, n, n_part_id
-  !   integer, allocatable      :: id_count(:), id_ipart(:)
-
-  !   t0 = omp_get_wtime()
-  !   call pc%sort_in_place(particle_sort_function)
-  !   t1 = omp_get_wtime()
-
-  !   allocate(id_ipart(tree%highest_id+1))
-  !   allocate(id_count(tree%highest_id))
-
-  !   ! Count how many particles there are per box id
-  !   id_count(:) = 0
-  !   do n = 1, pc%n_part
-  !      id           = pc%particles(n)%id
-  !      id_count(id) = id_count(id) + 1
-  !   end do
-
-  !   ! Now id_ipart(id) should be the index of the first particle in box id (even
-  !   ! when none are present), and the number of particles in the box is
-  !   ! id_ipart(id+1) - id_ipart(id)
-  !   id_ipart(1) = 1
-  !   do id = 2, tree%highest_id+1
-  !      id_ipart(id) = id_ipart(id-1) + id_count(id-1)
-  !   end do
-
-  !   ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
-  !   do id = 1, tree%highest_id
-  !      n_part_id = id_ipart(id+1) - id_ipart(id)
-  !      if (n_part_id > 0) then
-  !         call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
-  !              [.true., .true., .false.], 1e-12_dp, &
-  !              .true., get_desired_weight, 1.0e10_dp, &
-  !              PC_merge_part_rxv, PC_split_part)
-  !      end if
-  !   end do
-
-  !   call pc%clean_up()
-  !   t2 = omp_get_wtime()
-
-  !   t_sort = t1 - t0
-  !   t_rest = t2 - t1
-  !   ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
-  ! end subroutine adapt_weights_old
-
-  !> Used to sort particles, first by id and then by tag
-  logical function particle_sort_function(a, b) result(less_than)
-    integer, intent(in) :: a, b
-
-    associate (pa => pc%particles(a), pb => pc%particles(b))
-      ! First sort by id
-      if (pa%id /= pb%id) then
-         less_than = pa%id < pb%id
-         return
-      end if
-
-      ! Then sort by cell tag
-      if (pa%tag /= pb%tag) then
-         less_than = pa%tag < pb%tag
-         return
-      end if
-
-      ! Then sort by energy
-      less_than = sum(pa%v**2) < sum(pb%v**2)
-    end associate
-  end function particle_sort_function
 
   subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
