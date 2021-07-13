@@ -305,11 +305,17 @@ program apic
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width)
         end if
+        t1 = omp_get_wtime()
+        wtime_amr = wtime_amr + (t1 - t0)
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
            ! Compute the field on the new mesh
            call particles_to_density_and_events(tree, pc, .false.)
+           t0 = omp_get_wtime()
+           wtime_todensity = wtime_todensity + (t0 - t1)
            call field_compute(tree, mg, .true.)
+           t1 = omp_get_wtime()
+           wtime_field = wtime_field + (t1 - t0)
            call adapt_weights(tree, pc, t_sort, t_rest)
 
            n_prev_merge     = pc%get_num_sim_part()
@@ -317,8 +323,6 @@ program apic
            wtime_sort       = wtime_sort + t_sort
            wtime_mergesplit = wtime_mergesplit + t_rest
         end if
-        t1 = omp_get_wtime()
-        wtime_amr = wtime_amr + (t1 - t0)
      end if
   end do
 
