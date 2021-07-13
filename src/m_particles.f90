@@ -189,7 +189,6 @@ contains
     t0 = omp_get_wtime()
     call pc%sort_in_place_by_id_tag()
     t1 = omp_get_wtime()
-    print *, pc%n_part, (t1 - t0)/pc%n_part
 
     n_threads = af_get_max_threads()
     allocate(ix_thread(0:n_threads))
