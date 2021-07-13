@@ -126,11 +126,12 @@ contains
 
   !> Set particle tags to cell they are in. Assumes that the 'id' of each
   !> particle is correctly set, and that there are no 'dead' particles
-  subroutine set_particle_tags(tree, pc)
+  subroutine set_particle_tags(tree, pc, n_velocity_bins)
     type(af_t), intent(in)    :: tree
     type(PC_t), intent(inout) :: pc
+    integer, intent(out)      :: n_velocity_bins
     integer                   :: n, nc, ix(NDIM), mapping(NDIM)
-    integer                   :: max_ix_tag, n_velocity_bins, v_to_int
+    integer                   :: max_ix_tag, v_to_int
     real(dp)                  :: inv_max_vel
 
     nc = tree%n_cell
@@ -177,6 +178,7 @@ contains
     integer, allocatable      :: ix_thread(:)
     integer                   :: cell_tag, cell_i0, cell_i1
     integer                   :: i, j, i_buffer, n_part_prev
+    integer                   :: n_velocity_bins
     real(dp)                  :: fac, v_new, w_min, w_max, desired_weight
     integer, parameter        :: buffer_size = 1024
     type(PC_part_t)           :: pbuffer(buffer_size)
@@ -184,11 +186,19 @@ contains
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
          ! pc%get_mean_energy() / UC_elec_volt
 
-    call set_particle_tags(tree, pc)
+    ! Set tags that contain information about the cell index and velocity
+    call set_particle_tags(tree, pc, n_velocity_bins)
 
     t0 = omp_get_wtime()
     call pc%sort_in_place_by_id_tag()
     t1 = omp_get_wtime()
+
+    ! Convert back tags to they correspond only to the cell index
+    !$omp parallel do
+    do n = 1, pc%n_part
+       pc%particles(n)%tag = pc%particles(n)%tag / n_velocity_bins
+    end do
+    !$omp end parallel do
 
     n_threads = af_get_max_threads()
     allocate(ix_thread(0:n_threads))
