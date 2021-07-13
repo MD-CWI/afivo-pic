@@ -125,13 +125,18 @@ contains
   end subroutine init_particle
 
   !> Adjust the weights of the particles
-  subroutine adapt_weights(tree, pc)
+  subroutine adapt_weights(tree, pc, t_sort, t_rest)
+    use omp_lib
     type(af_t), intent(in)    :: tree
     type(PC_t), intent(inout) :: pc
+    real(dp), intent(out)     :: t_sort, t_rest
+    real(dp)                  :: t0, t1, t2
     integer                   :: id, n, n_part_id
     integer, allocatable      :: id_count(:), id_ipart(:)
 
+    t0 = omp_get_wtime()
     call pc%sort_in_place(particle_sort_function)
+    t1 = omp_get_wtime()
 
     allocate(id_ipart(tree%highest_id+1))
     allocate(id_count(tree%highest_id))
@@ -163,6 +168,10 @@ contains
     end do
 
     call pc%clean_up()
+    t2 = omp_get_wtime()
+
+    t_sort = t1 - t0
+    t_rest = t2 - t1
     ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
   end subroutine adapt_weights
 

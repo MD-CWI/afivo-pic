@@ -35,11 +35,12 @@ program apic
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
 
-  real(dp) :: t0, t1
+  real(dp) :: t0, t1, t_sort, t_rest
   real(dp) :: wtime_start
   real(dp) :: wtime_run = 0.0_dp
   real(dp) :: wtime_advance = 0.0_dp
   real(dp) :: wtime_mergesplit = 0.0_dp
+  real(dp) :: wtime_sort = 0.0_dp
   real(dp) :: wtime_todensity = 0.0_dp
   real(dp) :: wtime_field = 0.0_dp
   real(dp) :: wtime_io = 0.0_dp
@@ -234,11 +235,12 @@ program apic
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase .or. &
           it - it_last_merge >= iterations_between_merge_split) then
-        call adapt_weights(tree, pc)
-        n_prev_merge = pc%get_num_sim_part()
-        it_last_merge = it
-        t1 = omp_get_wtime()
-        wtime_mergesplit = wtime_mergesplit + (t1 - t0)
+        call adapt_weights(tree, pc, t_sort, t_rest)
+
+        n_prev_merge     = pc%get_num_sim_part()
+        it_last_merge    = it
+        wtime_sort       = wtime_sort + t_sort
+        wtime_mergesplit = wtime_mergesplit + t_rest
      end if
 
      ! Compute field with new density
@@ -308,9 +310,12 @@ program apic
            ! Compute the field on the new mesh
            call particles_to_density_and_events(tree, pc, .false.)
            call field_compute(tree, mg, .true.)
-           call adapt_weights(tree, pc)
-           n_prev_merge = pc%get_num_sim_part()
-           it_last_merge = it
+           call adapt_weights(tree, pc, t_sort, t_rest)
+
+           n_prev_merge     = pc%get_num_sim_part()
+           it_last_merge    = it
+           wtime_sort       = wtime_sort + t_sort
+           wtime_mergesplit = wtime_mergesplit + t_rest
         end if
         t1 = omp_get_wtime()
         wtime_amr = wtime_amr + (t1 - t0)
@@ -386,11 +391,11 @@ contains
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
 
     wtime_run = omp_get_wtime() - wtime_start
-    write(*, "(7A10)") "advance", "to_grid", "weights", &
+    write(*, "(8A10)") "advance", "to_grid", "weights", "sort", &
          "field", "accel", "amr", "io"
-    write(*, "(7F10.2)") 1e2 * [wtime_advance, wtime_todensity, &
-         wtime_mergesplit, wtime_field, wtime_accel, wtime_amr, &
-         wtime_io] / wtime_run
+    write(*, "(8F10.2)") 1e2 * [wtime_advance, wtime_todensity, &
+         wtime_mergesplit, wtime_sort, wtime_field, wtime_accel, &
+         wtime_amr, wtime_io] / wtime_run
   end subroutine print_info
 
   subroutine set_output_variables()
