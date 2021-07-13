@@ -124,6 +124,27 @@ contains
 
   end subroutine init_particle
 
+  !> Set particle tags to cell they are in. Assumes that the 'id' of each
+  !> particle is correctly set, and that there are no 'dead' particles
+  subroutine set_particle_tags(tree, pc)
+    type(af_t), intent(in)    :: tree
+    type(PC_t), intent(inout) :: pc
+    integer                   :: n, ix(NDIM), mapping(NDIM)
+
+    do n = 1, NDIM
+       mapping(n) = tree%n_cell**(n-1)
+    end do
+
+    !$omp parallel do private(ix)
+    do n = 1, pc%n_part
+       ix = af_cc_ix(tree%boxes(pc%particles(n)%id), &
+            get_coordinates(pc%particles(n)))
+       pc%particles(n)%tag = sum((ix-1) * mapping) + 1
+    end do
+    !$omp end parallel do
+
+  end subroutine set_particle_tags
+
   !> Adjust the weights of the particles
   subroutine adapt_weights(tree, pc, t_sort, t_rest)
     use omp_lib
@@ -131,61 +152,232 @@ contains
     type(PC_t), intent(inout) :: pc
     real(dp), intent(out)     :: t_sort, t_rest
     real(dp)                  :: t0, t1, t2
-    integer                   :: id, n, n_part_id
-    integer, allocatable      :: id_count(:), id_ipart(:)
+    integer                   :: n, n_threads, thread_id
+    integer, allocatable      :: ix_thread(:)
+    integer                   :: cell_tag, cell_i0, cell_i1
+    integer                   :: i, j, i_buffer, n_part_prev
+    real(dp)                  :: fac, v_new, w_min, w_max, desired_weight
+    integer, parameter        :: buffer_size = 1024
+    type(PC_part_t)           :: pbuffer(buffer_size)
+
+    ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
+         ! pc%get_mean_energy() / UC_elec_volt
+
+    call set_particle_tags(tree, pc)
 
     t0 = omp_get_wtime()
     call pc%sort_in_place(particle_sort_function)
     t1 = omp_get_wtime()
 
-    allocate(id_ipart(tree%highest_id+1))
-    allocate(id_count(tree%highest_id))
+    n_threads = af_get_max_threads()
+    allocate(ix_thread(0:n_threads))
 
-    ! Count how many particles there are per box id
-    id_count(:) = 0
-    do n = 1, pc%n_part
-       id           = pc%particles(n)%id
-       id_count(id) = id_count(id) + 1
+    ! Determine which threads work on which particles
+    ix_thread(0) = 1
+    ix_thread(n_threads) = pc%n_part + 1
+    do n = 1, n_threads-1
+       ix_thread(n) = nint(pc%n_part * real(n, dp)/n_threads)
     end do
 
-    ! Now id_ipart(id) should be the index of the first particle in box id (even
-    ! when none are present), and the number of particles in the box is
-    ! id_ipart(id+1) - id_ipart(id)
-    id_ipart(1) = 1
-    do id = 2, tree%highest_id+1
-       id_ipart(id) = id_ipart(id-1) + id_count(id-1)
+    ! Correct so that the boundaries between threads occur at tag boundaries
+    do n = 1, n_threads-1
+       do while (pc%particles(ix_thread(n))%tag == &
+            pc%particles(ix_thread(n)-1)%tag .and. &
+            ix_thread(n) > ix_thread(n-1))
+          ix_thread(n) = ix_thread(n) - 1
+       end do
     end do
 
-    ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
-    do id = 1, tree%highest_id
-       n_part_id = id_ipart(id+1) - id_ipart(id)
-       if (n_part_id > 0) then
-          call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
-               [.true., .true., .false.], 1e-12_dp, &
-               .true., get_desired_weight, 1.0e10_dp, &
-               PC_merge_part_rxv, PC_split_part)
+    !$omp parallel private(thread_id, cell_tag, cell_i0, cell_i1, &
+    !$omp i, j, i_buffer, fac, v_new, w_min, w_max, desired_weight, &
+    !$omp pbuffer)
+    i_buffer = 0
+    thread_id = omp_get_thread_num()
+
+    cell_i0 = ix_thread(thread_id)
+    do while (cell_i0 < ix_thread(thread_id+1))
+       ! Find indices of particles with current tag
+       cell_tag = pc%particles(cell_i0)%tag
+       do cell_i1 = cell_i0+1, ix_thread(thread_id+1) - 1
+          if (pc%particles(cell_i1)%tag /= cell_tag) exit
+       end do
+       ! Went one index too far, so subtract one
+       cell_i1 = cell_i1 - 1
+
+       desired_weight = get_desired_weight(pc%particles(cell_i0))
+       w_min = desired_weight / 1.5_dp
+       w_max = desired_weight * 1.5_dp
+
+       ! Merge particles
+       i = cell_i0
+       do while (i < cell_i1)
+          if (pc%particles(i)%w > 0 .and. pc%particles(i)%w < w_min) then
+             ! Look for candidate to merge with
+             do j = i + 1, cell_i1
+                if (pc%particles(j)%w > 0 .and. pc%particles(j)%w < w_min) exit
+             end do
+
+             if (j == cell_i1 + 1) exit ! No candidate found
+
+             ! Merge particles
+             associate (pa => pc%particles(i), pb => pc%particles(j))
+               fac = 1.0_dp / (pa%w + pb%w)
+               pa%x = (pa%w * pa%x + pb%w * pb%x) * fac
+               pa%a = (pa%w * pa%a + pb%w * pb%a) * fac
+
+               ! Determine new velocity
+               v_new = sqrt((pa%w * sum(pa%v**2) + pb%w * sum(pb%v**2)) * fac)
+               pa%v = (pa%w * pa%v + pb%w * pb%v) * fac
+               pa%v = v_new * pa%v / max(norm2(pa%v), epsilon(1.0_dp))
+
+               pa%w = pa%w + pb%w
+               ! Don't use linked list for better parallel performance
+               pb%w = PC_dead_weight
+             end associate
+
+             ! Jump to next possible particle that can be merged
+             i = j + 1
+          else
+             ! Proceed with next particle
+             i = i + 1
+          end if
+       end do
+
+       ! Split particles
+       do i = cell_i0, cell_i1
+          if (pc%particles(i)%w > 0 .and. pc%particles(i)%w > w_max) then
+             pc%particles(i)%w = 0.5_dp * pc%particles(i)%w
+
+             ! Empty buffer if necessary
+             if (i_buffer == buffer_size) then
+                !$omp critical
+                j = pc%n_part
+                pc%n_part = pc%n_part + buffer_size
+                !$omp end critical
+                pc%particles(j+1:j+buffer_size) = pbuffer
+                i_buffer = 0
+             end if
+
+             i_buffer = i_buffer + 1
+             pbuffer(i_buffer) = pc%particles(i)
+          end if
+       end do
+
+       ! Go to next cell
+       cell_i0 = cell_i1 + 1
+    end do
+
+    ! Empty buffer at end
+    if (i_buffer > 0) then
+       !$omp critical
+       j = pc%n_part
+       pc%n_part = pc%n_part + i_buffer
+       !$omp end critical
+       pc%particles(j+1:j+i_buffer) = pbuffer(1:i_buffer)
+       i_buffer = 0
+    end if
+    !$omp end parallel
+
+    ! Clean up dead particles at the end
+    i = 1
+    do while (i <= pc%n_part)
+       if (pc%particles(i)%w <= PC_dead_weight) then
+          n_part_prev = pc%n_part
+          ! This is overridden if a replacement is found
+          pc%n_part = min(pc%n_part, i-1)
+
+          ! Find the last "alive" particle in the list
+          do j = n_part_prev, i+1, -1
+             if (pc%particles(j)%w > PC_dead_weight) then
+                pc%particles(i) = pc%particles(j)
+                pc%n_part       = j-1
+                exit
+             end if
+          end do
        end if
+       i = i + 1
     end do
 
-    call pc%clean_up()
     t2 = omp_get_wtime()
 
     t_sort = t1 - t0
     t_rest = t2 - t1
-    ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
+
+    ! print *, "after: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
+         ! pc%get_mean_energy() / UC_elec_volt
   end subroutine adapt_weights
+
+  ! !> Adjust the weights of the particles
+  ! subroutine adapt_weights_old(tree, pc, t_sort, t_rest)
+  !   use omp_lib
+  !   type(af_t), intent(in)    :: tree
+  !   type(PC_t), intent(inout) :: pc
+  !   real(dp), intent(out)     :: t_sort, t_rest
+  !   real(dp)                  :: t0, t1, t2
+  !   integer                   :: id, n, n_part_id
+  !   integer, allocatable      :: id_count(:), id_ipart(:)
+
+  !   t0 = omp_get_wtime()
+  !   call pc%sort_in_place(particle_sort_function)
+  !   t1 = omp_get_wtime()
+
+  !   allocate(id_ipart(tree%highest_id+1))
+  !   allocate(id_count(tree%highest_id))
+
+  !   ! Count how many particles there are per box id
+  !   id_count(:) = 0
+  !   do n = 1, pc%n_part
+  !      id           = pc%particles(n)%id
+  !      id_count(id) = id_count(id) + 1
+  !   end do
+
+  !   ! Now id_ipart(id) should be the index of the first particle in box id (even
+  !   ! when none are present), and the number of particles in the box is
+  !   ! id_ipart(id+1) - id_ipart(id)
+  !   id_ipart(1) = 1
+  !   do id = 2, tree%highest_id+1
+  !      id_ipart(id) = id_ipart(id-1) + id_count(id-1)
+  !   end do
+
+  !   ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part()
+  !   do id = 1, tree%highest_id
+  !      n_part_id = id_ipart(id+1) - id_ipart(id)
+  !      if (n_part_id > 0) then
+  !         call pc%merge_and_split_range(id_ipart(id), id_ipart(id+1)-1, &
+  !              [.true., .true., .false.], 1e-12_dp, &
+  !              .true., get_desired_weight, 1.0e10_dp, &
+  !              PC_merge_part_rxv, PC_split_part)
+  !      end if
+  !   end do
+
+  !   call pc%clean_up()
+  !   t2 = omp_get_wtime()
+
+  !   t_sort = t1 - t0
+  !   t_rest = t2 - t1
+  !   ! print *, "after:  ", pc%get_num_sim_part(), pc%get_num_real_part()
+  ! end subroutine adapt_weights_old
 
   !> Used to sort particles, first by id and then by tag
   logical function particle_sort_function(a, b) result(less_than)
     integer, intent(in) :: a, b
 
-    if (pc%particles(a)%id == pc%particles(b)%id) then
-       ! Sort by x-coordinate
-       less_than = pc%particles(a)%x(1) < pc%particles(b)%x(1)
-    else
-       ! Sort by id
-       less_than = pc%particles(a)%id < pc%particles(b)%id
-    end if
+    associate (pa => pc%particles(a), pb => pc%particles(b))
+      ! First sort by id
+      if (pa%id /= pb%id) then
+         less_than = pa%id < pb%id
+         return
+      end if
+
+      ! Then sort by cell tag
+      if (pa%tag /= pb%tag) then
+         less_than = pa%tag < pb%tag
+         return
+      end if
+
+      ! Then sort by energy
+      less_than = sum(pa%v**2) < sum(pb%v**2)
+    end associate
   end function particle_sort_function
 
   subroutine particles_to_density_and_events(tree, pc, init_cond)
