@@ -183,9 +183,10 @@ contains
     integer, allocatable      :: ix_thread(:)
     integer                   :: cell_tag, cell_i0, cell_i1
     integer                   :: i, j, i_buffer, n_part_prev, N_vb
-    real(dp)                  :: fac, v_new, w_min, w_max, desired_weight
+    real(dp)                  :: v_new, w_min, w_max, desired_weight
     integer, parameter        :: buffer_size = 1024
     type(PC_part_t)           :: pbuffer(buffer_size)
+    type(prng_t)              :: prng
 
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
          ! pc%get_mean_energy() / UC_elec_volt
@@ -216,8 +217,10 @@ contains
        end do
     end do
 
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
     !$omp parallel private(thread_id, cell_tag, cell_i0, cell_i1, &
-    !$omp i, j, i_buffer, fac, v_new, w_min, w_max, desired_weight, &
+    !$omp i, j, i_buffer, v_new, w_min, w_max, desired_weight, &
     !$omp pbuffer)
     i_buffer = 0
     thread_id = omp_get_thread_num()
@@ -249,28 +252,15 @@ contains
 
              ! Merge particles
              associate (pa => pc%particles(i), pb => pc%particles(j))
-               fac = 1.0_dp / (pa%w + pb%w)
-               if (GL_cylindrical) then
-                  ! r-coordinate
-                  pa%x(1) = (pa%w * norm2(pa%x([1,3])) + &
-                       pb%w * norm2(pb%x([1,3]))) * fac
-                  ! z-coordinate
-                  pa%x(2) = (pa%w * pa%x(2) + pb%w * pb%x(2)) * fac
-                  pa%x(3) = 0.0_dp
+               if (prng%rngs(thread_id+1)%unif_01() > pa%w/(pa%w + pb%w)) then
+                  ! Keep particle b
+                  pb%w = pa%w + pb%w
+                  pa%w = PC_dead_weight
                else
-                  pa%x = (pa%w * pa%x + pb%w * pb%x) * fac
+                  ! Keep particle a
+                  pa%w = pa%w + pb%w
+                  pb%w = PC_dead_weight
                end if
-
-               pa%a = (pa%w * pa%a + pb%w * pb%a) * fac
-
-               ! Determine new velocity
-               v_new = sqrt((pa%w * sum(pa%v**2) + pb%w * sum(pb%v**2)) * fac)
-               pa%v = (pa%w * pa%v + pb%w * pb%v) * fac
-               pa%v = v_new * pa%v / max(norm2(pa%v), epsilon(1.0_dp))
-
-               pa%w = pa%w + pb%w
-               ! Don't use linked list for better parallel performance
-               pb%w = PC_dead_weight
              end associate
 
              ! Jump to next possible particle that can be merged
@@ -336,8 +326,9 @@ contains
        i = i + 1
     end do
 
-    t2 = omp_get_wtime()
+    call prng%update_seed(GL_rng)
 
+    t2 = omp_get_wtime()
     t_sort = t1 - t0
     t_rest = t2 - t1
 
