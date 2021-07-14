@@ -102,8 +102,13 @@ contains
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
-    pc%particle_mover => PC_verlet_advance
-    pc%after_mover => PC_verlet_correct_accel
+    if (GL_cylindrical) then
+       pc%particle_mover => PC_verlet_cyl_advance
+       pc%after_mover => PC_verlet_cyl_correct_accel
+    else
+       pc%particle_mover => PC_verlet_advance
+       pc%after_mover => PC_verlet_correct_accel
+    end if
 
     ! How many bytes are required per particle (accounting for overhead, for
     ! example when they are mapped to a grid)
@@ -245,7 +250,17 @@ contains
              ! Merge particles
              associate (pa => pc%particles(i), pb => pc%particles(j))
                fac = 1.0_dp / (pa%w + pb%w)
-               pa%x = (pa%w * pa%x + pb%w * pb%x) * fac
+               if (GL_cylindrical) then
+                  ! r-coordinate
+                  pa%x(1) = (pa%w * norm2(pa%x([1,3])) + &
+                       pb%w * norm2(pb%x([1,3]))) * fac
+                  ! z-coordinate
+                  pa%x(2) = (pa%w * pa%x(2) + pb%w * pb%x(2)) * fac
+                  pa%x(3) = 0.0_dp
+               else
+                  pa%x = (pa%w * pa%x + pb%w * pb%x) * fac
+               end if
+
                pa%a = (pa%w * pa%a + pb%w * pb%a) * fac
 
                ! Determine new velocity
@@ -476,7 +491,6 @@ contains
     use m_units_constants
     type(PC_part_t), intent(inout) :: my_part
     real(dp)                       :: accel(3), coord(NDIM)
-    real(dp), parameter            :: min_radius = 1e-50_dp
     logical                        :: success
 
     ! Set acceleration for extra dimensions to zero
@@ -486,12 +500,6 @@ contains
     ! Interpolation of face-centered fields
     accel(1:NDIM) = af_interp1_fc(tree, coord, ifc_E, &
          success, id_guess=my_part%id) * UC_elec_q_over_m
-
-    if (GL_cylindrical) then
-       ! Convert back to xyz coordinates
-       accel([1, 3]) = accel(1) * my_part%x([1, 3]) / max(coord(1), min_radius)
-    end if
-
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)
