@@ -177,8 +177,7 @@ contains
     integer                   :: n, n_threads, thread_id
     integer, allocatable      :: ix_thread(:)
     integer                   :: cell_tag, cell_i0, cell_i1
-    integer                   :: i, j, i_buffer, n_part_prev
-    integer                   :: n_velocity_bins
+    integer                   :: i, j, i_buffer, n_part_prev, N_vb
     real(dp)                  :: fac, v_new, w_min, w_max, desired_weight
     integer, parameter        :: buffer_size = 1024
     type(PC_part_t)           :: pbuffer(buffer_size)
@@ -187,18 +186,11 @@ contains
          ! pc%get_mean_energy() / UC_elec_volt
 
     ! Set tags that contain information about the cell index and velocity
-    call set_particle_tags(tree, pc, n_velocity_bins)
+    call set_particle_tags(tree, pc, N_vb)
 
     t0 = omp_get_wtime()
     call pc%sort_in_place_by_id_tag()
     t1 = omp_get_wtime()
-
-    ! Convert back tags to they correspond only to the cell index
-    !$omp parallel do
-    do n = 1, pc%n_part
-       pc%particles(n)%tag = pc%particles(n)%tag / n_velocity_bins
-    end do
-    !$omp end parallel do
 
     n_threads = af_get_max_threads()
     allocate(ix_thread(0:n_threads))
@@ -212,8 +204,8 @@ contains
 
     ! Correct so that the boundaries between threads occur at tag boundaries
     do n = 1, n_threads-1
-       do while (pc%particles(ix_thread(n))%tag == &
-            pc%particles(ix_thread(n)-1)%tag .and. &
+       do while (pc%particles(ix_thread(n))%tag/N_vb == &
+            pc%particles(ix_thread(n)-1)%tag/N_vb .and. &
             ix_thread(n) > ix_thread(n-1))
           ix_thread(n) = ix_thread(n) - 1
        end do
@@ -228,9 +220,9 @@ contains
     cell_i0 = ix_thread(thread_id)
     do while (cell_i0 < ix_thread(thread_id+1))
        ! Find indices of particles with current tag
-       cell_tag = pc%particles(cell_i0)%tag
+       cell_tag = pc%particles(cell_i0)%tag/N_vb
        do cell_i1 = cell_i0+1, ix_thread(thread_id+1) - 1
-          if (pc%particles(cell_i1)%tag /= cell_tag) exit
+          if (pc%particles(cell_i1)%tag/N_vb /= cell_tag) exit
        end do
        ! Went one index too far, so subtract one
        cell_i1 = cell_i1 - 1
