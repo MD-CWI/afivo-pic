@@ -102,8 +102,13 @@ contains
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
-    pc%particle_mover => PC_verlet_advance
-    pc%after_mover => PC_verlet_correct_accel
+    if (GL_cylindrical) then
+       pc%particle_mover => PC_verlet_cyl_advance
+       pc%after_mover => PC_verlet_cyl_correct_accel
+    else
+       pc%particle_mover => PC_verlet_advance
+       pc%after_mover => PC_verlet_correct_accel
+    end if
 
     ! How many bytes are required per particle (accounting for overhead, for
     ! example when they are mapped to a grid)
@@ -177,28 +182,21 @@ contains
     integer                   :: n, n_threads, thread_id
     integer, allocatable      :: ix_thread(:)
     integer                   :: cell_tag, cell_i0, cell_i1
-    integer                   :: i, j, i_buffer, n_part_prev
-    integer                   :: n_velocity_bins
-    real(dp)                  :: fac, v_new, w_min, w_max, desired_weight
+    integer                   :: i, j, i_buffer, n_part_prev, N_vb
+    real(dp)                  :: v_new, w_min, w_max, desired_weight
     integer, parameter        :: buffer_size = 1024
     type(PC_part_t)           :: pbuffer(buffer_size)
+    type(prng_t)              :: prng
 
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
          ! pc%get_mean_energy() / UC_elec_volt
 
     ! Set tags that contain information about the cell index and velocity
-    call set_particle_tags(tree, pc, n_velocity_bins)
+    call set_particle_tags(tree, pc, N_vb)
 
     t0 = omp_get_wtime()
     call pc%sort_in_place_by_id_tag()
     t1 = omp_get_wtime()
-
-    ! Convert back tags to they correspond only to the cell index
-    !$omp parallel do
-    do n = 1, pc%n_part
-       pc%particles(n)%tag = pc%particles(n)%tag / n_velocity_bins
-    end do
-    !$omp end parallel do
 
     n_threads = af_get_max_threads()
     allocate(ix_thread(0:n_threads))
@@ -212,15 +210,17 @@ contains
 
     ! Correct so that the boundaries between threads occur at tag boundaries
     do n = 1, n_threads-1
-       do while (pc%particles(ix_thread(n))%tag == &
-            pc%particles(ix_thread(n)-1)%tag .and. &
+       do while (pc%particles(ix_thread(n))%tag/N_vb == &
+            pc%particles(ix_thread(n)-1)%tag/N_vb .and. &
             ix_thread(n) > ix_thread(n-1))
           ix_thread(n) = ix_thread(n) - 1
        end do
     end do
 
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
     !$omp parallel private(thread_id, cell_tag, cell_i0, cell_i1, &
-    !$omp i, j, i_buffer, fac, v_new, w_min, w_max, desired_weight, &
+    !$omp i, j, i_buffer, v_new, w_min, w_max, desired_weight, &
     !$omp pbuffer)
     i_buffer = 0
     thread_id = omp_get_thread_num()
@@ -228,9 +228,9 @@ contains
     cell_i0 = ix_thread(thread_id)
     do while (cell_i0 < ix_thread(thread_id+1))
        ! Find indices of particles with current tag
-       cell_tag = pc%particles(cell_i0)%tag
+       cell_tag = pc%particles(cell_i0)%tag/N_vb
        do cell_i1 = cell_i0+1, ix_thread(thread_id+1) - 1
-          if (pc%particles(cell_i1)%tag /= cell_tag) exit
+          if (pc%particles(cell_i1)%tag/N_vb /= cell_tag) exit
        end do
        ! Went one index too far, so subtract one
        cell_i1 = cell_i1 - 1
@@ -252,18 +252,15 @@ contains
 
              ! Merge particles
              associate (pa => pc%particles(i), pb => pc%particles(j))
-               fac = 1.0_dp / (pa%w + pb%w)
-               pa%x = (pa%w * pa%x + pb%w * pb%x) * fac
-               pa%a = (pa%w * pa%a + pb%w * pb%a) * fac
-
-               ! Determine new velocity
-               v_new = sqrt((pa%w * sum(pa%v**2) + pb%w * sum(pb%v**2)) * fac)
-               pa%v = (pa%w * pa%v + pb%w * pb%v) * fac
-               pa%v = v_new * pa%v / max(norm2(pa%v), epsilon(1.0_dp))
-
-               pa%w = pa%w + pb%w
-               ! Don't use linked list for better parallel performance
-               pb%w = PC_dead_weight
+               if (prng%rngs(thread_id+1)%unif_01() > pa%w/(pa%w + pb%w)) then
+                  ! Keep particle b
+                  pb%w = pa%w + pb%w
+                  pa%w = PC_dead_weight
+               else
+                  ! Keep particle a
+                  pa%w = pa%w + pb%w
+                  pb%w = PC_dead_weight
+               end if
              end associate
 
              ! Jump to next possible particle that can be merged
@@ -331,8 +328,9 @@ contains
        i = i + 1
     end do
 
-    t2 = omp_get_wtime()
+    call prng%update_seed(GL_rng)
 
+    t2 = omp_get_wtime()
     t_sort = t1 - t0
     t_rest = t2 - t1
 
@@ -486,7 +484,6 @@ contains
     use m_units_constants
     type(PC_part_t), intent(inout) :: my_part
     real(dp)                       :: accel(3), coord(NDIM)
-    real(dp), parameter            :: min_radius = 1e-50_dp
     logical                        :: success
 
     ! Set acceleration for extra dimensions to zero
@@ -496,12 +493,6 @@ contains
     ! Interpolation of face-centered fields
     accel(1:NDIM) = af_interp1_fc(tree, coord, ifc_E, &
          success, id_guess=my_part%id) * UC_elec_q_over_m
-
-    if (GL_cylindrical) then
-       ! Convert back to xyz coordinates
-       accel([1, 3]) = accel(1) * my_part%x([1, 3]) / max(coord(1), min_radius)
-    end if
-
   end function get_accel
 
   function get_desired_weight(my_part) result(weight)
