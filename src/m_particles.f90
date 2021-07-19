@@ -283,9 +283,10 @@ contains
              if (i_buffer == buffer_size) then
                 !$omp critical
                 j = pc%n_part
-                pc%n_part = pc%n_part + buffer_size
+                pc%n_part = pc%n_part + i_buffer
                 !$omp end critical
-                pc%particles(j+1:j+buffer_size) = pbuffer
+                call pc%check_space(j+i_buffer)
+                pc%particles(j+1:j+i_buffer) = pbuffer(1:i_buffer)
                 i_buffer = 0
              end if
 
@@ -304,6 +305,7 @@ contains
        j = pc%n_part
        pc%n_part = pc%n_part + i_buffer
        !$omp end critical
+       call pc%check_space(j+i_buffer)
        pc%particles(j+1:j+i_buffer) = pbuffer(1:i_buffer)
        i_buffer = 0
     end if
