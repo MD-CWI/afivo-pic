@@ -58,7 +58,7 @@ program apic
   call domain_init(cfg)
   call time_step_init(cfg)
   call GL_initialize(cfg, ndim)
-  call check_path_writable(trim(GL_output_dir))
+  call check_path_writable(trim(GL_output_dir), trim(GL_simulation_name))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
   call refine_init(cfg, ndim)
@@ -423,11 +423,12 @@ contains
 
   end subroutine set_output_variables
 
-  subroutine check_path_writable(pathname)
-    character(len=*), intent(in) :: pathname
+  subroutine check_path_writable(pathname, filename)
+    character(len=*), intent(in) :: pathname, filename
     integer                      :: my_unit, iostate
 
-    open(newunit=my_unit, file=trim(pathname)//"/DUMMY", iostat=iostate)
+    open(newunit=my_unit, file=trim(pathname)//"/"//trim(filename)// &
+         "_DUMMY", iostat=iostate)
     if (iostate /= 0) then
        print *, "Output directory: " // trim(pathname)
        error stop "Directory not writable (does it exist?)"
