@@ -101,7 +101,8 @@ contains
     integer                    :: IJK, n, nc, ix, n_particles
     real(dp)                   :: rr(NDIM), w
     real(dp)                   :: density, pos(NDIM, ceiling(particle_per_cell))
-    real(dp)                   :: volume, r0, r1, n_expected
+    real(dp)                   :: volume, r0, r1, tmp
+    integer                    :: n_expected, n_compensate
     type(PC_part_t)            :: new_part
 
     nc = box%n_cell
@@ -122,23 +123,29 @@ contains
                init_conds%seed_falloff(n))
        end do
 
-       ! Determine number of particles to generate
-       n_expected = min(density * volume / particle_min_weight, &
-            particle_per_cell)
+       ! Determine number of min_weight particles to generate
+       tmp = density * volume / particle_min_weight
 
        ! The most physical would be to sample particle counts from the Poisson
        ! distribution, but this is difficult to sample from for large N, and
        ! sometimes it is useful to have less noise in the initial conditions.
-       n_particles = floor(n_expected)
-       if (n_expected - n_particles > GL_rng%unif_01()) then
-          n_particles = n_particles + 1
+       n_expected = floor(tmp)
+       if (tmp - n_expected > GL_rng%unif_01()) then
+          n_expected = n_expected + 1
        end if
 
-       ! Determine weight. Note that this will not give exactly the required
-       ! density when linear weighting is used, since particles are also mapped
-       ! to nearby cells.
-       w = nint(max(particle_min_weight, &
-            density * volume / max(n_particles, 1)))
+       if (n_expected == 0) cycle
+
+       if (n_expected <= particle_per_cell) then
+          n_particles = n_expected
+          w = particle_min_weight
+          n_compensate = 0
+       else
+          n_particles = nint(particle_per_cell)
+          w = n_expected/n_particles * particle_min_weight
+          ! Add n_compensate particles with weight w + particle_min_weight
+          n_compensate = n_expected - (n_expected/n_particles) * n_particles
+       end if
 
        ! Sample particle positions within the cell
        if (GL_cylindrical) then
@@ -162,6 +169,10 @@ contains
        new_part%w = w
 
        do ix = 1, n_particles
+          if (ix > n_particles - n_compensate) then
+             new_part%w = w + particle_min_weight
+          end if
+
           new_part%x(1:NDIM) = pos(:, ix)
           if (outside_check(new_part) == 0) then
              call pc%add_part(new_part)
