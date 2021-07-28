@@ -184,6 +184,7 @@ contains
     integer                   :: cell_tag, cell_i0, cell_i1
     integer                   :: i, j, i_buffer, n_part_prev, N_vb
     real(dp)                  :: v_new, w_min, w_max, desired_weight
+    real(dp)                  :: w_new, remainder
     integer, parameter        :: buffer_size = 1024
     type(PC_part_t)           :: pbuffer(buffer_size)
     type(prng_t)              :: prng
@@ -221,7 +222,7 @@ contains
 
     !$omp parallel private(thread_id, cell_tag, cell_i0, cell_i1, &
     !$omp i, j, i_buffer, v_new, w_min, w_max, desired_weight, &
-    !$omp pbuffer)
+    !$omp pbuffer, w_new, remainder)
     i_buffer = 0
     thread_id = omp_get_thread_num()
 
@@ -274,7 +275,12 @@ contains
        ! Split particles
        do i = cell_i0, cell_i1
           if (pc%particles(i)%w > 0 .and. pc%particles(i)%w > w_max) then
-             pc%particles(i)%w = 0.5_dp * pc%particles(i)%w
+             ! Determine new weights that are multiples of particle_min_weight,
+             ! there is a correction below for odd multiples
+             w_new = floor(0.5_dp * pc%particles(i)%w/particle_min_weight) * &
+                  particle_min_weight
+             remainder = pc%particles(i)%w - 2 * w_new
+             pc%particles(i)%w = w_new
 
              ! Empty buffer if necessary
              if (i_buffer == buffer_size) then
@@ -289,6 +295,15 @@ contains
 
              i_buffer = i_buffer + 1
              pbuffer(i_buffer) = pc%particles(i)
+
+             ! Correct for original weight that could not evenly be divided in two
+             if (remainder > 0) then
+                if (prng%rngs(thread_id+1)%unif_01() > 0.5_dp) then
+                   pc%particles(i)%w = pc%particles(i)%w + remainder
+                else
+                   pbuffer(i_buffer)%w = pbuffer(i_buffer)%w + remainder
+                end if
+             end if
           end if
        end do
 
