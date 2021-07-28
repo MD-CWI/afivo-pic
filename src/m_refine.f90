@@ -174,7 +174,8 @@ contains
        id = box%neighbor_mat(DTIMES(0))
        if (diel%box_id_in_to_surface_ix(id) /= surface_none .or. &
             diel%box_id_out_to_surface_ix(id) /= surface_none) then
-          cell_flags = af_do_ref
+          ! Mark just the center cell to prevent refining neighbors
+          cell_flags(DTIMES(nc/2)) = af_do_ref
        end if
     end if
 
