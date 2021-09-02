@@ -297,7 +297,7 @@ subroutine Ar2_radiative_decay(tree, pc)
          pi_min_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(1) + frac_CH4 * cs_CH4)
          pi_max_inv_abs_len = GAS_number_dens * (frac_O2 * cs_O2(2) + frac_CH4 * cs_CH4)
 
-         pi_quench_effective = (frac_N2 / 40.0_dp + frac_O2 / 3.5_dp + frac_CH4 / 1.8_dp) ** (-1) * UC_torr_to_bar
+         pi_quench_effective = (frac_N2 / 91.0_dp + frac_O2 / 3.8_dp + frac_CH4 / 1.8_dp) ** (-1) * UC_torr_to_bar
          pi_quench_fac = pi_quench_effective / (GAS_pressure + pi_quench_effective)
        end if
 
