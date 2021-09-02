@@ -17,7 +17,7 @@ contains
     type(CFG_t), intent(inout) :: cfg
 
     user_initial_particles => init_particles
-    ! user_set_dielectric_eps => set_epsilon
+    user_set_dielectric_eps => set_epsilon
   end subroutine user_initialize
 
   subroutine init_particles(pctest)
@@ -52,7 +52,7 @@ contains
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
-          if (r(2)/domain_len(2) < 0.5_dp) then
+          if (r(1)/domain_len(1) < 0.125_dp) then
              box%cc(i, j, i_eps) = 100.0_dp
           else
              box%cc(i, j, i_eps) = 1.0_dp
