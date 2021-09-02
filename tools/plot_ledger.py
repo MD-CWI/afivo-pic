@@ -304,6 +304,7 @@ class Ledger:
             # print(index)
             # print(self.ledger[-1, index]/volume)
             print("cIx = " + str(index+1) + ":  " + str(self.ledger[-1, index]/volume))
+            # print(str(self.ledger[-1, index]/volume))
 
         # print("Total N2 ion")
         # print(self.ledger[-1, self.i_N2_ion])
@@ -333,9 +334,10 @@ class Ledger:
         # print(self.i_CH4_attach)
 
 # ==============================
-fuel = Ledger("/home/dennis/codes/afivo-pic/programs/combustion_3d/output/archive/maybe_sim_thijs/")
+fuel = Ledger("/home/dennis/codes/afivo-pic/programs/combustion_2d/output/")
+# fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/new_acc/")
 # fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/bigboy/fuel/")
-fuel.print_volume_weighted_species(volume=1)
+fuel.print_volume_weighted_species(volume=1)#2.04e-9)
 
 fuel.set_grouping_all_repo()
 fuel.plot_all_repo()

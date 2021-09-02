@@ -13,8 +13,8 @@ visit.Launch()
 visit.DeleteAllPlots()
 
 # Opening a virtual database representing all wave*.silo files.
-visit.OpenDatabase("/home/dennis/Documents/drafts/air_methane_streamers/results/bigboy/fuel/sim_*.silo database") # <- Path your results
-# visit.OpenDatabase("/home/dennis/codes/afivo-pic/programs/combustion_3d/output/archive/maybe_sim_thijs/sim_*.silo database") # <- Path your results
+# visit.OpenDatabase("/home/dennis/Documents/drafts/air_methane_streamers/results/bigboy/fuel/sim_*.silo database") # <- Path your results
+visit.OpenDatabase("/home/dennis/Documents/drafts/air_methane_streamers/results/new_acc_long/sim_*.silo database") # <- Path your results
 
 # Make plots
 visit.AddPlot("Pseudocolor", "power_deposition")
@@ -88,7 +88,7 @@ plt.ylabel('P_dep (J/s)')
 
 s[0]=0
 
-s_trapz = np.trapz(s, t)
+s_trapz = np.trapz(s[0:81], t[0:81])
 
 print("Total energy: ")
 print(np.sum(s) * (t[1]-t[0]))
