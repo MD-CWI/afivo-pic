@@ -166,6 +166,7 @@ contains
        end if
 
        new_part%a = 0
+       new_part%v = 0
        new_part%w = w
 
        do ix = 1, n_particles
