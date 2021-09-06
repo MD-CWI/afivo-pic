@@ -25,14 +25,13 @@ real(dp)              :: cs_O2(2), cs_CH4, frac_O2, frac_CH4, frac_N2
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
 real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
 
-!Default reaction rates for excited Ar and Ar2 pools
-real(dp)  :: k_Ar_decay_rad  = 0.0_dp
-real(dp)  :: k_Ar_quench     = 0.0_dp
-real(dp)  :: k_Ar2_prod_rate = 3.0e-46_dp
-real(dp)  :: k_Ar2_decay_rad = 6.0e7_dp
+!> Ignore photoionization below this coordinate
+real(dp)              :: pi_photon_rmin(NDIM) = -1e10_dp
+!> Ignore photoionization above this coordinate
+real(dp)              :: pi_photon_rmax(NDIM) = 1e10_dp
 
-integer, protected, public  :: i_Ar_pool = -1 !Index of cell-centered pool of excited argon species
-integer, protected, public  :: i_Ar2_pool = -1 !Index of cell-centered Argon excimer
+! the proportional factor for photoionization
+real(dp)              :: pi_eff = 0.075_dp
 
 procedure(photoi), pointer :: photoionization => null()
 procedure(photoe), pointer :: photoemission => null()
@@ -43,12 +42,10 @@ public  :: photoionization
 public  :: photoemission
 
 abstract interface
-  subroutine photoi(tree, pc, photo_pos, photo_w, n_photons)
+  subroutine photoi(tree, pc, n_photons)
     import
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
   end subroutine photoi
 
@@ -73,19 +70,21 @@ contains
          "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
         "Whether photoionization is used")
-        call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
+    call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
         "Whether photoionization is used")
+    call CFG_add_get(cfg, "photon%rmin", pi_photon_rmin, &
+         "Ignore photoionization below this coordinate")
+    call CFG_add_get(cfg, "photon%rmax", pi_photon_rmax, &
+        "Ignore photoionization above this coordinate")
+    call CFG_add_get(cfg, "photon%ion_eff", pi_eff, &
+        "the proportional factor for photoionization")
 
     ! Initialize parameters and pointers according to the selected model
     select case (model)
     case("Zheleznyak")
         call Zheleznyak_initialize(cfg)
-        photoionization => photoi_Zheleznyak_OMP
+        photoionization => photoi_Zheleznyak
         photoemission => photoe_Zheleznyak
-      case("Argon")
-        call Argon_initialize(cfg)
-        photoionization => null() ! No photoionization is considered
-        photoemission => photoe_Argon
       case default
         if (photoi_enabled .or. photoe_enabled) then
           error stop "Unrecognized photon model"
@@ -97,162 +96,7 @@ contains
 
   end subroutine photons_initialize
 
-! ===== Model photon interactions in argon
-
-  subroutine Argon_initialize(cfg)
-    use m_config
-    type(CFG_t), intent(inout) :: cfg
-
-    call CFG_add_get(cfg, "photon%k_Ar_decay_rad", k_Ar_decay_rad, &
-         "Rate of radiative decay of excited Ar")
-    call CFG_add_get(cfg, "photon%k_Ar_quench", k_Ar_quench, &
-         "Rate of quenching of excited Ar")
-    call CFG_add_get(cfg, "photon%k_Ar2_prod_rate", k_Ar2_prod_rate, &
-         "Rate of production of excited Argon2")
-    call CFG_add_get(cfg, "photon%k_Ar2_decay_rad", k_Ar2_decay_rad, &
-         "Rate of radiative decay of excited Ar2")
-
-    if (GL_use_dielectric .and. photoe_enabled) then
-      where(pc%colls(:)%type == CS_excite_t)
-        pc%coll_is_event(:) = .true.
-      end where
-
-      !Create empty argon pool and excimer
-      call af_add_cc_variable(tree, "Ar_pool", .true., ix=i_Ar_pool)
-      call af_set_cc_methods(tree, i_Ar_pool, af_bc_neumann_zero, &
-           prolong=af_prolong_limit)
-
-      call af_add_cc_variable(tree, "Ar2_pool", .true., ix=i_Ar2_pool)
-      call af_set_cc_methods(tree, i_Ar2_pool, af_bc_neumann_zero, &
-                prolong=af_prolong_limit)
-    end if
-
-  end subroutine Argon_initialize
-
-  subroutine photoe_Argon(tree, pc)
-    ! Perform photoemission due to pool of excited argon species
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-
-    real(dp), allocatable, save :: coords(:, :)
-    real(dp), allocatable, save :: weights(:)
-    integer, allocatable, save  :: id_guess(:)
-
-    integer       :: n, jj
-
-    if (.not. allocated(weights)) then
-       allocate(coords(NDIM, pc%n_events))
-       allocate(weights(pc%n_events))
-       allocate(id_guess(pc%n_events))
-    else if (size(weights) < pc%n_events) then
-       deallocate(coords)
-       deallocate(weights)
-       deallocate(id_guess)
-       allocate(coords(NDIM, pc%n_events))
-       allocate(weights(pc%n_events))
-       allocate(id_guess(pc%n_events))
-    end if
-
-    call Ar2_radiative_decay(tree, pc) ! Do photoemission events (updates the Ar2 pool)
-    call af_loop_box(tree, perform_argon_reactions, .true.)
-
-    ! Calculate production to the pool of excited Argon species
-    jj = 0
-    do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_excite_t) then
-         jj = jj + 1
-         coords(:, jj) = pc%event_list(n)%part%x(1:NDIM)
-         weights(jj) = pc%event_list(n)%part%w
-         id_guess(jj) = pc%event_list(n)%part%id
-         ! end if
-       end if
-     end do
-     call af_particles_to_grid(tree, i_Ar_pool, coords(:, 1:jj), &
-          weights(1:jj), jj, 0, id_guess(1:jj)) ! Use zeroth order interpolation for simplicity
-end subroutine photoe_Argon
-
-subroutine Ar2_radiative_decay(tree, pc)
-  ! Routine that performs Ar2_exc radiative decay for every cell in a box
-  ! This routine also performs photoemission
-
-  ! TODO Code from af_loop_box is copied (because of particle creation and non-local effects). Thats why this code is nasty
-  type(af_t), intent(inout)  :: tree
-  type(PC_t), intent(inout)  :: pc
-
-  integer    :: ii, jj, nn
-  integer    :: lvl, i, id
-  integer    :: n_uv
-  real(dp)   :: mean_ph
-  real(dp)   :: cell_size
-  real(dp)   :: x_start(3), x_cc(3), x_stop(3)
-  logical    :: on_surface
-
-  if (.not. tree%ready) stop "Ar2_radiative_decay: set_base has not been called"
-
-#if NDIM == 2
-  !!$omp parallel private(lvl, i, id, ii, jj, nn)
-  do lvl = 1, tree%highest_lvl
-    !!$omp do
-    do i = 1, size(tree%lvls(lvl)%leaves)
-      id = tree%lvls(lvl)%leaves(i)
-      cell_size = product(tree%boxes(id)%dr)
-      do ii = 1, tree%boxes(id)%n_cell
-        do jj = 1, tree%boxes(id)%n_cell
-          mean_ph = cell_size * GL_dt * k_Ar2_decay_rad &
-            * tree%boxes(id)%cc(ii, jj, i_Ar2_pool) !/ particle_min_weight
-          n_uv = GL_rng%poisson(mean_ph)
-
-          x_cc(1:NDIM) = af_r_cc(tree%boxes(id), [ii, jj])
-          do nn = 1, n_uv
-            x_start = x_cc
-            x_stop(1:NDIM) = x_start(1:NDIM) + GL_rng%circle(norm2(domain_len)) ! Always scatter out of the domain
-            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
-            if (on_surface) then
-              ! call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
-              call single_photoemission_event(tree, pc, 1.0_dp, x_start, x_stop)
-              ! print *, "photoemission event has occurred"
-            end if
-          end do
-        end do
-      end do
-      !!$omp end do
-    end do
-    !!$omp end do
-  end do
-  !!$omp end parallel
-#elif NDIM == 3
-    error stop
-#endif
-  end subroutine Ar2_radiative_decay
-
-  subroutine perform_argon_reactions(box)
-    use m_gas
-    ! Per cell, do explicit Euler to update the Ar-Ar2 pools due to reaction mechanism (excluding Ar* production and Ar2 radiative decay)
-    ! type(af_t), intent(inout) :: tree
-    type(box_t), intent(inout)  :: box
-    integer    :: ii, jj
-
-#if NDIM == 2
-    do ii = 1, box%n_cell
-      do jj = 1, box%n_cell
-        ! Production of Ar2
-        box%cc(ii, jj, i_Ar2_pool) = box%cc(ii, jj, i_Ar2_pool) + &
-          GL_dt * k_Ar2_prod_rate * GAS_number_dens**2 * box%cc(ii, jj, i_Ar_pool)
-        ! decay, quenching and Ar2-prod for Ar
-        box%cc(ii, jj, i_Ar_pool) = box%cc(ii, jj, i_Ar_pool) - GL_dt * &
-          (k_Ar_decay_rad + k_Ar_quench * GAS_number_dens + k_Ar2_prod_rate * GAS_number_dens**2) * box%cc(ii, jj, i_Ar_pool)
-        if (box%cc(ii, jj, i_Ar2_pool) < 0.0_dp .or. box%cc(ii, jj, i_Ar_pool) < 0.0_dp) then
-          error stop "Negative density for excited states of Argon or Argon2 found after performing chemical reactions."
-        end if
-      end do
-    end do
-#elif NDIM == 3
-      error stop
-#endif
-  end subroutine perform_argon_reactions
-
-  ! ==== Now the modules for Zheleznyak model
-
+  ! ==== Now the modules for Zheleznyak air model
   subroutine Zheleznyak_initialize(cfg)
     use m_gas
     use m_config
@@ -316,105 +160,22 @@ subroutine Ar2_radiative_decay(tree, pc)
   end subroutine Zheleznyak_initialize
 
   ! Perform photon generation and ionization according to the Zheleznyak model
-  subroutine photoi_Zheleznyak(tree, pc, photo_pos, photo_w, n_photons)
+  subroutine photoi_Zheleznyak(tree, pc, n_photons)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
-    type(PC_buf_t)                :: buffer
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
     integer, intent(out)          :: n_photons
     type(prng_t)                  :: prng
 
-    integer         :: i, n, m, n_uv, tid
-    real(dp)        :: x_start(3), x_stop(3)
-    real(dp)        :: en_frac
+    integer  :: n, m, n_uv, tid
+    integer  :: n_part_before
+    real(dp) :: x_start(3), x_stop(3)
 
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
-    i = 0
+    n_part_before = pc%n_part
 
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer, en_frac)
-    call init_buffer(buffer) !Initialize private copies of the buffer
-
-    tid = omp_get_thread_num() + 1
-    !$omp do
-    do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_ionize_t) then
-          ! The Zheleznyak model is calibrated for air, i.e. CH4-ionizations dont participate
-          if (pc%colls(pc%event_list(n)%cIx)%gas_name == CS_is_CH4) cycle
-          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
-
-          do m = 1, n_uv
-             en_frac = prng%rngs(tid)%unif_01()
-             if (frac_CH4 > epsilon(1.0_dp) .and. is_absorbed_by_CH4(en_frac)) cycle
-             x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start, en_frac, prng%rngs(tid))
-
-             if (is_in_gas(tree, x_stop)) then
-               call single_photoionization_event(tree, pc, buffer, i, photo_pos, photo_w, x_stop)
-
-               ! Make sure buffers are not getting too full
-               call handle_buffer(pc, buffer, PC_advance_buf_size/2)
-             end if
-          end do
-       end if
-    end do
-    !$omp end do
-
-    ! Ensure all buffers are empty at the end of the loop
-    call handle_buffer(pc, buffer, 0)
-    !$omp end parallel
-    n_photons = i
-    call prng%update_seed(GL_rng)
-  end subroutine photoi_Zheleznyak
-
-  ! Perform photon generation and ionization according to the Zheleznyak model
-  ! But optimized for use with multiple cores
-  subroutine photoi_Zheleznyak_OMP(tree, pc, photo_pos, photo_w, n_photons)
-    use omp_lib, only: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    type(PC_buf_t)                :: buffer
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
-    real(dp), allocatable, save   :: pw_array(:, :), ppos_array(:, :, :)
-    integer, allocatable, save    :: pindex(:)
-    integer, intent(out)          :: n_photons
-    type(prng_t)                  :: prng
-
-    integer         :: tid, max_threads, n_alloc, HEAD
-    integer         :: n, m, n_uv, ii
-    real(dp)        :: x_start(3), x_stop(3)
-    real(dp)        :: en_frac
-
-    call prng%init_parallel(omp_get_max_threads(), GL_rng)
-
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, buffer, en_frac)
-    call init_buffer(buffer) !Initialize private copies of the buffer
-
-    ! allocate the arrays for storing results of individual threads
-    !$omp single
-    max_threads = omp_get_num_threads()
-    n_alloc = int(max(pc%get_num_sim_part(), pc%n_events) / max_threads)
-    if (.not. allocated(pw_array)) then
-      allocate(pw_array(max_threads, n_alloc))
-      allocate(ppos_array(max_threads, NDIM, n_alloc))
-      allocate(pindex(max_threads))
-    else if (size(pw_array, dim=1)<max_threads .or. size(pw_array, dim=2)<n_alloc) then
-      deallocate(pw_array)
-      deallocate(ppos_array)
-      deallocate(pindex)
-      allocate(pw_array(max_threads, n_alloc))
-      allocate(ppos_array(max_threads, NDIM, n_alloc))
-      allocate(pindex(max_threads))
-    end if
-
-    pindex = 0
-    !$omp end single
-
-    !$omp barrier
-
+    !$omp parallel private(n, n_uv, x_start, x_stop, en_frac, m, tid)
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
@@ -428,32 +189,21 @@ subroutine Ar2_radiative_decay(tree, pc)
              if (frac_CH4 > epsilon(1.0_dp) .and. is_absorbed_by_CH4(en_frac)) cycle
              x_start = pc%event_list(n)%part%x
              x_stop  = get_x_stop(x_start, en_frac, prng%rngs(tid))
-             if (is_in_gas(tree, x_stop)) then
-               call single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
+             x_stop(1:NDIM) = get_coordinates_x(x_stop)
 
-               ! Make sure buffers are not getting too full
-               call handle_buffer(pc, buffer, PC_advance_buf_size/2)
+             if (is_in_gas(tree, x_stop) .and. .not. &
+                  ignore_photon(x_stop)) then
+               call single_photoionization_event(tree, pc, x_stop)
              end if
           end do
        end if
     end do
     !$omp end do
-
-    ! Ensure all buffers are empty at the end of the loop
-    call handle_buffer(pc, buffer, 0)
     !$omp end parallel
 
-    ! Now combine the results of individual threads
-    HEAD = 1
-    do ii = 1, max_threads
-      photo_w(HEAD:(HEAD+pindex(ii)-1)) = pw_array(ii, 1:pindex(ii))
-      photo_pos(:, HEAD:(HEAD+pindex(ii)-1)) = ppos_array(ii, :, 1:pindex(ii))
-      HEAD = HEAD + pindex(ii)
-    end do
-    n_photons = HEAD - 1
-
+    n_photons = pc%n_part - n_part_before
     call prng%update_seed(GL_rng)
-  end subroutine photoi_Zheleznyak_OMP
+  end subroutine photoi_Zheleznyak
 
   ! Perform photoemission based on the Zheleznyak model for air
   subroutine photoe_Zheleznyak(tree, pc)
@@ -530,7 +280,7 @@ subroutine Ar2_radiative_decay(tree, pc)
   real(dp) function get_photoi_eff(fld)
     use m_lookup_table
     real(dp), intent(in) :: fld
-    get_photoi_eff = 0.075_dp
+    get_photoi_eff = pi_eff
     ! call LT_lin_interp_list(pi_photo_eff_table1, &
          ! pi_photo_eff_table2, fld, get_photoi_eff)
   end function get_photoi_eff
@@ -586,7 +336,7 @@ subroutine Ar2_radiative_decay(tree, pc)
     integer, intent(in)         :: i_surf !< Surface variable
     integer                     :: ix_surf, ix_cell(NDIM-1)
 
-    call dielectric_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
+    call surface_get_surface_cell(tree, diel, my_part%x(1:NDIM), &
          ix_surf, ix_cell)
 
     ! Update the charge in the surface cell
@@ -601,27 +351,11 @@ subroutine Ar2_radiative_decay(tree, pc)
 #endif
   end subroutine surface_charge_to_particle
 
-  subroutine single_photoionization_event(tree, pc, buffer, i, photo_pos, photo_w, x_stop)
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    type(PC_buf_t), intent(inout) :: buffer
-    real(dp), intent(inout)       :: photo_pos(:, :)
-    real(dp), intent(inout)       :: photo_w(:)
-
-    type(PC_part_t)         :: new_part
-    integer, intent(inout)  :: i
-    integer                 :: i_cpy
-    real(dp)                :: x_stop(3)
-
-    !$omp critical
-    i = i + 1
-    i_cpy = i
-    !$omp end critical
-    if (i_cpy > size(photo_w)) error stop "Too many photons were generated"
-
-    ! Return coordinates and weights for ion production
-    photo_pos(:, i_cpy) = x_stop(1:NDIM)
-    photo_w(i_cpy)      = particle_min_weight
+  subroutine single_photoionization_event(tree, pc, x_stop)
+    type(af_t), intent(inout) :: tree !
+    type(PC_t), intent(inout) :: pc
+    real(dp), intent(in)      :: x_stop(3)
+    type(PC_part_t)           :: new_part
 
     ! Initialize new particle
     new_part%x = 0
@@ -631,40 +365,9 @@ subroutine Ar2_radiative_decay(tree, pc)
     new_part%w = particle_min_weight
     new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
 
-    ! Add the particle to the buffer
-    buffer%i_part = buffer%i_part + 1
-    buffer%part(buffer%i_part) = new_part
+    ! It is key that the photons are added at the end of the list
+    call pc%add_part(new_part)
   end subroutine single_photoionization_event
-
-  subroutine single_photoionization_event_OMP(tree, pc, buffer, ppos_array, pw_array, pindex, tid, x_stop)
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    type(PC_buf_t), intent(inout) :: buffer
-    real(dp), intent(inout)       :: ppos_array(:, :, :)
-    real(dp), intent(inout)       :: pw_array(:, :)
-
-
-    type(PC_part_t)         :: new_part
-    integer, intent(inout)  :: pindex(:)
-    integer, intent(in)     :: tid
-    real(dp)                :: x_stop(3)
-
-    pindex(tid) = pindex(tid) + 1
-    ppos_array(tid, :, pindex(tid)) = x_stop(1:NDIM)
-    pw_array(tid, pindex(tid)) =  particle_min_weight
-
-    ! Initialize new particle
-    new_part%x = 0
-    new_part%x(1:NDIM) = x_stop(1:NDIM)
-    new_part%v = 0
-    new_part%a = pc%accel_function(new_part)
-    new_part%w = particle_min_weight
-    new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
-
-    ! Add the particle to the buffer
-    buffer%i_part = buffer%i_part + 1
-    buffer%part(buffer%i_part) = new_part
-  end subroutine single_photoionization_event_OMP
 
   ! Check if the photon is absorbed in the gas
   logical function is_in_gas(tree, x_stop)
@@ -697,6 +400,12 @@ subroutine Ar2_radiative_decay(tree, pc)
     end if
 
   end function is_in_gas
+
+  ! Check if the photon is in the ignore area
+  logical function ignore_photon(x_stop)
+    real(dp), intent(in) :: x_stop(NDIM)
+    ignore_photon = any(x_stop < pi_photon_rmin) .or. any(x_stop > pi_photon_rmax)
+  end function ignore_photon
 
   ! Determine if an emitted photon is absorbed by the gas or dielectric surface
   ! Return coordinates of gas/diel points nearest to intersection

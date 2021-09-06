@@ -43,7 +43,7 @@ contains
     type(PC_part_t), intent(inout) :: my_part
     real(dp)                       :: x(NDIM)
 
-    x = my_part%x(1:NDIM)
+    x = get_coordinates(my_part)
     outside_check = 0
 
     if (any(x < 0.0_dp .or. x > domain_len)) then
@@ -72,8 +72,12 @@ contains
     real(dp)                       :: eps(1)
     logical                        :: success
 
-    eps = af_interp0(tree, my_part%x(1:NDIM), [i_eps], success, my_part%id)
-    if (.not. success) error stop "unexpected particle outside domain"
+    eps = af_interp0(tree, get_coordinates(my_part), &
+         [i_eps], success, my_part%id)
+    if (.not. success) then
+       print *, "coordinates: ", get_coordinates(my_part)
+       error stop "unexpected particle outside domain"
+    end if
     is_in_dielectric = (eps(1) > 1)
   end function is_in_dielectric
 
@@ -82,8 +86,12 @@ contains
     real(dp)                       :: lsf(1)
     logical                        :: success
 
-    lsf = af_interp1(tree, my_part%x(1:NDIM), [i_lsf], success, my_part%id)
-    if (.not. success) error stop "unexpected particle outside domain"
+    lsf = af_interp1(tree, get_coordinates(my_part), &
+         [i_lsf], success, my_part%id)
+    if (.not. success) then
+       print *, "coordinates: ", get_coordinates(my_part)
+       error stop "unexpected particle outside domain"
+    end if
     is_in_electrode = (lsf(1) < 0)
   end function is_in_electrode
 end module m_domain

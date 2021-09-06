@@ -14,6 +14,8 @@ program apic
   use m_user
   use m_user_methods
   use m_cross_sec
+  use m_init_cond
+  use m_output
 
   implicit none
 
@@ -23,8 +25,9 @@ program apic
   real(dp)               :: dt
   real(dp)               :: wc_time, inv_count_rate
   real(dp)               :: time_last_print, time_last_generate
-  integer                :: it
+  integer                :: it, it_last_merge
   integer                :: n_part, n_prev_merge, n_samples
+  integer                :: lvl, i, id
   integer, allocatable   :: ref_links(:, :)
   character(len=GL_slen) :: fname
   logical                :: write_out
@@ -32,13 +35,18 @@ program apic
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
   real(dp)               :: dt_cfl, dt_growth, dt_drt
 
-  real(dp) :: t0
+  real(dp) :: t0, t1, t_sort, t_rest
   real(dp) :: wtime_start
   real(dp) :: wtime_run = 0.0_dp
   real(dp) :: wtime_advance = 0.0_dp
+  real(dp) :: wtime_mergesplit = 0.0_dp
+  real(dp) :: wtime_sort = 0.0_dp
+  real(dp) :: wtime_todensity = 0.0_dp
+  real(dp) :: wtime_field = 0.0_dp
+  real(dp) :: wtime_io = 0.0_dp
+  real(dp) :: wtime_accel = 0.0_dp
+  real(dp) :: wtime_amr = 0.0_dp
   integer :: output_cnt = 0 ! Number of output files written
-
-  wtime_start = omp_get_wtime()
 
   ! Read command line arguments and configuration files
   call CFG_update_from_arguments(cfg)
@@ -50,11 +58,12 @@ program apic
   call domain_init(cfg)
   call time_step_init(cfg)
   call GL_initialize(cfg, ndim)
-  call check_path_writable(trim(GL_output_dir))
+  call check_path_writable(trim(GL_output_dir), trim(GL_simulation_name))
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
   call refine_init(cfg, ndim)
   call photons_initialize(cfg)
+  call init_cond_initialize(cfg)
 
   ! Write configuration to output
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
@@ -104,7 +113,7 @@ program apic
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
      call af_refine_up_to_lvl(tree, 3)
-     call dielectric_initialize(tree, i_eps, diel, n_surf_vars)
+     call surface_initialize(tree, i_eps, diel, n_surf_vars)
   end if
 
   output_cnt         = 0 ! Number of output files written
@@ -112,13 +121,11 @@ program apic
   time_last_generate = GL_time
 
   ! Set up the initial conditions
-  if (associated(user_initial_particles)) then
-       ! error stop "user_initial_particles not defined"
+  if (associated(user_initial_particles)) &
        call user_initial_particles(pc)
-  end if
 
   ! Perform additional refinement
-  do
+  do i = 1, 100
      call af_tree_clear_cc(tree, i_pos_ion)
 
      call particles_to_density_and_events(tree, pc, associated(user_initial_particles), dt)
@@ -130,10 +137,10 @@ program apic
 
      if (GL_use_dielectric) then
         ! Make sure there are no refinement jumps across the dielectric
-        call dielectric_get_refinement_links(diel, ref_links)
+        call surface_get_refinement_links(diel, ref_links)
         call af_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width, ref_links)
-        call dielectric_update_after_refinement(tree, diel, ref_info)
+        call surface_update_after_refinement(tree, diel, ref_info)
      else
         call af_adjust_refinement(tree, refine_routine, ref_info, &
              refine_buffer_width)
@@ -141,14 +148,29 @@ program apic
      if (ref_info%n_add == 0) exit
   end do
 
+  ! Add particles from the initial condition. Note that this cannot be done in
+  ! parallel at the moment
+  if (any(init_conds%seed_density > 0) .or. &
+       init_conds%background_density > 0) then
+     do lvl = 1, tree%highest_lvl
+        do i = 1, size(tree%lvls(lvl)%leaves)
+           id = tree%lvls(lvl)%leaves(i)
+           call init_cond_set_box(tree%boxes(id))
+        end do
+     end do
+
+     call af_tree_clear_cc(tree, i_pos_ion)
+     call particles_to_density_and_events(tree, pc, .true.)
+  end if
+
   ! Set an initial surface charge
   if (associated(user_set_surface_charge)) then
-     call dielectric_set_values(tree, diel, i_surf_pos_ion, user_set_surface_charge)
+     call surface_set_values(tree, diel, i_surf_pos_ion, user_set_surface_charge)
   end if
 
   call pc%set_accel()
 
-  print *, "Number of threads", af_get_max_threads()
+  write(*, "(A,I12)") " Number of threads:       ", af_get_max_threads()
   call af_print_info(tree)
 
   ! Start from small time step
@@ -158,8 +180,11 @@ program apic
   call system_clock(t_start, count_rate)
   inv_count_rate = 1.0_dp / count_rate
   time_last_print = -1e10_dp
+  it_last_merge = 0
   n_prev_merge = pc%get_num_sim_part()
   n_elec_prev = pc%get_num_real_part()
+
+  wtime_start = omp_get_wtime()
 
   ! Start of time integration
   do it = 1, huge(1)-1
@@ -197,22 +222,35 @@ program apic
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt)
      call pc%after_mover(dt)
-     wtime_advance = wtime_advance + omp_get_wtime() - t0
+     t1 = omp_get_wtime()
+     wtime_advance = wtime_advance + (t1 - t0)
 
      GL_time = GL_time + dt
 
-     call particles_to_density_and_events(tree, pc, .false., dt)
+     call particles_to_density_and_events(tree, pc, .false.)
+     t0 = omp_get_wtime()
+     wtime_todensity = wtime_todensity + (t0 - t1)
 
      n_part = pc%get_num_sim_part()
-     if (n_part > n_prev_merge * min_merge_increase) then
-        call adapt_weights(tree, pc)
-        n_prev_merge = pc%get_num_sim_part()
+     if (n_part > n_prev_merge * min_merge_increase .or. &
+          it - it_last_merge >= iterations_between_merge_split) then
+        call adapt_weights(tree, pc, t_sort, t_rest)
+
+        n_prev_merge     = pc%get_num_sim_part()
+        it_last_merge    = it
+        wtime_sort       = wtime_sort + t_sort
+        wtime_mergesplit = wtime_mergesplit + t_rest
      end if
 
      ! Compute field with new density
+     t0 = omp_get_wtime()
      call field_compute(tree, mg, .true.)
+     t1 = omp_get_wtime()
+     wtime_field = wtime_field + (t1 - t0)
 
      call pc%set_accel()
+     t0 = omp_get_wtime()
+     wtime_accel = wtime_accel + (t0 - t1)
 
      n_samples = min(n_part, 1000)
      call af_tree_max_cc(tree, i_electron, max_elec_dens)
@@ -226,42 +264,65 @@ program apic
      ! call print_diagnostics(print_output=.false., print_info=.true.)
 
      if (write_out) then
+        t0 = omp_get_wtime()
         call set_output_variables()
 
-        write(fname, "(A,I6.6)") trim(GL_simulation_name) // "_", output_cnt
+        write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // &
+             trim(GL_simulation_name) // "_", output_cnt
         call af_write_silo(tree, fname, output_cnt, GL_time, &
-             dir=GL_output_dir, add_curve_names = ["EEDF"], &
+             add_curve_names = ["EEDF"], &
              add_curve_dat = write_EEDF_as_curve(pc))
         call print_info()
         call CS_write_ledger(pc%coll_ledger, &
         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
         GL_time)
 
+        ! output the log file
+        write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_log.txt"
+        if (associated(user_write_log)) then
+          call user_write_log(tree, fname, output_cnt)
+        else
+          call output_log(tree, fname, output_cnt, wc_time)
+        end if
+
         if (GL_write_to_dat) then
           if (GL_write_to_dat_interval(1) .le. GL_time .and. GL_time .le. GL_write_to_dat_interval(2)) then
             call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
           end if
         end if
+        t1 = omp_get_wtime()
+        wtime_io = wtime_io + (t1 - t0)
      end if
 
      if (mod(it, refine_per_steps) == 0) then
         t0 = omp_get_wtime()
         if (GL_use_dielectric) then
            ! Make sure there are no refinement jumps across the dielectric
-           call dielectric_get_refinement_links(diel, ref_links)
+           call surface_get_refinement_links(diel, ref_links)
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width, ref_links)
-           call dielectric_update_after_refinement(tree, diel, ref_info)
+           call surface_update_after_refinement(tree, diel, ref_info)
         else
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width)
         end if
+        t1 = omp_get_wtime()
+        wtime_amr = wtime_amr + (t1 - t0)
 
         if (ref_info%n_add + ref_info%n_rm > 0) then
            ! Compute the field on the new mesh
-           call particles_to_density_and_events(tree, pc, .false., dt)
+           call particles_to_density_and_events(tree, pc, .false.)
+           t0 = omp_get_wtime()
+           wtime_todensity = wtime_todensity + (t0 - t1)
            call field_compute(tree, mg, .true.)
-           call adapt_weights(tree, pc)
+           t1 = omp_get_wtime()
+           wtime_field = wtime_field + (t1 - t0)
+           call adapt_weights(tree, pc, t_sort, t_rest)
+
+           n_prev_merge     = pc%get_num_sim_part()
+           it_last_merge    = it
+           wtime_sort       = wtime_sort + t_sort
+           wtime_mergesplit = wtime_mergesplit + t_rest
         end if
      end if
   end do
@@ -271,16 +332,17 @@ contains
   !> Initialize the AMR tree
   subroutine init_tree(tree)
     type(af_t), intent(inout) :: tree
+    integer                   :: coord
 
-    ! Initialize tree
     if (GL_cylindrical) then
-       call af_init(tree, box_size, domain_len, &
-            coarse_grid_size, coord=af_cyl)
+       coord = af_cyl
     else
-       call af_init(tree, box_size, domain_len, &
-            coarse_grid_size)
+       coord = af_xyz
     end if
 
+    ! Initialize tree
+    call af_init(tree, box_size, domain_len, coarse_grid_size, &
+         coord=coord, mem_limit_gb=GL_memory_afivo_GB)
   end subroutine init_tree
 
   subroutine print_status()
@@ -328,52 +390,34 @@ contains
     write(*, "(A20,E12.4)") "max field", max_fld
     write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
     write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
-    call dielectric_get_integral(diel, i_surf_sum_dens, surf_int)
+    call surface_get_integral(diel, i_surf_sum_dens, surf_int)
     write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
     write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
 
     wtime_run = omp_get_wtime() - wtime_start
-    write(*, "(A20,F8.2,A)") "cost of advance", &
-         1e2 * wtime_advance / wtime_run, "%"
+    write(*, "(8A10)") "advance", "to_grid", "weights", "sort", &
+         "field", "accel", "amr", "io"
+    write(*, "(8F10.2)") 1e2 * [wtime_advance, wtime_todensity, &
+         wtime_mergesplit, wtime_sort, wtime_field, wtime_accel, &
+         wtime_amr, wtime_io] / wtime_run
   end subroutine print_info
 
   subroutine set_output_variables()
     use m_units_constants
-    integer :: n, n_part
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: weights(:)
-    real(dp), allocatable :: energy(:)
-    integer, allocatable  :: id_guess(:)
+    integer :: n_part
 
     n_part = pc%get_num_sim_part()
-    allocate(coords(NDIM, n_part))
-    allocate(weights(n_part))
-    allocate(energy(n_part))
-    allocate(id_guess(n_part))
-
-    !$omp parallel do
-    do n = 1, n_part
-       coords(:, n) = pc%particles(n)%x(1:NDIM)
-       weights(n) = 1.0_dp
-       energy(n) = pc%particles(n)%w * &
-            PC_v_to_en(pc%particles(n)%v, UC_elec_mass) / &
-            UC_elec_volt
-       id_guess(n) = pc%particles(n)%id
-    end do
-    !$omp end parallel do
 
     call af_tree_clear_cc(tree, i_ppc)
     ! Don't divide by cell volume (last .false. argument)
-    call af_particles_to_grid(tree, i_ppc, coords(:, 1:n_part), &
-         weights(1:n_part), n_part, 0, id_guess(1:n_part), &
-         density=.false., fill_gc=.false.)
+    call af_particles_to_grid(tree, i_ppc, n_part, get_id, get_r_unit_dens, &
+         0, density=.false., fill_gc=.false.)
 
     call af_tree_clear_cc(tree, i_energy)
-    call af_particles_to_grid(tree, i_energy, coords(:, 1:n_part), &
-         energy(1:n_part), n_part, 1, id_guess(1:n_part), &
-         fill_gc=.false.)
+    call af_particles_to_grid(tree, i_energy, n_part, get_id, &
+         get_r_energy, 1, fill_gc=.false., iv_tmp=i_tmp_dens)
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
 
     ! Fill ghost cells before writing output
@@ -381,11 +425,12 @@ contains
 
   end subroutine set_output_variables
 
-  subroutine check_path_writable(pathname)
-    character(len=*), intent(in) :: pathname
+  subroutine check_path_writable(pathname, filename)
+    character(len=*), intent(in) :: pathname, filename
     integer                      :: my_unit, iostate
 
-    open(newunit=my_unit, file=trim(pathname)//"/DUMMY", iostat=iostate)
+    open(newunit=my_unit, file=trim(pathname)//"/"//trim(filename)// &
+         "_DUMMY", iostat=iostate)
     if (iostate /= 0) then
        print *, "Output directory: " // trim(pathname)
        error stop "Directory not writable (does it exist?)"

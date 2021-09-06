@@ -21,6 +21,7 @@ deps=$(echo "$deps" | sed 's/use m_mrgrnk.*$//')
 deps=$(echo "$deps" | sed 's/use m_lookup_table.*$//')
 deps=$(echo "$deps" | sed 's/use m_random.*$//')
 deps=$(echo "$deps" | sed 's/use m_units_constants.*$//')
+deps=$(echo "$deps" | sed 's/use m_pc_all.*$//')
 
 # Remove lines without dependencies
 deps=$(echo "$deps" | sed 's/^.*: *$//')

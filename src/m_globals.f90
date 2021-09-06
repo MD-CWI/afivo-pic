@@ -3,6 +3,7 @@
 !! * Names of the cell-centered variables
 !! * Indices of face-centered variables
 !! * Indices of transport data
+#include "../afivo/src/cpp_macros.h"
 module m_globals
   use m_af_all
   use m_particle_core
@@ -17,7 +18,7 @@ module m_globals
   type(af_t)  :: tree ! This contains the full grid information
   type(mg_t)  :: mg   ! Multigrid option struct
   type(PC_t)  :: pc
-  type(dielectric_t) :: diel ! To store dielectric surface
+  type(surfaces_t) :: diel ! To store dielectric surface
 
   ! Default length of strings
   integer, parameter :: GL_slen = 200
@@ -47,7 +48,7 @@ module m_globals
   integer, protected :: i_energy_dep  = -1 ! Density of deposited power
   integer, protected, allocatable :: i_tracked_cIx(:) ! CAS that will be tracked
   integer, protected :: i_lsf      = -1 ! level set function (for electrode)
-
+  integer, protected :: i_tmp_dens = -1 ! used in cylindrical coordinate system
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
@@ -56,6 +57,12 @@ module m_globals
   integer, parameter :: i_surf_elec_close = 2
   integer, parameter :: i_surf_elec = 3
   integer, parameter :: i_surf_pos_ion = 4
+
+  !> How many gigabytes of memory to use for afivo
+  real(dp), protected :: GL_memory_afivo_GB = 2.0_dp
+
+  !> How many gigabytes of memory to use for particles
+  real(dp), protected :: GL_memory_particles_GB = 4.0_dp
 
   ! Whether cylindrical coordinates are used
   logical, protected :: GL_cylindrical = .false.
@@ -88,7 +95,7 @@ module m_globals
   integer :: num_cIx_to_track
 
   ! Interval for writing to .dat file
-  real(dp), protected :: GL_write_to_dat_interval(2)
+  real(dp), protected :: GL_write_to_dat_interval(2) = 1e100_dp
 
 
   ! Random number generator
@@ -126,11 +133,17 @@ module m_globals
   real(dp) :: GL_init_seed_sigma    = 1.0e-3_dp
   integer  :: GL_init_num_particles = 10000
 
+  ! The length of the (square) domain
+  ! TODO: cannot directly use domain_len in m_domain
+  real(dp), protected, public :: GL_domain_len(NDIM) = 4e-3_dp
+
   real(dp) :: particle_min_weight = 1.0_dp
   real(dp) :: particle_max_weight = 1.0e20_dp
   real(dp) :: particle_per_cell = 100.0_dp
 
   integer  :: ii
+  ! Density threshold for detecting plasma regions
+  real(dp) :: density_threshold = 1e18_dp
 contains
 
   !> Create the configuration file with default values
@@ -149,7 +162,7 @@ contains
     call af_add_cc_variable(tree, "E", .true., ix=i_E)
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "residual", .false., ix=i_residual)
-    call af_add_cc_variable(tree, "ppc", .false., ix=i_ppc)
+    call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
     call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
     call af_add_cc_variable(tree, "energy_deposition", .true., ix=i_energy_dep)
 
@@ -181,7 +194,20 @@ contains
     call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, &
           "The time interval that is written to a .dat file")
     call CFG_add_get(cfg, "use_electrode", GL_use_electrode, &
-             "Whether to include an electrode")
+         "Whether to include an electrode")
+
+    call CFG_add_get(cfg, "memory_afivo_GB", GL_memory_afivo_GB, &
+         "How many gigabytes of memory to use for afivo")
+    call CFG_add_get(cfg, "memory_particles_GB", GL_memory_particles_GB, &
+         "How many gigabytes of memory to use for particles")
+
+    write(*, "(A,F12.2)") " memory_particles_GB:     ", GL_memory_particles_GB
+    write(*, "(A,F12.2)") " memory_afivo_GB:         ", GL_memory_afivo_GB
+
+
+    if (GL_cylindrical) then
+       call af_add_cc_variable(tree, "tmp_dens", .false., ix=i_tmp_dens)
+    end if
 
 
     if (GL_use_dielectric) then
@@ -224,26 +250,46 @@ contains
 
   end subroutine GL_initialize
 
+  !> Convert particle coordinates to desired format
+  pure function get_coordinates(my_part) result(coord)
+    type(PC_part_t), intent(in) :: my_part
+    real(dp)                    :: coord(NDIM)
+    coord = get_coordinates_x(my_part%x)
+  end function get_coordinates
+
+  !> Convert particle coordinates to desired format
+  pure function get_coordinates_x(x) result(coord)
+    real(dp), intent(in) :: x(3)
+    real(dp)             :: coord(NDIM)
+
+    if (GL_cylindrical) then
+       coord(1) = norm2(x([1, 3])) ! radius
+       coord(2) = x(2)
+    else
+       coord = x(1:NDIM)
+    end if
+  end function get_coordinates_x
+
     !> Impose a Dirichlet zero boundary condition for plasma species in the last
     !> dimension, which is supposed to have the electrodes. We use Neumann
     !> conditions in the other dimensions. Note that this version avoids
     !> extrapolation (in contrast to the regular Dirichlet b.c.), which is more
     !> suitable for conserved species densities.
-    subroutine bc_species_dirichlet_zero(box, nb, iv, coords, bc_val, bc_type)
-      type(box_t), intent(in) :: box
-      integer, intent(in)     :: nb
-      integer, intent(in)     :: iv
-      real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
-      real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
-      integer, intent(out)    :: bc_type
+  subroutine bc_species_dirichlet_zero(box, nb, iv, coords, bc_val, bc_type)
+    type(box_t), intent(in) :: box
+    integer, intent(in)     :: nb
+    integer, intent(in)     :: iv
+    real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
+    real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
+    integer, intent(out)    :: bc_type
 
-      if (af_neighb_dim(nb) == NDIM) then
-         bc_type = af_bc_dirichlet_copy
-         bc_val  = 0.0_dp
-      else
-         bc_type = af_bc_neumann
-         bc_val  = 0.0_dp
-      end if
-    end subroutine bc_species_dirichlet_zero
+    if (af_neighb_dim(nb) == NDIM) then
+       bc_type = af_bc_dirichlet_copy
+       bc_val  = 0.0_dp
+    else
+       bc_type = af_bc_neumann
+       bc_val  = 0.0_dp
+    end if
+  end subroutine bc_species_dirichlet_zero
 
 end module m_globals

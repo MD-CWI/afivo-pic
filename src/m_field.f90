@@ -28,7 +28,7 @@ module m_field
   real(dp) :: field_amplitude = 1.0e6_dp
 
   !> The applied voltage (vertical direction)
-  real(dp) :: field_voltage
+  real(dp), public, protected :: field_voltage
 
   !> Drop-off radius
   real(dp) :: field_dropoff_radius = 1e-3_dp
@@ -149,7 +149,7 @@ contains
 
     if (GL_use_dielectric) then
        ! Map surface charge to the right-hand side
-       call dielectric_surface_charge_to_rhs(tree, diel, i_surf_sum_dens, &
+       call surface_surface_charge_to_rhs(tree, diel, i_surf_sum_dens, &
             i_rhs, fac)
     end if
 
@@ -226,7 +226,9 @@ contains
     call af_gc_tree(tree, [i_E])
 
     if (GL_use_dielectric) then
-       call dielectric_correct_field_fc(tree, diel, i_surf_sum_dens, &
+       ! call surface_correct_field_cc(tree, diel, i_surf_sum_dens, &
+            ! i_E_all, i_phi, -fac)
+       call surface_correct_field_fc(tree, diel, i_surf_sum_dens, &
             ifc_E, i_phi, -fac)
 
        call af_loop_box(tree, compute_field_norm)
