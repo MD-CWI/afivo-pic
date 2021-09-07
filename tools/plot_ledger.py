@@ -1,31 +1,17 @@
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 import argparse
-# from tkinter.filedialog import askopenfilename
-from scipy.optimize import curve_fit
 
-#This is for later
+#Increase font size
+plt.rcParams.update({'font.size': 14})
+cwd = os.getcwd()
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument("--select", help= "Open a dialog to manually select a file",
-#                                  action="store_true")
-# args = parser.parse_args()
-#
-# if args.select:
-#     from tkinter.filedialog import askopenfilename
-#     filename = askopenfilename()
-#     print(filename)
-# else:
-#     print("default")
-
-def lin_func(x, a, b):
-    return a*x+b
-
-def exp_func(x, a, c):
-    return a*np.exp(c*x)
+def get_args():
+    p = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description='''Plot various quantities using the ledger file''')
+    return p.parse_args()
 
 def idx(cIx):
     "Python starts at 0, and I am not dealing with it any longer..."
@@ -33,10 +19,36 @@ def idx(cIx):
 
 class Ledger:
     def __init__(self, file, name=""):
+        # Lowest x coordinate (start of the plot range)
+        self.xmin = 0
 
-        self.get_streamer_length(file+"streamer_length.txt")
-        self.get_streamer_radius(file+"streamer_radius.txt")
+        # Guess the default x-axis based on which files are supplied
+        if os.path.isfile(file+"streamer_length.txt"):
+            self.xaxis = 'length'
+        elif os.path.isfile(file+"streamer_Lgap.txt"):
+            self.xaxis = 'Lgap'
+        else:
+            self.xaxis = 'time'
 
+        # Try to load any data that is present
+        print_string = ""
+        try: self.L = np.loadtxt(file+"streamer_length.txt", dtype=np.dtype('float'))
+        except: print_string += (" length,")
+        try: self.R = np.loadtxt(file+"streamer_radius.txt", dtype=np.dtype('float'))
+        except: print_string += (" radius,")
+        try: self.V = np.loadtxt(file+"streamer_volume.txt", dtype=np.dtype('float'))
+        except: print_string += (" volume,")
+        try: self.Lgap = np.loadtxt(file+"streamer_Lgap.txt", dtype=np.dtype('float'))
+        except: print_string += (" Lgap,")
+        try: self.energy = np.loadtxt(file+"streamer_energy.txt", dtype=np.dtype('float'))
+        except: print_string += (" energy,")
+        try: self.Emax = np.loadtxt(file+"streamer_Emax.txt", dtype=np.dtype('float'))
+        except: print_string += (" Emax,")
+        finally:
+            if (not print_string == ""):
+                print("Was not able to load:"+print_string+" to data structure "+name)
+
+        # Load the ledger
         file = file + "sim_cs_ledger.txt"
 
         # Header data is loaded seperately
@@ -57,22 +69,6 @@ class Ledger:
         self.generic_grouping()
 
         self.name = name
-
-    def get_streamer_length(self, file):
-        if os.path.isfile(file):
-            self.L = np.loadtxt(file, dtype=np.dtype('float'))
-        else:
-            print("Cannot find file containing streamer length: " + file)
-            print("First define streamer length by running write_streamer_length.py in the tools-directory")
-            input("No streamer length was found. Continue anyway?")
-
-    def get_streamer_radius(self, file):
-        if os.path.isfile(file):
-            self.R = np.loadtxt(file, dtype=np.dtype('float'))
-        else:
-            print("Cannot find file containing streamer radius: " + file)
-            print("First define streamer radius by running write_streamer_length.py in the tools-directory")
-            input("No streamer radius was found. Continue anyway?")
 
     def generic_grouping(self):
         self.i_N2_ion  = []
@@ -118,148 +114,105 @@ class Ledger:
                 1/0 # I am too lazy to look for the proper clausule
 
     def set_grouping_all_repo(self):
+        # Assuming that by-products are in the lowest energy state
         self.i_O_rad = [17, 28, 30, 31]
         self.i_H2    = [34, 35, 40, 41, 42, 45, 46, 48]
-        self.i_H_rad = [33, 35, 36, 40, 43, 47, 48]
+        self.i_H_rad = [33, 36, 40, 43, 47, 48]
+        self.i_N_rad = [13, 15, 16]
 
-    def plot_all_repo(self):
+    def plot_all_repo(self, factor=1, **kwargs):
         # plt.figure()
-        self.plot_single_species_weighted(self.i_O_rad, "O rad"+self.name, [2, 2, 2, 2])
-        self.plot_single_species_weighted(self.i_H2, "H2"+self.name, [1, 0.5, 1, 2, 1, 1, 2, 1])
-        self.plot_single_species_weighted(self.i_H_rad, "H rad"+self.name, [1, 1, 1, 1, 1, 1, 1])
+        self.plot_single_species_weighted(self.i_O_rad, np.array([2, 2, 2, 2])*factor, label="O", color='r', **kwargs)
+        self.plot_single_species_weighted(self.i_H2, np.array([1, 1, 1, 2, 1, 1, 2, 1])*factor, label="H$_2$", color='b', **kwargs)
+        self.plot_single_species_weighted(self.i_H_rad, np.array([1, 1, 1, 1, 1, 1])*factor, label="H", color='g', **kwargs)
+        self.plot_single_species_weighted(self.i_N_rad, np.array([2, 2, 2])*factor, label="N", color='m', **kwargs)
 
-        plt.legend()
-        plt.xlabel("length")
-        plt.ylabel("no. occurences")
-        plt.title("Radicals")
+        # plt.legend()
+        plt.xlabel(self.xaxis)
+        plt.ylabel("particle number")
 
-    def set_grouping_biagi_and_lisbon(self):
-        self.i_O_rad = [47, 57, 58]
-        self.i_H2    = [62, 66]
-        self.i_H_rad   = [61, 66, 67, 69]
-
-    def plot_biagi_and_lisbon(self):
-        # plt.figure()
-        self.plot_single_species_weighted(self.i_O_rad, "BIAGI_IST-L O rad", [2, 2, 2])
-        self.plot_single_species_weighted(self.i_H2, "BIAGI_IST-L H2", [1, 0.5])
-        self.plot_single_species_weighted(self.i_H_rad, "BIAGI_IST-L H rad", [1, 1, 1, 1])
-
-        plt.legend()
-        plt.xlabel("length")
-        plt.ylabel("no. occurences")
-        plt.title("Radicals")
-
-    def plot_biagi_and_lisbon_seperate(self):
-        plt.figure()
-        self.plot_single_species_weighted([47], "O- + O", 2.0)
-        self.plot_single_species_weighted([57], "O2(EXC A3 DISOC)", 2.0)
-        self.plot_single_species_weighted([58], "O2(EXC B3 DISOC)", 2.0)
-        plt.title("Amount of oxygen radicals produced")
-        plt.legend()
-
-        plt.figure()
-        self.plot_single_species([62], "CH2- + H2")
-        self.plot_single_species_weighted([66], "CH2 + H2", 0.5)
-        plt.title("Amount of molecular hydrogen produced")
-        plt.legend()
-
-        plt.figure()
-        self.plot_single_species([61], "CH3 + H-")
-        self.plot_single_species_weighted([66], "CH2 + H + H", 1.0)
-        self.plot_single_species([67], "CH3 + H")
-        self.plot_single_species([69], "CH3+ + H")
-        plt.title("Amount of hydrogen radicals produced")
-        plt.legend()
-
-    def set_grouping_biagi_and_repo(self):
-        self.i_O_rad = [47, 57, 58]
-        self.i_H2    = [62, 63, 68, 69, 70, 73, 74, 76]
-        self.i_H_rad   = [61, 63, 64, 68, 71, 75, 76]
-
-    def plot_biagi_and_repo(self):
-        # plt.figure()
-        self.plot_single_species_weighted(self.i_O_rad, "BIAGI_REPO O rad", [2, 2, 2])
-        self.plot_single_species_weighted(self.i_H2, "BIAGI_REPO H2", [1, 0.5, 1, 2, 1, 1, 2, 1])
-        self.plot_single_species_weighted(self.i_H_rad, "BIAGI_REPO H rad", [1, 1, 1, 1, 1, 1, 1])
-
-        plt.legend()
-        plt.xlabel("length")
-        plt.ylabel("no. occurences")
-        plt.title("Radicals")
-
-    def plot_biagi_and_repo_seperate(self):
-        plt.figure()
-        self.plot_single_species_weighted([47], "O- + O", 2.0)
-        self.plot_single_species_weighted([57], "O2(EXC A3 DISOC)", 2.0)
-        self.plot_single_species_weighted([58], "O2(EXC B3 DISOC)", 2.0)
-        plt.title("Amount of oxygen radicals produced")
-        plt.legend()
-
-        plt.figure()
-        self.plot_single_species_weighted([62], "CH2- + H2", 1)
-        self.plot_single_species_weighted([63], "CH2 + H2", 0.5)
-        self.plot_single_species_weighted([68], "CH + H2 + H", 1)
-        self.plot_single_species_weighted([69], "C + H2 + H2", 2)
-        self.plot_single_species_weighted([70], "CH2 + H2+", 1)
-        self.plot_single_species_weighted([73], "CH2+ + H2", 1)
-        self.plot_single_species_weighted([74], "C+ + H2 + H2", 2)
-        self.plot_single_species_weighted([76], "CH+ + H + H2", 1)
-        plt.title("Amount of molecular hydrogen produced")
-        plt.legend()
-
-        plt.figure()
-        self.plot_single_species_weighted([61], "CH3 + H-", 1.0)
-        self.plot_single_species_weighted([63], "CH2 + H + H", 1.0)
-        self.plot_single_species_weighted([64], "CH3 + H", 1.0)
-        self.plot_single_species_weighted([68], "CH + H2 + H", 1.0)
-        self.plot_single_species_weighted([71], "CH3 + H+", 1.0)
-        self.plot_single_species_weighted([75], "CH3+ + H", 1.0)
-        self.plot_single_species_weighted([76], "CH+ + H + H2", 1.0)
-        plt.title("Amount of hydrogen radicals produced")
-        plt.legend()
-
-
-    def plot_generic_grouped_species(self):
+    def plot_generic_grouped_species(self, print_CH4=True, **kwargs):
         "Plot the grouped CAS, ions/excited states/fragmented fuel/dissociated oxygen"
-        plt.figure()
-        self.plot_single_species(self.i_N2_ion, "N2_ion")
-        self.plot_single_species(self.i_O2_ion, "O2_ion")
-        self.plot_single_species(self.i_CH4_ion, "CH4_ion")
+        self.plot_single_species(self.i_N2_ion, label="N$_2$ ions", linestyle='-', color='tab:blue', **kwargs)
+        self.plot_single_species(self.i_O2_ion, label="O$_2$ ions", linestyle='-', color='tab:green', **kwargs)
+        if (print_CH4):
+            self.plot_single_species(self.i_CH4_ion, label="CH$_4$ ions", linestyle='-', color='tab:brown', **kwargs)
 
-        self.plot_single_species(self.i_N2_exc, "N2_exc")
-        self.plot_single_species(self.i_O2_exc, "O2_exc")
-        self.plot_single_species(self.i_CH4_exc, "CH4_exc")
+        self.plot_single_species(self.i_N2_exc, label="N$_2$ exc.", linestyle=':', color='tab:blue', **kwargs)
+        self.plot_single_species(self.i_O2_exc, label="O$_2$ exc.", linestyle=':', color='tab:green', **kwargs)
+        if (print_CH4):
+            self.plot_single_species(self.i_CH4_exc, label="CH$_4$ exc.", linestyle=':', color='tab:brown', **kwargs)
 
-        self.plot_single_species(self.i_N2_attach, "N2_attach")
-        self.plot_single_species(self.i_O2_attach, "O2_attach")
-        self.plot_single_species(self.i_CH4_attach, "CH4_attach")
+        self.plot_single_species(self.i_N2_attach, linestyle='-.', label="N2_attach")
+        self.plot_single_species(self.i_O2_attach, linestyle='-.', label="O2_attach")
+        self.plot_single_species(self.i_CH4_attach, linestyle='-.', label="CH4_attach")
 
         plt.legend()
-        plt.xlabel("time")
-        plt.ylabel("no. occurences")
-        plt.title("Grouped CAS")
+        # plt.xlabel("time")
+        plt.ylabel("particle number")
+        plt.title("Grouped species")
 
-    def plot_single_species(self, index, label, xaxis='length'):
-        if xaxis == 'length':
-            xsteps = self.L
-        elif xaxis == 'time':
-            xsteps = self.timesteps
+    # def plot_efficiency_all_repo(self):
+    #     self.plot_single_efficiency_weighted(self.i_O_rad, "O rad "+self.name, [2, 2, 2, 2])
+    #     self.plot_single_efficiency_weighted(self.i_H2, "H2 "+self.name, [1, 0.5, 1, 2, 1, 1, 2, 1])
+    #     self.plot_single_efficiency_weighted(self.i_H_rad, "H rad "+self.name, [1, 1, 1, 1, 1, 1, 1])
+    #
+    #     plt.legend()
+    #     plt.xlabel(self.xaxis)
+    #     plt.ylabel("eV$^{-1}$")
+    #     plt.title("Efficiency (num. radicals per energy)")
+
+    # def plot_single_efficiency_weighted(self, index, label, weight):
+    #     if self.xaxis == 'length':
+    #         xsteps = self.L * 1e3 # set x-axis to millimeters
+    #     elif self.xaxis == 'time':
+    #         xsteps = self.timesteps * 1e9 # set x-axis to nanoseconds
+    #     else:
+    #         print("Given xaxis not permitted. Use length or time")
+    #         exit()
+    #
+    #     # plt.semilogy(xsteps[xsteps>=self.xmin], np.sum(self.ledger[:, index], 1)[xsteps>=self.xmin]/np.cumsum(self.P[xsteps>=self.xmin]), label=label)
+    #     plt.semilogy(xsteps[xsteps>=self.xmin], np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1)[xsteps>=self.xmin]/self.P_integrated[xsteps>=self.xmin]/6.242e+18, label=label)
+
+    def plot_single_species(self, index, **kwargs):
+        if self.xaxis == 'length':
+            xsteps = self.L * 1e3 # set x-axis to millimeters
+        elif self.xaxis == 'Lgap':
+            xsteps = self.Lgap * 1e3 # set x-axis to millimeters
+        elif self.xaxis == 'time':
+            xsteps = self.timesteps * 1e9 # set x-axis to nanoseconds
+        elif self.xaxis == 'volume':
+            xsteps = self.V * 1e9 #set x-axis to cubic millimeters
         else:
-            print("Given xaxis not permitted. Use length or time")
-            1/0
+            print("Given xaxis not permitted. Use length, time or volume")
+            exit()
 
-        plt.semilogy(xsteps, np.sum(self.ledger[:, index], 1), label=label)
+        plt.semilogy(xsteps, np.sum(self.ledger[:, index], 1), **kwargs)
 
-    def plot_single_species_weighted(self, index, label, weight, xaxis='length'):
-        if xaxis == 'length':
-            xsteps = self.L
-        elif xaxis == 'time':
-            xsteps = self.timesteps
+    # def plot_single_species_weighted(self, index, label, weight):
+    def plot_single_species_weighted(self, index, weight, scale='semilog', volume_averaged=False, **kwargs):
+        if self.xaxis == 'length':
+            xsteps = self.L * 1e3 # set x-axis to millimeters
+        elif self.xaxis == 'Lgap':
+            xsteps = self.Lgap * 1e3 # set x-axis to millimeters
+        elif self.xaxis == 'time':
+            xsteps = self.timesteps * 1e9 # set x-axis to nanoseconds
+        elif self.xaxis == 'volume':
+            xsteps = self.V * 1e9 #set x-axis to cubic millimeters
         else:
-            print("Given xaxis not permitted. Use length or time")
-            1/0
+            print("Given xaxis not permitted. Use length, time or volume")
+            exit()
 
-        plt.semilogy(xsteps, np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1), label=label)
+        if volume_averaged:
+            factor = self.V # Keep in units of m^(-3)
+        else:
+            factor = 1.0
+
+        if scale == 'semilog':
+            plt.semilogy(xsteps[xsteps>=self.xmin], np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1)[xsteps>=self.xmin]/factor[xsteps>=self.xmin], **kwargs)
+        if scale == 'linear':
+            plt.plot(xsteps[xsteps>=self.xmin], np.sum(np.tile(weight, (np.shape(self.ledger)[0], 1)) * self.ledger[:, index], 1)[xsteps>=self.xmin]/factor[xsteps>=self.xmin], **kwargs)
+
 
     def plot_excitations(self, index, label):
         exc_total = np.tile(np.sum(self.ledger[:, index], 1, keepdims=True), (1, np.size(index)))
@@ -280,134 +233,22 @@ class Ledger:
         plt.ylabel("fraction")
         plt.title("Relative population of excited states of " + label)
 
-    def plot_single_fit(self, index, label, skip=0, logplot=False):
-        # popt, pcov = curve_fit(exp_func, self.timesteps, np.squeeze(np.sum(self.ledger[:, index], 1)), p0=(1e7, 1e5))
-        # yy = exp_func(self.timesteps, *popt)
-        popt, pcov = curve_fit(lin_func, self.timesteps[skip:], np.log(np.squeeze(np.sum(self.ledger[skip:, index], 1))),  p0=(16, 11))
-        y_fit = np.exp(lin_func(self.timesteps, *popt))
-
-        if logplot == True:
-            self.plot_single_species(index, label)
-            plt.semilogy(self.timesteps, y_fit, label="fit", marker='.')
-        else:
-            plt.plot(self.timesteps, np.sum(self.ledger[:, index], 1), label=label)
-            plt.plot(self.timesteps, y_fit, label="fit")
-        plt.title("R = " + "{:.2e}".format(popt[0]) )
-        plt.legend()
-
-    def print_single_fit(self, index, skip=0):
-        popt, pcov = curve_fit(lin_func, self.timesteps[skip:], np.log(np.squeeze(np.sum(self.ledger[skip:, index], 1))),  p0=(16, 11))
-        print("(lambda, A) = " + str(popt))
-
-    def print_volume_weighted_species(self, volume):
+    def print_volume_weighted_species(self):
+        # Only plot the final timestep
         for index in range(len(self.cIx)):
-            # print(index)
-            # print(self.ledger[-1, index]/volume)
-            print("cIx = " + str(index+1) + ":  " + str(self.ledger[-1, index]/volume))
-            # print(str(self.ledger[-1, index]/volume))
+            print("cIx = " + str(index+1) + ":  " + str('{:0.2e}'.format(self.ledger[-1, index]/self.V[-1])))
 
-        # print("Total N2 ion")
-        # print(self.ledger[-1, self.i_N2_ion])
-        # a = np.sum(self.ledger[-1, self.i_N2_ion])
-        # print(a)
-        # print("Total O2 ion")
-        # b = np.sum(self.ledger[-1, self.i_O2_ion])
-        # print(b)
-        # print("Total CH4 ion")
-        # c = np.sum(self.ledger[-1, self.i_CH4_ion])
-        #
-        # print(c)
-        #
-        # print("sum pos ion")
-        # print(a + b + c)
-        #
-        #
-        # print("Total attach:")
-        # d = np.sum(self.ledger[-1, self.i_N2_attach]) + np.sum(self.ledger[-1, self.i_O2_attach]) + np.sum(self.ledger[-1, self.i_CH4_attach])
-        # # d = d/volume
-        # print(d)
-        # print("netto pos ion")
-        # print((a + b + c - d))
+def print_volume_weighted_species_table(fieldz):
+    for index in range(len(fieldz[0].cIx)):
+        print("cIx = " + str(index+1), end="  ")
+        for ii in range(len(fieldz)):
+            print(str('{:0.2e}'.format(fieldz[ii].ledger[-1, index]/fieldz[ii].V[-1])), end=" & ")
+        print() #move to next line
 
-        # print(self.i_N2_attach)
-        # print(self.i_O2_attach)
-        # print(self.i_CH4_attach)
+# ============================
 
-# ==============================
-fuel = Ledger("/home/dennis/codes/afivo-pic/programs/combustion_2d/output/")
-# fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/new_acc/")
-# fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/bigboy/fuel/")
-fuel.print_volume_weighted_species(volume=1)#2.04e-9)
+args = get_args()
 
-fuel.set_grouping_all_repo()
-fuel.plot_all_repo()
-
-# ========
-
-# fuel = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/fuel/")
-# air = Ledger("/home/dennis/Documents/drafts/air_methane_streamers/results/electrode_fat/air/")
-#
-# plt.figure()
-# plt.plot(air.L[-len(air.R):]*1e3, air.R*1e3, 'rd-', label='air')
-# plt.plot(fuel.L[-len(fuel.R):]*1e3, fuel.R*1e3, 'ks-', label='fuel')
-# plt.xlabel('length (mm)')
-# plt.ylabel('radius (mm)')
-# plt.legend()
-
-
-# fuel = Ledger("/home/ddb/results/electrode_fat/fuel/")
-# air = Ledger("/home/ddb/results/electrode_fat/air/")
-
-# fuel.set_grouping_all_repo()
-# fuel.plot_all_repo()
-# plt.figure()
-# air.set_grouping_all_repo()
-# air.plot_all_repo()
-#
-# xn_fuel = (fuel.L[:-1] + fuel.L[1:])/2
-# xn_air = (air.L[:-1] + air.L[1:])/2
-#
-# plt.figure()
-# plt.plot(xn_fuel/1e-3, np.diff(fuel.L)/np.diff(fuel.timesteps)/1e6, label='fuel')
-# plt.plot(xn_air/1e-3, np.diff(air.L)/np.diff(air.timesteps)/1e6, label='air')
-# plt.xlabel('length (mm)')
-# plt.ylabel('velocity (mm/ns)')
-# plt.legend()
-
-# =======
-# plt.figure()
-# plt.plot(fuel.timesteps/1e-9, fuel.L/1e-3, label='fuel')
-# plt.plot(air.timesteps/1e-9, air.L/1e-3, label='air')
-# plt.xlabel('time (ns)')
-# plt.ylabel('Length (mm)')
-# plt.legend()
-#
-
-
-# lisbon.set_grouping_biagi_and_lisbon()
-# repo.set_grouping_biagi_and_repo()
-#
-# full_repo.plot_generic_grouped_species()
-# repo.plot_generic_grouped_species()
-
-# plt.figure()
-# lisbon.plot_biagi_and_lisbon()
-# repo.plot_biagi_and_repo()
-#
-# # plt.figure()
-# # lisbon.plot_biagi_and_lisbon_seperate()
-# repo.plot_biagi_and_repo_seperate()
-#
-#
-# # %% Now some plotting
-# # ledger.set_grouping_biagi_and_lisbon()
-# # ledger.plot_biagi_and_lisbon_seperate()
-# # ledger.generic_grouping()
-# #
-# repo.plot_generic_grouped_species()
-# # #
-# repo.plot_excitations(repo.i_N2_exc, "N2")
-# repo.plot_excitations(repo.i_O2_exc, "O2")
-# repo.plot_excitations(repo.i_CH4_exc, "CH4")
+# TODO Implement standardized plots as an example
 
 plt.show()
