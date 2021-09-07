@@ -82,7 +82,9 @@ program apic
           error stop "field_rod_r1 not set correctly"
      if (field_rod_radius <= 0) &
           error stop "field_rod_radius not set correctly"
-     call af_set_cc_methods(tree, i_lsf, rb=rb_err, funcval=field_rod_lsf)
+     call af_set_cc_methods(tree, i_lsf, af_bc_neumann_zero, &
+          af_gc_prolong_copy, af_prolong_zeroth, funcval=field_rod_lsf)
+
      mg%i_lsf = i_lsf
   end if
 
@@ -234,9 +236,7 @@ program apic
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase .or. &
           it - it_last_merge >= iterations_between_merge_split) then
-        print *, "A"
         call adapt_weights(tree, pc, t_sort, t_rest)
-        print *, "B"
         n_prev_merge     = pc%get_num_sim_part()
         it_last_merge    = it
         wtime_sort       = wtime_sort + t_sort
@@ -440,63 +440,54 @@ contains
     end if
   end subroutine check_path_writable
 
-  !> Print diagnostics that are useful for benchmarking the performance of the code
-  subroutine print_diagnostics(print_output, print_info)
-    use iso_fortran_env, only: error_unit
-    logical, optional, intent(in)    ::  print_output ! Setting this to false will suppress the output of the code
-    logical, optional, intent(in)    ::  print_info ! Setting this to false will suppress the output of the code
-    character(LEN=GL_slen) :: filename
-    integer                :: io_state, my_unit
-    real(dp)               :: n_part
-
-    n_part  = pc%get_num_sim_part()
-
-    ! write_out should not be always set to true
-    if (present(print_output) .and. .not. print_output) write_out = print_output
-
-    ! Print info to the command line
-    if (present(print_info) .and. print_info) then
-      write(*, "(A6,E24.3,A,I5,A,E24.3)") "time: ", GL_time, " iteration number: ", it, " number of particles:", n_part
-    end if
-
-    wtime_run = omp_get_wtime() - wtime_start
-    write(filename, "(A)") "output/" // trim(GL_simulation_name) // "_diagnostics"
-    my_unit = 123
-
-    if (it .eq. 1) then
-      open(my_unit, FILE = trim(filename), ACTION = "WRITE", &
-        ERR = 998, IOSTAT = io_state)
-    else
-      open(my_unit, FILE = trim(filename), ACTION = "WRITE", position = "append", &
-        ERR = 998, IOSTAT = io_state)
-    end if
-
-    write(my_unit, "(I0, A)", advance = 'no') it, char(9)
-    write(my_unit, "(ES13.6, A)", advance = 'no') n_part, char(9)
-    write(my_unit, "(ES13.6, A)", advance = 'no') wc_time, char(9)
-    write(my_unit, "(ES13.6, A)", advance = 'no') wtime_advance, char(9)
-    write(my_unit, "(ES13.6, A)", advance = 'no') wtime_run, char(9)
-    write(my_unit, "(F8.2, A)", advance = 'no') 1e2 * wtime_advance / (wtime_run + 1.0e-10_dp)
-
-    close(my_unit, STATUS = "KEEP", ERR = 999, IOSTAT = io_state)
-
-    return
-
-    998 continue ! If there was an error, the routine will end here
-        write(error_unit, *) " Error while opening ", trim(filename), ", io_state = ", io_state
-        error stop
-    999 continue ! If there was an error, the routine will end here
-        write(error_unit, *) "Error while writing to ", trim(filename), ", io_state = ", io_state
-        error stop
-  end subroutine
-
-  subroutine rb_err(boxes, id, nb, iv)
-     type(box_t), intent(inout) :: boxes(:) !< Array with all boxes
-     integer, intent(in)         :: id       !< Id of the box that needs to have ghost cells filled
-     integer, intent(in)         :: nb       !< Neighbor direction in which ghost cells need to be filled
-     integer, intent(in)         :: iv       !< Variable for which ghost cells are filled
-
-     error stop "rb called for lsf"
-  end subroutine rb_err
+  ! !> Print diagnostics that are useful for benchmarking the performance of the code
+  ! subroutine print_diagnostics(print_output, print_info)
+  !   use iso_fortran_env, only: error_unit
+  !   logical, optional, intent(in)    ::  print_output ! Setting this to false will suppress the output of the code
+  !   logical, optional, intent(in)    ::  print_info ! Setting this to false will suppress the output of the code
+  !   character(LEN=GL_slen) :: filename
+  !   integer                :: io_state, my_unit
+  !   real(dp)               :: n_part
+  !
+  !   n_part  = pc%get_num_sim_part()
+  !
+  !   ! write_out should not be always set to true
+  !   if (present(print_output) .and. .not. print_output) write_out = print_output
+  !
+  !   ! Print info to the command line
+  !   if (present(print_info) .and. print_info) then
+  !     write(*, "(A6,E24.3,A,I5,A,E24.3)") "time: ", GL_time, " iteration number: ", it, " number of particles:", n_part
+  !   end if
+  !
+  !   wtime_run = omp_get_wtime() - wtime_start
+  !   write(filename, "(A)") "output/" // trim(GL_simulation_name) // "_diagnostics"
+  !   my_unit = 123
+  !
+  !   if (it .eq. 1) then
+  !     open(my_unit, FILE = trim(filename), ACTION = "WRITE", &
+  !       ERR = 998, IOSTAT = io_state)
+  !   else
+  !     open(my_unit, FILE = trim(filename), ACTION = "WRITE", position = "append", &
+  !       ERR = 998, IOSTAT = io_state)
+  !   end if
+  !
+  !   write(my_unit, "(I0, A)", advance = 'no') it, char(9)
+  !   write(my_unit, "(ES13.6, A)", advance = 'no') n_part, char(9)
+  !   write(my_unit, "(ES13.6, A)", advance = 'no') wc_time, char(9)
+  !   write(my_unit, "(ES13.6, A)", advance = 'no') wtime_advance, char(9)
+  !   write(my_unit, "(ES13.6, A)", advance = 'no') wtime_run, char(9)
+  !   write(my_unit, "(F8.2, A)", advance = 'no') 1e2 * wtime_advance / (wtime_run + 1.0e-10_dp)
+  !
+  !   close(my_unit, STATUS = "KEEP", ERR = 999, IOSTAT = io_state)
+  !
+  !   return
+  !
+  !   998 continue ! If there was an error, the routine will end here
+  !       write(error_unit, *) " Error while opening ", trim(filename), ", io_state = ", io_state
+  !       error stop
+  !   999 continue ! If there was an error, the routine will end here
+  !       write(error_unit, *) "Error while writing to ", trim(filename), ", io_state = ", io_state
+  !       error stop
+  ! end subroutine
 
 end program apic

@@ -222,7 +222,6 @@ contains
     end if
 
     ! Set ghost cells for the field components
-    call af_restrict_tree(tree, [i_E])
     call af_gc_tree(tree, [i_E])
 
     if (GL_use_dielectric) then
@@ -230,12 +229,12 @@ contains
             ! i_E_all, i_phi, -fac)
        call surface_correct_field_fc(tree, diel, i_surf_sum_dens, &
             ifc_E, i_phi, -fac)
-
-       call af_loop_box(tree, compute_field_norm)
-
-       ! Set the field norm also in ghost cells
-       call af_gc_tree(tree, [i_E])
     end if
+
+    call af_loop_box(tree, compute_field_norm)
+
+    ! Set the field norm also in ghost cells
+    call af_gc_tree(tree, [i_E])
 
   end subroutine field_compute
 

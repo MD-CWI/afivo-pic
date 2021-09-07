@@ -166,7 +166,6 @@ contains
     do n = 1, pc%n_part
        ix = af_cc_ix(tree%boxes(pc%particles(n)%id), &
             get_coordinates(pc%particles(n)))
-
        ! Convert cell index to number
        pc%particles(n)%tag = sum((ix-1) * mapping) + 1
 
@@ -179,7 +178,6 @@ contains
             v_to_int
     end do
     !$omp end parallel do
-
   end subroutine set_particle_tags
 
   !> Adjust the weights of the particles
@@ -204,7 +202,6 @@ contains
 
     ! Set tags that contain information about the cell index and velocity
     call set_particle_tags(tree, pc, N_vb)
-
     t0 = omp_get_wtime()
     call pc%sort_in_place_by_id_tag()
     t1 = omp_get_wtime()
@@ -429,8 +426,6 @@ contains
        pc%particles(n)%en_loss = 0.0_dp ! Reset the energy_loss of all particles
     end do
     !$omp end parallel do
-
-    pc%particles(1:n_part)%id = id_guess(1:n_part)
 
     i = 0 ! Counter for ionizing events
     j = 0 ! Counter for CAS tracker
