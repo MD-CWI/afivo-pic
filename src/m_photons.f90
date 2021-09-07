@@ -166,6 +166,7 @@ contains
     type(PC_t), intent(inout)     :: pc
     integer, intent(out)          :: n_photons
     type(prng_t)                  :: prng
+    real(dp)                      :: en_frac
 
     integer  :: n, m, n_uv, tid
     integer  :: n_part_before
@@ -181,7 +182,7 @@ contains
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
          ! The Zheleznyak model is calibrated for air, i.e. CH4-ionizations dont participate
-         if (pc%colls(pc%event_list(n)%cIx)%gas_name == CS_is_CH4) cycle
+         if (pc%colls(pc%event_list(n)%cIx)%gas_index == CS_is_CH4) cycle
           n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv
@@ -224,7 +225,7 @@ contains
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           ! The Zheleznyak model is calibrated for air, i.e. CH4-ionizations dont participate
-          if (pc%colls(pc%event_list(n)%cIx)%gas_name == CS_is_CH4) cycle
+          if (pc%colls(pc%event_list(n)%cIx)%gas_index == CS_is_CH4) cycle
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
 
           do m = 1, n_uv ! High&low en photons are handled equally

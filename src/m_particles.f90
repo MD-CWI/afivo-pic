@@ -363,16 +363,15 @@ contains
          ! pc%get_mean_energy() / UC_elec_volt
   end subroutine adapt_weights
 
-  subroutine particles_to_density_and_events(tree, pc, init_cond, dt)
+  subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
     use m_particle_core
     use m_domain, only: outside_check
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
-    real(dp), intent(in)             :: dt
 
-    integer                     :: n, i, j, ii, n_part, n_photons
+    integer                     :: n, i, j, ii, n_part, n_photons, n_part_before
 
     real(dp), allocatable, save :: coords(:, :), coords_CAS(:, :)
     real(dp), allocatable, save :: weights(:), weights_CAS(:), mask_var(:)
@@ -398,16 +397,6 @@ contains
        end if
     end if
 
-    !$omp parallel do
-    do n = 1, n_part
-       coords(:, n)   = pc%particles(n)%x(1:NDIM)
-       weights(n)     = pc%particles(n)%w
-       id_guess(n)    = pc%particles(n)%id
-       energy_lost(n) = pc%particles(n)%en_loss
-       pc%particles(n)%en_loss = 0.0_dp ! Reset the energy_loss of all particles
-    end do
-    !$omp end parallel do
-
     if (init_cond) then
        call af_tree_clear_cc(tree, i_electron)
        call af_particles_to_grid(tree, i_electron, n_part, &
@@ -422,15 +411,26 @@ contains
            get_id, get_rw, interpolation_order_to_density, &
            iv_tmp=i_tmp_dens)
       ! FLAG This routine needs to be rewritten in new syntax
-      call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:n_part), &
-          weights(1:n_part)*energy_lost(1:n_part), n_part, 1, &
-          id_guess(1:n_part))
+      ! call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:n_part), &
+      !     weights(1:n_part)*energy_lost(1:n_part), n_part, 1, &
+      !     id_guess(1:n_part))
+      call af_particles_to_grid(tree, i_energy_dep, n_part, &
+          get_id, get_r_energydeposit, interpolation_order_to_density, &
+          iv_tmp=i_tmp_dens)
       ! END FLAG
     end if
 
-    ! FLAG What is this doing?
+    !$omp parallel do
+    do n = 1, n_part
+       ! coords(:, n)   = pc%particles(n)%x(1:NDIM)
+       ! weights(n)     = pc%particles(n)%w
+       ! id_guess(n)    = pc%particles(n)%id
+       ! energy_lost(n) = pc%particles(n)%en_loss
+       pc%particles(n)%en_loss = 0.0_dp ! Reset the energy_loss of all particles
+    end do
+    !$omp end parallel do
+
     pc%particles(1:n_part)%id = id_guess(1:n_part)
-    ! END FLAG
 
     i = 0 ! Counter for ionizing events
     j = 0 ! Counter for CAS tracker
@@ -472,18 +472,21 @@ contains
            get_event_id, get_event_rw, interpolation_order_to_density, &
            iv_tmp=i_tmp_dens)
       ! FLAG rewrite in terms of new syntax
-       call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:i), &
-           abs(weights(1:i)*energy_lost(1:i)), i, 1, &
-           id_guess(1:i))
+       ! call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:i), &
+       !     abs(weights(1:i)*energy_lost(1:i)), i, 1, &
+       !     id_guess(1:i))
+       call af_particles_to_grid(tree, i_energy_dep, i, &
+           get_event_id, get_event_r_energydeposit, interpolation_order_to_density, &
+           iv_tmp=i_tmp_dens)
     end if
 
     if (j > 0) then
       do ii = 1, num_cIx_to_track
         mask_var = 0.0_dp
         where (mask == GL_cIx_to_track(ii)) mask_var = 1.0_dp
-
-        call af_particles_to_grid(tree, i_tracked_cIx(ii), coords_CAS(:, 1:j), &
-              mask_var(1:j) * weights_CAS(1:j), j, 1, id_guess_CAS(1:j))
+        call af_particles_to_grid(tree, i_tracked_cIx(ii), j, &
+              get_event_id_CAS, get_event_rw_CAS, interpolation_order_to_density, &
+              iv_tmp=i_tmp_dens)
       end do
       ! END FLAG
     end if
@@ -525,6 +528,13 @@ contains
       id = af_get_id_at(tree, coords(:, n), guess=id_guess(n))
     end subroutine get_event_id
 
+    subroutine get_event_id_CAS(n, id)
+      integer, intent(in)  :: n
+      integer, intent(out) :: id
+
+      id = af_get_id_at(tree, coords_CAS(:, n), guess=id_guess_CAS(n))
+    end subroutine get_event_id_CAS
+
     !> Get particle position and weight
     subroutine get_event_rw(n, r, w)
       integer, intent(in)   :: n
@@ -534,6 +544,26 @@ contains
       r = coords(:, n)
       w = weights(n)
     end subroutine get_event_rw
+
+    !> Get energy deposited to the gas
+    subroutine get_event_r_energydeposit(n, r, w)
+      integer, intent(in)   :: n
+      real(dp), intent(out) :: r(NDIM)
+      real(dp), intent(out) :: w
+
+      r = coords(:, n)
+      w = abs(weights(n) * energy_lost(n))
+    end subroutine get_event_r_energydeposit
+
+    !> Get position and reactive species produced
+    subroutine get_event_rw_CAS(n, r, w)
+      integer, intent(in)   :: n
+      real(dp), intent(out) :: r(NDIM)
+      real(dp), intent(out) :: w
+
+      r = coords_CAS(:, n)
+      w = mask_var(n) * weights_CAS(n)
+    end subroutine get_event_rw_CAS
 
   end subroutine particles_to_density_and_events
 
@@ -679,6 +709,16 @@ contains
     r = get_coordinates(pc%particles(n))
     w = pc%particles(n)%w
   end subroutine get_rw
+
+  !> Get energy deposited to the gas
+  subroutine get_r_energydeposit(n, r, w)
+    integer, intent(in)   :: n
+    real(dp), intent(out) :: r(NDIM)
+    real(dp), intent(out) :: w
+
+    r = get_coordinates(pc%particles(n))
+    w = pc%particles(n)%en_loss * pc%particles(n)%w
+  end subroutine get_r_energydeposit
 
   !> Get particle position and energy
   subroutine get_r_energy(n, r, w)

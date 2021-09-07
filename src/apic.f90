@@ -128,7 +128,7 @@ program apic
   do i = 1, 100
      call af_tree_clear_cc(tree, i_pos_ion)
 
-     call particles_to_density_and_events(tree, pc, associated(user_initial_particles), dt)
+     call particles_to_density_and_events(tree, pc, .true.)
 
      if (associated(user_initial_ion_density)) &
           call af_loop_box(tree, user_initial_ion_density)
@@ -234,8 +234,9 @@ program apic
      n_part = pc%get_num_sim_part()
      if (n_part > n_prev_merge * min_merge_increase .or. &
           it - it_last_merge >= iterations_between_merge_split) then
+        print *, "A"
         call adapt_weights(tree, pc, t_sort, t_rest)
-
+        print *, "B"
         n_prev_merge     = pc%get_num_sim_part()
         it_last_merge    = it
         wtime_sort       = wtime_sort + t_sort
