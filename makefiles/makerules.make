@@ -11,17 +11,7 @@ ifeq ($(COMPILER), gfortran)
 		FFLAGS += -O0 -fcheck=all -pg				\
 		-ffpe-trap=invalid,zero,overflow -pedantic -finit-real=snan
 	endif
-<<<<<<< HEAD
 
-	ifeq ($(PROF), 1)
-		FFLAGS += -pg
-	endif
-	ifeq ($(PROF), gperftools)
-		FFLAGS += -lprofiler
-	endif
-
-=======
->>>>>>> master
 else ifeq ($(COMPILER), ifort)
 	FC 	:= ifort
 	FFLAGS := -warn all -O2 -g -stand f08 -openmp -assume realloc-lhs -fpp
@@ -36,11 +26,8 @@ else ifeq ($(PROF), gperftools)
   LIBS += profiler
 endif
 
-<<<<<<< HEAD
-=======
 FFLAGS += $(USR_FLAGS)
 
->>>>>>> master
 # How to get .o object files from .f90 source files
 %.o: %.f90
 	$(FC) -c -o $@ $< $(FFLAGS) $(addprefix -I,$(INCDIRS))
