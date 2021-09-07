@@ -45,13 +45,6 @@ contains
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-<<<<<<< HEAD
-    do n = 1, 50000
-       pos(1:2) = [0.5_dp, 0.075_dp] * domain_len
-       pos(3)   = 0.0_dp
-       part%w   = 4000 * particle_min_weight
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * [1.5e-4_dp, 3.0e-4_dp]
-=======
     do n = 1, seed_num_particles
        if (GL_cylindrical) then
           tmp_vec = GL_rng%two_normals() * seed_sigma
@@ -67,7 +60,6 @@ contains
        end if
 
        part%w = seed_particle_weight
->>>>>>> master
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
