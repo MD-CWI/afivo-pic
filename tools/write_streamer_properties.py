@@ -16,24 +16,47 @@ def get_args():
         description='''Compute streamer properties and write them to a text file''')
     p.add_argument('-write_all', dest='write_all', action='store_true',
                    help='write parameters to file')
+
     p.add_argument('-write_length', dest='write_length', action='store_true',
                    help='write the distance of the maximal electric field to the tip of the electrode (only valid for axisymmetric streamers)')
+
     p.add_argument('-write_Emax', dest='write_Emax', action='store_true',
                    help='write the maximal electric field')
+
     p.add_argument('-write_radius', dest='write_radius', action='store_true',
                    help='write the electrodynamic radius (only for axisymmetric streamers)')
     p.add_argument('-R_start_state', dest='R_start_state', type=int, default=10,
                    help='Skip the first N time states to ensure R is calculated only after inception')
     p.add_argument('-R_slices_per_mm', dest='R_slices_per_mm', type=float, default=25,
                    help='Number of horizontal slices per mm considered for determining radius')
+
     p.add_argument('-write_volume', dest='write_volume', action='store_true',
                    help='write the volume of a streamer where the electron density is above a threshold value')
     p.add_argument('-volume_threshold', type=float, default=1.0e19,
                    help='The threshold value of the electron density that defines the streamer volume')
+
     p.add_argument('-write_Lgap', dest='write_Lgap', action='store_true',
                    help='write the max z coordinate where the electron density is above the volume threshold value')
+
     p.add_argument('-write_energy_deposition', dest='write_energy_deposition', action='store_true',
                    help='write the time- and space-integrated energy density deposition')
+
+
+    p.add_argument('-plot_V_distribution', dest='plot_distribution', action='store_true',
+                   help='Whether to plot a volume distribution')
+    p.add_argument('-Vdist_logplot', dest='Vdist_logplot', action='store_true',
+                   help='Whether to plot on a semilogy axis')
+    p.add_argument('-Vdist_start', dest='Vdist_start', type=float, default=0,
+                   help='The lowest value of the x-axis variable')
+    p.add_argument('-Vdist_stop', dest='Vdist_stop', type=float, default=1e7,
+                   help='The highest value of the x-axis variable')
+    p.add_argument('-Vdist_num', dest='Vdist_num', type=int, default=25,
+                   help='The number of points on the x-axis')
+    p.add_argument('-Vdist_state', dest='Vdist_state', type=float, default=0,
+                   help='The time state at which to make the distribution')
+    p.add_argument('-Vdist_var_name', dest='Vdist_var_name', type=str,
+                   help='The variable for which the distribution is calculated')
+
     p.add_argument('-no_win', dest='no_win', action='store_true',
                    help='suppress visit to open windows')
     p.add_argument('-path', dest='path', type=str,
@@ -217,7 +240,7 @@ def calculate_Lgap():
         print(str(states+1) + " out of " +  str(visit.TimeSliderGetNStates()))
         visit.SetTimeSliderState(states)
         visit.Query("SpatialExtents") # This query derives the mask of the streamer
-        
+
         t = np.append(t, [states])
         Lgap = np.append(Lgap, [visit.GetQueryOutputValue()[5] - visit.GetQueryOutputValue()[4]])
 
@@ -225,6 +248,35 @@ def calculate_Lgap():
     plot_Lgap(t, Lgap)
 
     return t, Lgap
+
+def plot_volume_distribution_single_state(start, stop, num, var_name, state):
+    print("Calculating distribution of " + var_name)
+    visit.RemoveAllOperators()
+    visit.DeleteAllPlots()
+    visit.AddPlot("Pseudocolor", "electron")
+    visit.SetTimeSliderState(state)
+
+    x = np.linspace(start, stop, num)
+
+    distribution = []
+
+    for ii in range(len(x)):
+        visit.DefineScalarExpression("I_mask", "if(ge("+var_name+"+,"+str(x)+"), I_mask=1, I_mask=0)") # Indicator function defining the volume
+        visit.ChangeActivePlotsVar("I_mask")
+        visit.DrawPlots()
+        visit.Query("Weighted Variable Sum")
+        distribution = np.append(distribution, [visit.GetQueryOutputValue()])
+
+    plt.figure()
+    if (args.Vdist_logplot):
+        plt.semilogy(x, distribution)
+    else:
+        plt.plot(x, distribution)
+    plt.xlabel("$x_{threshold}$")
+    plt.ylabel("Vol(I($x>x_{threshold}$))")
+    plt.title("Volume distribution of "+var_name)
+    plt.tight_layout()
+    return
 
 def plot_length(t, L):
     plt.figure()
@@ -297,5 +349,7 @@ elif (args.write_length or args.write_Emax):
 if (args.write_energy_deposition or args.write_all): [t, E_dep] = calculate_energy()
 if (args.write_volume or args.write_all):                [t, V] = calculate_volume()
 if (args.write_Lgap or args.write_all):               [t, Lgap] = calculate_Lgap()
+
+if (args.plot_V_distribution): plot_volume_distribution_single_state(args.Vdist_start, args.Vdist_stop, args.Vdist_num, args.Vdist_var_name, args.Vdist_state)
 
 if (not args.no_plots): plt.show()
