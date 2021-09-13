@@ -8,6 +8,11 @@ module m_user
   implicit none
   private
 
+  real(dp) :: seed_pos(2) = [0.5_dp, 0.5_dp]
+  real(dp) :: seed_sigma = 1e-4_dp
+  integer :: seed_num_particles = 10000
+  real(dp) :: seed_particle_weight = 1e4
+
   ! Public methods
   public :: user_initialize
 
@@ -16,143 +21,113 @@ contains
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
+    call CFG_add_get(cfg, "seed_pos", seed_pos, &
+         "relative position of initial seed")
+    call CFG_add_get(cfg, "seed_sigma", seed_sigma, &
+         "characteristic size of the initial seed")
+    call CFG_add_get(cfg, "seed_num_particles", seed_num_particles, &
+         "number of particles in the seed")
+    call CFG_add_get(cfg, "seed_particle_weight", seed_particle_weight, &
+         "weight of the particles in the seed")
+
     user_initial_particles => init_particles
-    ! user_generate_particles => init_electrons_only
-    ! user_set_dielectric_eps => set_epsilon
-    ! user_set_surface_charge => set_surface_charge
-    ! user_potential_bc => my_potential
+    user_init_CAS_array => init_CAS_array
   end subroutine user_initialize
+
+  ! subroutine init_CAS_array_old(cIx_to_track, cIx_weights, cIx_labels, num_cIx)
+  !   integer, allocatable, intent(inout) :: cIx_to_track(:, :)
+  !   real(dp), allocatable, intent(inout) :: cIx_weights(:, :)
+  !   character(len=GL_slen), allocatable, intent(inout) :: cIx_labels(:)
+  !   integer, intent(inout)  :: num_cIx
+  !   integer :: max_proc
+  !
+  !   num_cIx = 2 ! The number of grouped CAS densities we include
+  !   max_proc = 6 ! The maximum number of processes in one group (needed for allocation)
+  !   allocate(cIx_to_track(num_cIx, max_proc), cIx_weights(num_cIx, max_proc), cIx_labels(num_cIx))
+  !   cIx_to_track(:,:) = 0
+  !   cIx_weights(:,:)  = 1 ! Default weight equals one
+  !
+  !   cIx_labels(1) = "N2_triplets"
+  !   cIx_to_track(1, :) = [1, 2, 3, 4, 5, 6]
+  !
+  !   cIx_labels(2) = "O2_singlets"
+  !   cIx_to_track(2, 1:2) = [23, 24]
+  !
+  !   print *, "CAS_weights not implemented."
+  !   ! TODO Consider switching to a dictionary-type structure using pointers.
+  ! end subroutine init_CAS_array_old
+
+  subroutine init_CAS_array(cIx_groups, cIx_labels, n_species)
+    real(dp), allocatable, intent(inout) :: cIx_groups(:, :)
+    character(len=GL_slen), allocatable, intent(inout) :: cIx_labels(:)
+    integer, intent(in)  :: n_species ! maximum number of species
+    integer :: n_groups
+
+    n_groups = 4
+    print *, n_species
+    allocate(cIx_groups(n_groups, n_species), cIx_labels(n_groups))
+    cIx_groups = 0.0_dp ! Initialize zero weight
+
+    !> INSERT GROUP NAMES HERE
+    cIx_labels(1) = "N2_triplets"
+    cIx_labels(2) = "O2_singlets"
+    cIx_labels(3) = "H2"
+    cIx_labels(4) = "H"
+
+    !> INSERT WEIGHTS HERE (First column => group, second column => cIx)
+    cIx_groups(1, 1:6)   = 1.0_dp ! Nitrogen triplets
+    cIx_groups(2, 23:24) = 1.0_dp ! Oxygen singlets
+
+    cIx_groups(3, 34) = 1.0_dp ! Hydrogen molecules
+    cIx_groups(3, 37) = 1.0_dp ! Hydrogen molecules
+    cIx_groups(3, 41) = 1.0_dp ! Hydrogen molecules
+    cIx_groups(3, 44) = 1.0_dp ! Hydrogen molecules
+    cIx_groups(3, 48) = 1.0_dp ! Hydrogen molecules
+    cIx_groups(3, 49) = 1.0_dp ! Hydrogen molecules
+
+    cIx_groups(4, 35) = 1.0_dp ! Hydrogen atoms
+    cIx_groups(4, 36) = 1.0_dp ! Hydrogen atoms
+    cIx_groups(4, 41) = 1.0_dp ! Hydrogen atoms
+    cIx_groups(4, 42) = 2.0_dp ! Hydrogen atoms
+    cIx_groups(4, 43) = 1.0_dp ! Hydrogen atoms
+    cIx_groups(4, 46) = 1.0_dp ! Hydrogen atoms
+    cIx_groups(4, 47) = 2.0_dp ! Hydrogen atoms
+    cIx_groups(4, 49) = 1.0_dp ! Hydrogen atoms
+
+
+  end subroutine init_CAS_array
 
   subroutine init_particles(pc)
     use m_particle_core
     type(PC_t), intent(inout) :: pc
     integer                   :: n
-    real(dp)                  :: pos(3)
+    real(dp)                  :: tmp_vec(2)
     type(PC_part_t)           :: part
 
     part%v      = 0.0_dp
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 3000
-       pos(1:2) = [0.5_dp, 0.5_dp] * domain_len
-       pos(3)   = 0.0_dp
-       part%w   = particle_min_weight
-       part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 2e-5_dp
+    do n = 1, seed_num_particles
+       if (GL_cylindrical) then
+          tmp_vec = GL_rng%two_normals() * seed_sigma
+          part%x(1) = norm2(tmp_vec)
+          tmp_vec = GL_rng%two_normals() * seed_sigma
+          part%x(2) = tmp_vec(1)
+          part%x(1:2) = part%x(1:2) + seed_pos * domain_len
+          part%x(3) = 0.0_dp
+       else
+          part%x(1:2) = GL_rng%two_normals() * seed_sigma
+          part%x(1:2) = part%x(1:2) + seed_pos * domain_len
+          part%x(3) = 0.0_dp
+       end if
+
+       part%w = seed_particle_weight
 
        if (outside_check(part) <= 0) then
           call pc%add_part(part)
        end if
     end do
-
-      ! do n = 1, 50000
-      !    pos(1:2) = [0.5_dp, 0.03_dp] * domain_len
-      !    pos(3)   = 0.0_dp
-      !    part%w   = 4000 * particle_min_weight
-      !    part%x(1:2) = pos(1:2) + GL_rng%two_normals() * [0.5e-4_dp, 1.0e-4_dp]
-      !
-      !    if (outside_check(part) <= 0) then
-      !       call pc%add_part(part)
-      !    end if
-      ! end do
-      !
-      ! do n = 1, 5000
-      !    pos(1:2) = [0.5_dp, 0.03_dp] * domain_len
-      !    pos(3)   = 0.0_dp
-      !    part%w   = particle_min_weight
-      !    part%x(1:2) = pos(1:2) + GL_rng%two_normals() * [0.5e-4_dp, 2.0e-4_dp]
-      !
-      !    if (outside_check(part) <= 0) then
-      !       call pc%add_part(part)
-      !    end if
-      ! end do
   end subroutine init_particles
-
-  subroutine init_electrons_only(pc, time, time_elapsed)
-    ! This model can be used to generate electrons (without ions)
-    use m_particle_core
-    type(PC_t), intent(inout)  :: pc
-    real(dp), intent(in)      :: time         !< Current time
-    real(dp), intent(in)      :: time_elapsed !< Time since last call
-
-    integer                   :: n
-    real(dp)                  :: pos(3)
-    type(PC_part_t)           :: part
-
-    if (time <= 0.0_dp) then
-          part%v      = 0.0_dp
-          part%a      = 0.0_dp
-          part%t_left = 0.0_dp
-
-          do n = 1, 5000
-             pos(1:2) = [0.5_dp, 0.02_dp] * domain_len
-             pos(3)   = 0.0_dp
-             part%w   = 1.0_dp
-             part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1.0e-5_dp
-
-             if (outside_check(part) <= 0) then
-                call pc%add_part(part)
-             end if
-          end do
-    end if
-  end subroutine
-
-  subroutine set_epsilon(box)
-    type(box_t), intent(inout) :: box
-    real(dp)                   :: r(2)
-    integer                    :: i, j
-
-    do j = 0, box%n_cell+1
-       do i = 0, box%n_cell+1
-          r = af_r_cc(box, [i, j])
-
-          if (r(2)/domain_len(2) < 0.25_dp) then
-             box%cc(i, j, i_eps) = 4.5_dp
-          else
-             box%cc(i, j, i_eps) = 1.0_dp
-          end if
-       end do
-    end do
-  end subroutine set_epsilon
-
-  real(dp) function set_surface_charge(r)
-    ! Set the surface charge on all dielectric surfaces as a function of r
-    real(dp), intent(in) :: r(NDIM)
-    real(dp)  :: coord, var, amplitude
-
-
-    coord     = r(1)/domain_len(1) - 0.5_dp
-    var       = 5.0e-5_dp
-    amplitude = 3.5e16_dp
-
-    set_surface_charge = amplitude * exp(- coord**2 / var)
-  end function set_surface_charge
-
-  subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
-    type(box_t), intent(in) :: box
-    integer, intent(in)     :: nb
-    integer, intent(in)     :: iv
-    real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
-    real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
-    integer, intent(out)    :: bc_type
-    integer                 :: ii
-
-    select case (nb)
-    case (af_neighb_highy)
-        bc_type = af_bc_dirichlet
-        bc_val = 0.0_dp
-      case (af_neighb_lowy)
-        bc_type = af_bc_dirichlet
-        do ii = 1, box%n_cell**(NDIM-1)
-          bc_val(ii) = 2.75e4_dp + 2.0e3_dp * exp( - (coords(1, ii)/domain_len(1) - 0.5_dp)**2 / 1.0e-3_dp)
-        end do
-      case default
-        bc_type = af_bc_neumann
-        bc_val = 0.0_dp
-    end select
-
-
-  end subroutine my_potential
-
 
 end module m_user
