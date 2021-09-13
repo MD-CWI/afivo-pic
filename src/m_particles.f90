@@ -36,7 +36,7 @@ contains
     character(len=20), allocatable :: gas_names(:)
     real(dp), allocatable          :: gas_fracs(:)
     type(CS_t), allocatable        :: cross_secs(:)
-    integer                        :: ii
+    integer                        :: ii, jj
     type(PC_part_t)                :: dummy_part
 
     ! Gas parameters
@@ -131,9 +131,14 @@ contains
          pc%coll_is_event(:) = .true.
     end where
 
+    ! Mark all stored cIx as an event
     if (GL_track_CAS) then
-      do ii = 1, num_cIx_to_track
-        pc%coll_is_event(GL_cIx_to_track(ii)) = .true.
+      do ii = 1, size(GL_cIx_groups, 1)
+        do jj = 1, size(pc%coll_is_event(:))
+          if(GL_cIx_groups(ii, jj) > 0.0_dp) then
+            pc%coll_is_event(jj) = .true.
+          end if
+        end do
       end do
     end if
 
@@ -368,7 +373,7 @@ contains
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
 
-    integer                     :: n, i, j, ii, n_part, n_photons, n_part_before
+    integer                     :: n, i, j, ii, jj, n_part, n_photons, n_part_before
 
     real(dp), allocatable, save :: coords(:, :), coords_CAS(:, :)
     real(dp), allocatable, save :: weights(:), weights_CAS(:), mask_var(:)
@@ -407,22 +412,13 @@ contains
       call af_particles_to_grid(tree, i_electron, n_part, &
            get_id, get_rw, interpolation_order_to_density, &
            iv_tmp=i_tmp_dens)
-      ! FLAG This routine needs to be rewritten in new syntax
-      ! call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:n_part), &
-      !     weights(1:n_part)*energy_lost(1:n_part), n_part, 1, &
-      !     id_guess(1:n_part))
       call af_particles_to_grid(tree, i_energy_dep, n_part, &
           get_id, get_r_energydeposit, interpolation_order_to_density, &
           iv_tmp=i_tmp_dens)
-      ! END FLAG
     end if
 
     !$omp parallel do
     do n = 1, n_part
-       ! coords(:, n)   = pc%particles(n)%x(1:NDIM)
-       ! weights(n)     = pc%particles(n)%w
-       ! id_guess(n)    = pc%particles(n)%id
-       ! energy_lost(n) = pc%particles(n)%en_loss
        pc%particles(n)%en_loss = 0.0_dp ! Reset the energy_loss of all particles
     end do
     !$omp end parallel do
@@ -452,13 +448,13 @@ contains
        end if
 
        if (GL_track_CAS) then
-         if(any(pc%event_list(n)%cIx == GL_cIx_to_track)) then
+         if(any(GL_cIx_groups(:, pc%event_list(n)%cIx) > 0.0_dp)) then
            j = j + 1
-           coords_CAS(:, j) = pc%event_list(n)%part%x(1:NDIM)
+           coords_CAS(:, j) = get_coordinates(pc%event_list(n)%part)
            weights_CAS(j)   = pc%event_list(n)%part%w
            id_guess_CAS(j)  = pc%event_list(n)%part%id
            mask(j)          = pc%event_list(n)%cIx
-         end if
+          end if
        end if
     end do
 
@@ -466,24 +462,20 @@ contains
        call af_particles_to_grid(tree, i_pos_ion, i, &
            get_event_id, get_event_rw, interpolation_order_to_density, &
            iv_tmp=i_tmp_dens)
-      ! FLAG rewrite in terms of new syntax
-       ! call af_particles_to_grid(tree, i_energy_dep, coords(:, 1:i), &
-       !     abs(weights(1:i)*energy_lost(1:i)), i, 1, &
-       !     id_guess(1:i))
        call af_particles_to_grid(tree, i_energy_dep, i, &
            get_event_id, get_event_r_energydeposit, interpolation_order_to_density, &
            iv_tmp=i_tmp_dens)
     end if
 
     if (j > 0) then
-      do ii = 1, num_cIx_to_track
-        mask_var = 0.0_dp
-        where (mask == GL_cIx_to_track(ii)) mask_var = 1.0_dp
-        call af_particles_to_grid(tree, i_tracked_cIx(ii), j, &
-              get_event_id_CAS, get_event_rw_CAS, interpolation_order_to_density, &
-              iv_tmp=i_tmp_dens)
+        do ii = 1, n_cIx_groups
+          do jj = 1, j
+            mask_var(jj) = GL_cIx_groups(ii, mask(jj)) ! Generate the weights from the "index table"
+          end do
+          call af_particles_to_grid(tree, i_tracked_cIx(ii), j, &
+                get_event_id_CAS, get_event_rw_CAS, interpolation_order_to_density, &
+                iv_tmp=i_tmp_dens)
       end do
-      ! END FLAG
     end if
 
     if (photoi_enabled) then

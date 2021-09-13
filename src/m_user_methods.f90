@@ -30,6 +30,9 @@ module m_user_methods
 
   procedure(log_subr), pointer :: user_write_log => null()
 
+  !> User method that specifies which collisions to track
+  procedure(CAS_array), pointer :: user_init_CAS_array => null()
+
   integer, parameter :: user_max_log_vars = 20
 
   !> To add entries to the log file
@@ -72,6 +75,13 @@ module m_user_methods
        import
        real(dp), intent(in) :: r(NDIM)
      end function sigma_func
+
+     subroutine CAS_array(cIx_groups, cIx_labels, n_species)
+       import
+       real(dp), allocatable, intent(inout) :: cIx_groups(:, :)
+       character(len=*), allocatable, intent(inout) :: cIx_labels(:)
+       integer, intent(in)  :: n_species ! maximum number of species
+     end subroutine CAS_array
   end interface
 
 end module m_user_methods

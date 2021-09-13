@@ -10,6 +10,7 @@ module m_globals
   use m_units_constants
   use m_config
   use m_random
+  use m_user_methods
 
   implicit none
   public
@@ -87,12 +88,12 @@ module m_globals
   logical, protected :: GL_track_CAS = .false.
 
   ! List of collision indices corresponding to species to track
-  integer, allocatable, protected :: GL_cIx_to_track(:)
+  real(dp), allocatable, protected :: GL_cIx_groups(:, :)
 
   character(len=GL_slen), allocatable, protected :: GL_cIx_labels(:)
 
   ! Total number of species to track
-  integer :: num_cIx_to_track
+  integer :: n_cIx_groups
 
   ! Interval for writing to .dat file
   real(dp), protected :: GL_write_to_dat_interval(2) = 1e100_dp
@@ -220,22 +221,15 @@ contains
     end if
 
     if (GL_track_CAS) then
-      call CFG_add(cfg, "cIx_to_track", [-1], &
-            "List of collision indices that are tracked", .true.)
-
-      call CFG_get_size(cfg, "cIx_to_track", num_cIx_to_track)
-
-      allocate(GL_cIx_to_track(num_cIx_to_track))
-      allocate(i_tracked_cIx(num_cIx_to_track))
-      allocate(GL_cIx_labels(num_cIx_to_track))
+      if (associated(user_init_CAS_array)) then
+        call user_init_CAS_array(GL_cIx_groups, GL_cIx_labels, PC_max_num_coll)
+        n_cIx_groups = size(GL_cIx_groups, 1) ! First dimension encodes the groups
+        allocate(i_tracked_cIx(n_cIx_groups))
+      end if
 
       i_tracked_cIx = -1
 
-      call CFG_get(cfg, "cIx_to_track", GL_cIx_to_track)
-      call CFG_add_get(cfg, "cIx_labels", GL_cIx_labels, &
-           "Output labels for tracked species")
-
-      do ii = 1, num_cIx_to_track
+      do ii = 1, n_cIx_groups
         call af_add_cc_variable(tree, trim(GL_cIx_labels(ii)), .true., ix=i_tracked_cIx(ii))
         call af_set_cc_methods(tree, i_tracked_cIx(ii), af_bc_neumann_zero)
       end do
