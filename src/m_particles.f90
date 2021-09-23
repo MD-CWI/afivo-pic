@@ -456,8 +456,6 @@ contains
           cycle
        end if
 
-       ! if(any(get_coordinates(pc%event_list(n)%part) > 1e-2)) print *, "JA"
-
        if (GL_track_CAS) then
          do i_group = 1, n_cIx_groups
            if(GL_cIx_groups(i_group, pc%event_list(n)%cIx) > 0.0_dp) then
