@@ -373,11 +373,12 @@ contains
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
 
-    integer                     :: n, i, j, ii, jj, n_part, n_photons, n_part_before
+    integer                     :: n, i, i_group, jj, n_part, n_photons, n_part_before
+    integer                     :: j(n_cIx_groups)
 
-    real(dp), allocatable, save :: coords(:, :), coords_CAS(:, :)
-    real(dp), allocatable, save :: weights(:), weights_CAS(:), mask_var(:)
-    integer, allocatable, save  :: id_guess(:), id_guess_CAS(:), mask(:)
+    real(dp), allocatable, save :: coords(:, :), coords_CAS(:, :, :)
+    real(dp), allocatable, save :: weights(:), weights_CAS(:, :), mask_var(:)
+    integer, allocatable, save  :: id_guess(:), id_guess_CAS(:, :), mask(:, :)
     real(dp), allocatable, save :: energy_lost(:)
 
     n_part = pc%get_num_sim_part()
@@ -387,7 +388,8 @@ contains
        n = nint(n * array_incr_fac)
        allocate(coords(NDIM, n), weights(n), id_guess(n), energy_lost(n))
        if (GL_track_CAS) then
-         allocate(coords_CAS(NDIM, n), weights_CAS(n), id_guess_CAS(n), mask(n), mask_var(n))
+         allocate(coords_CAS(n_cIx_groups, NDIM, n), weights_CAS(n_cIx_groups, n), &
+            id_guess_CAS(n_cIx_groups, n), mask(n_cIx_groups, n), mask_var(n))
        end if
     else if (size(weights) < n) then
        n = nint(n * array_incr_fac)
@@ -395,7 +397,8 @@ contains
        allocate(coords(NDIM, n), weights(n), id_guess(n), energy_lost(n))
        if (GL_track_CAS) then
          deallocate(coords_CAS, mask_var, mask, id_guess_CAS, weights_CAS)
-         allocate(coords_CAS(NDIM, n), weights_CAS(n), id_guess_CAS(n), mask(n), mask_var(n))
+         allocate(coords_CAS(n_cIx_groups, NDIM, n), weights_CAS(n_cIx_groups, n), &
+            id_guess_CAS(n_cIx_groups, n), mask(n_cIx_groups, n), mask_var(n))
        end if
     end if
 
@@ -424,7 +427,7 @@ contains
     !$omp end parallel do
 
     i = 0 ! Counter for ionizing events
-    j = 0 ! Counter for CAS tracker
+    j = 0 ! Counter for CAS tracker (per cIx_group)
 
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
@@ -445,17 +448,27 @@ contains
           ! Now we map the particle to surface charge
           call particle_to_surface_charge(tree, pc%event_list(n)%part, &
                i_surf_elec)
+
+       else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
+            pc%event_list(n)%cIx == outside_domain) then
+          ! Explicitely skip particles that have moved out of the domain to avoid
+          ! overlapping cIx for further events
+          cycle
        end if
 
+       ! if(any(get_coordinates(pc%event_list(n)%part) > 1e-2)) print *, "JA"
+
        if (GL_track_CAS) then
-         if(any(GL_cIx_groups(:, pc%event_list(n)%cIx) > 0.0_dp)) then
-           j = j + 1
-           coords_CAS(:, j) = get_coordinates(pc%event_list(n)%part)
-           weights_CAS(j)   = pc%event_list(n)%part%w
-           id_guess_CAS(j)  = pc%event_list(n)%part%id
-           mask(j)          = pc%event_list(n)%cIx
-          end if
-       end if
+         do i_group = 1, n_cIx_groups
+           if(GL_cIx_groups(i_group, pc%event_list(n)%cIx) > 0.0_dp) then
+             j(i_group) = j(i_group) + 1
+             coords_CAS(i_group, :, j(i_group)) = get_coordinates(pc%event_list(n)%part)
+             weights_CAS(i_group, j(i_group))   = pc%event_list(n)%part%w
+             id_guess_CAS(i_group, j(i_group))  = pc%event_list(n)%part%id
+             mask(i_group, j(i_group))          = pc%event_list(n)%cIx
+            end if
+          end do
+         end if
     end do
 
     if (i > 0) then ! only for the events that created an ion
@@ -467,16 +480,17 @@ contains
            iv_tmp=i_tmp_dens)
     end if
 
-    if (j > 0) then
-        do ii = 1, n_cIx_groups
-          do jj = 1, j
-            mask_var(jj) = GL_cIx_groups(ii, mask(jj)) ! Generate the weights from the "index table"
-          end do
-          call af_particles_to_grid(tree, i_tracked_cIx(ii), j, &
-                get_event_id_CAS, get_event_rw_CAS, interpolation_order_to_density, &
-                iv_tmp=i_tmp_dens)
-      end do
-    end if
+    ! Write CAS to grid per cIx_group. This prevents writing a bunch of zero entries to grid
+    do i_group = 1, n_cIx_groups
+      if (j(i_group) > 0) then
+        do jj = 1, j(i_group) ! Loop over all the events that are in the current cIx_group
+          mask_var(jj) = GL_cIx_groups(i_group, mask(i_group, jj)) ! Generate the weights from the "index table"
+        end do
+        call af_particles_to_grid(tree, i_tracked_cIx(i_group), j(i_group), &
+              get_event_id_CAS, get_event_rw_CAS, interpolation_order_to_density, &
+              iv_tmp=i_tmp_dens)
+      end if
+    end do
 
     if (photoi_enabled) then
        ! Photo-electrons are added to the end of the particle list
@@ -519,7 +533,7 @@ contains
       integer, intent(in)  :: n
       integer, intent(out) :: id
 
-      id = af_get_id_at(tree, coords_CAS(:, n), guess=id_guess_CAS(n))
+      id = af_get_id_at(tree, coords_CAS(i_group, :, n), guess=id_guess_CAS(i_group, n))
     end subroutine get_event_id_CAS
 
     !> Get particle position and weight
@@ -548,8 +562,8 @@ contains
       real(dp), intent(out) :: r(NDIM)
       real(dp), intent(out) :: w
 
-      r = coords_CAS(:, n)
-      w = mask_var(n) * weights_CAS(n)
+      r = coords_CAS(i_group, :, n)
+      w = mask_var(n) * weights_CAS(i_group, n)
     end subroutine get_event_rw_CAS
 
   end subroutine particles_to_density_and_events
