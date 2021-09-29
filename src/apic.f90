@@ -111,8 +111,7 @@ program apic
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
-  call af_set_cc_methods(tree, i_energy_dep, af_bc_neumann_zero, &
-       prolong=af_prolong_limit)
+  call af_set_cc_methods(tree, i_energy_dep, af_bc_neumann_zero)
 
   if (GL_use_dielectric) then
      ! Initialize dielectric surfaces at the third refinement level
