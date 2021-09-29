@@ -454,6 +454,7 @@ contains
           ! Explicitely skip particles that have moved out of the domain to avoid
           ! overlapping cIx for further events
           cycle
+          ! TODO instead of cycling here, we should make cIx of "outside domain" negative
        end if
 
        if (GL_track_CAS) then
