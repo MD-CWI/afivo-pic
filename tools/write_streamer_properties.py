@@ -42,7 +42,7 @@ def get_args():
                    help='write the time- and space-integrated energy density deposition')
 
 
-    p.add_argument('-plot_V_distribution', dest='plot_distribution', action='store_true',
+    p.add_argument('-plot_V_distribution', dest='plot_V_distribution', action='store_true',
                    help='Whether to plot a volume distribution')
     p.add_argument('-Vdist_logplot', dest='Vdist_logplot', action='store_true',
                    help='Whether to plot on a semilogy axis')
@@ -261,7 +261,7 @@ def plot_volume_distribution_single_state(start, stop, num, var_name, state):
     distribution = []
 
     for ii in range(len(x)):
-        visit.DefineScalarExpression("I_mask", "if(ge("+var_name+"+,"+str(x)+"), I_mask=1, I_mask=0)") # Indicator function defining the volume
+        visit.DefineScalarExpression("I_mask", "if(ge("+var_name+","+str(x)+"), I_mask=1, I_mask=0)") # Indicator function defining the volume
         visit.ChangeActivePlotsVar("I_mask")
         visit.DrawPlots()
         visit.Query("Weighted Variable Sum")
@@ -320,7 +320,7 @@ def plot_volume(t, V):
 
 def plot_Lgap(t, Lgap):
     plt.figure()
-    plt.plot(t, Lgap*1e-3)
+    plt.plot(t, Lgap*1e3)
     plt.xlabel("time (frame)")
     plt.ylabel("Lgap (mm)")
     plt.title("axial length (i.e. Lgap)")
