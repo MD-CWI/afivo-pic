@@ -73,7 +73,7 @@ program apic
   mg%i_phi = i_phi
   mg%i_tmp = i_residual
   mg%i_rhs = i_rhs
-  if (GL_use_dielectric) mg%i_eps = i_eps
+  if (GL_use_dielectric) tree%mg_i_eps = i_eps
 
   if (GL_use_electrode) then
      if (any(field_rod_r0 <= -1.0_dp)) &
@@ -82,17 +82,17 @@ program apic
           error stop "field_rod_r1 not set correctly"
      if (field_rod_radius <= 0) &
           error stop "field_rod_radius not set correctly"
-     ! print *, "AT YOUR SERVICE"
-     call af_set_cc_methods(tree, i_lsf, af_bc_neumann_zero, &
-          af_gc_prolong_copy, af_prolong_zeroth, funcval=field_rod_lsf)
-     mg%i_lsf = i_lsf
-  end if
 
-  ! This automatically handles cylindrical symmetry
-  mg%box_op => mg_auto_op
-  mg%box_gsrb => mg_auto_gsrb
-  mg%box_corr => mg_auto_corr
-  mg%box_stencil => mg_auto_stencil
+     call af_set_cc_methods(tree, i_lsf, af_bc_neumann_zero, &
+          af_gc_prolong_copy, af_prolong_zeroth, &
+          funcval=field_set_lsf_box)
+
+     mg%lsf => field_get_lsf
+     tree%mg_i_lsf = i_lsf
+
+     mg%lsf_dist => mg_lsf_dist_gss
+     mg%lsf_length_scale = field_rod_radius
+  end if
 
   ! Initialize the tree (which contains all the mesh information)
   call init_tree(tree)

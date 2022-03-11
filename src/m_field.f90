@@ -59,7 +59,8 @@ module m_field
   public :: field_get_amplitude
   public :: field_set_voltage
   public :: field_bc_homogeneous
-  public :: field_rod_lsf
+  public :: field_set_lsf_box
+  public :: field_get_lsf
 
 contains
 
@@ -286,7 +287,7 @@ contains
   end subroutine field_bc_homogeneous
 
   ! This routine sets the level set function for a simple rod
-  subroutine field_rod_lsf(box, iv)
+  subroutine field_set_lsf_box(box, iv)
     use m_geometry
     type(box_t), intent(inout) :: box
     integer, intent(in)        :: iv
@@ -295,16 +296,18 @@ contains
 
     nc = box%n_cell
 
-    ! print *, "I HAVE BEEN CALLED"
-
     do KJI_DO(0,nc+1)
        rr = af_r_cc(box, [IJK])
-       box%cc(IJK, iv) = GM_dist_line(rr, field_rod_r0 * domain_len, &
-            field_rod_r1 * domain_len, NDIM) - field_rod_radius
-       ! print *, box%cc(IJK, iv)
+       box%cc(IJK, iv) = field_get_lsf(rr)
     end do; CLOSE_DO
+  end subroutine field_set_lsf_box
 
-  end subroutine field_rod_lsf
+  real(dp) function field_get_lsf(r)
+    real(dp), intent(in) :: r(NDIM)
+
+    field_get_lsf = GM_dist_line(r, field_rod_r0 * domain_len, &
+         field_rod_r1 * domain_len, NDIM) - field_rod_radius
+  end function field_get_lsf
 
   !> Compute electric field from electrical potential
   subroutine field_from_potential(box)
