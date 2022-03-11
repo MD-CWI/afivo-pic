@@ -37,6 +37,7 @@ contains
     real(dp), allocatable          :: gas_fracs(:)
     type(CS_t), allocatable        :: cross_secs(:)
     type(PC_part_t)                :: dummy_part
+    real(dp)                       :: boris_dt_factor = 0.1_dp
 
     ! Gas parameters
     call CFG_add(cfg, "gas%temperature", 300.0_dp, &
@@ -58,6 +59,9 @@ contains
 
     call CFG_add_get(cfg, "particle%min_merge_increase", min_merge_increase, &
          "Minimum increase in particle count before merging")
+
+    call CFG_add_get(cfg, "particle%boris_dt_factor", boris_dt_factor, &
+         "With B-field: limit time step to boris_dt_factor / cyclotron freq.")
 
     if (GL_cylindrical) then
        ! Adapt weights more frequently to prevent fluctuations near the axis
@@ -102,12 +106,23 @@ contains
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
-    if (GL_cylindrical) then
-       pc%particle_mover => PC_verlet_cyl_advance
-       pc%after_mover => PC_verlet_cyl_correct_accel
+    if (magnetic_field_used) then
+       if (GL_cylindrical) error stop "Not implemented"
+
+       pc%B_vec = magnetic_field
+       pc%particle_mover => PC_boris_advance
+
+       pc%dt_max = boris_dt_factor * 2 * UC_pi / &
+            (norm2(magnetic_field) * abs(UC_elec_q_over_m))
+       write(*, "(A,E12.2)") " Boris max. time step:    ", pc%dt_max
     else
-       pc%particle_mover => PC_verlet_advance
-       pc%after_mover => PC_verlet_correct_accel
+       if (GL_cylindrical) then
+          pc%particle_mover => PC_verlet_cyl_advance
+          pc%after_mover => PC_verlet_cyl_correct_accel
+       else
+          pc%particle_mover => PC_verlet_advance
+          pc%after_mover => PC_verlet_correct_accel
+       end if
     end if
 
     ! How many bytes are required per particle (accounting for overhead, for

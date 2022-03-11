@@ -222,7 +222,7 @@ program apic
 
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt)
-     call pc%after_mover(dt)
+     if (.not. magnetic_field_used) call pc%after_mover(dt)
      t1 = omp_get_wtime()
      wtime_advance = wtime_advance + (t1 - t0)
 

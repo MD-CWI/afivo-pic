@@ -9,6 +9,12 @@ module m_field
   implicit none
   private
 
+  !> Magnetic field
+  real(dp), public, protected :: magnetic_field(3) = 0.0_dp
+
+  !> Whether there is a magnetic field
+  logical, public, protected :: magnetic_field_used = .false.
+
   !> Start modifying the vertical background field after this time
   real(dp) :: field_mod_t0 = 1e99_dp
 
@@ -69,6 +75,10 @@ contains
     use m_user_methods
     type(CFG_t), intent(inout)  :: cfg !< Settings
     type(mg_t), intent(inout) :: mg  !< Multigrid option struct
+
+    call CFG_add_get(cfg, "field%magnetic", magnetic_field, &
+         "Background magnetic field vector (T)")
+    magnetic_field_used = any(abs(magnetic_field) > 0)
 
     call CFG_add_get(cfg, "field%mod_t0", field_mod_t0, &
          "Modify electric field after this time (s)")
