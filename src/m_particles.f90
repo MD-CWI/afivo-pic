@@ -16,6 +16,8 @@ module m_particles
 
   real(dp), protected :: steps_per_period = 30.0_dp
 
+  real(dp), protected :: boris_dt_factor = 0.1_dp
+
 contains
 
   subroutine init_particle(cfg, pc)
@@ -106,7 +108,7 @@ contains
 
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
-    if (magnetic_field_used) then
+    if (magnetic_field_used .and. magnetic_apply_t0 == 0.0_dp ) then
        if (GL_cylindrical) error stop "Not implemented"
 
        pc%B_vec = magnetic_field
@@ -144,6 +146,29 @@ contains
 
   end subroutine init_particle
 
+  subroutine check_particle_mover(pc, dt)
+    use m_units_constants
+    !use m_gas
+    !use m_cross_sec
+    use m_config
+    use m_domain
+    use m_field
+    class(PC_t), intent(inout)       :: pc
+    real(dp), intent(in)             :: dt
+
+    if (dt > magnetic_apply_t0) then
+        if (GL_cylindrical) error stop "Not implemented"
+        
+        pc%B_vec = magnetic_field
+        pc%particle_mover => PC_boris_advance
+
+        pc%dt_max = boris_dt_factor * 2 * UC_pi / &
+            (norm2(magnetic_field) * abs(UC_elec_q_over_m))
+        !write(*, "(A,E12.2)") " Boris max. time step:    ", pc%dt_max
+    end if
+  end subroutine check_particle_mover
+   
+  
   !> Set particle tags to cell they are in. Assumes that the 'id' of each
   !> particle is correctly set, and that there are no 'dead' particles
   subroutine set_particle_tags(tree, pc, n_velocity_bins)

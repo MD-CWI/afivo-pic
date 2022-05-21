@@ -14,10 +14,13 @@ module m_field
 
   !> Whether there is a magnetic field
   logical, public, protected :: magnetic_field_used = .false.
-
+ 
+  !> Start applying the magentic field after this time
+  real(dp), public, protected :: magnetic_apply_t0 = 0.0_dp
+  
   !> Start modifying the vertical background field after this time
   real(dp) :: field_mod_t0 = 1e99_dp
-
+  
   !> Amplitude of sinusoidal modification
   real(dp) :: field_sin_amplitude = 0.0_dp
 
@@ -79,6 +82,8 @@ contains
     call CFG_add_get(cfg, "field%magnetic", magnetic_field, &
          "Background magnetic field vector (T)")
     magnetic_field_used = any(abs(magnetic_field) > 0)
+    call CFG_add_get(cfg, "magnetic_apply_t0", magnetic_apply_t0, &
+         "Start applying the magentic field after this time")
 
     call CFG_add_get(cfg, "field%mod_t0", field_mod_t0, &
          "Modify electric field after this time (s)")

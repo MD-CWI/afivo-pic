@@ -221,6 +221,8 @@ program apic
      end if
 
      t0 = omp_get_wtime()
+     
+
      call pc%advance_openmp(dt)
      if (.not. magnetic_field_used) call pc%after_mover(dt)
      t1 = omp_get_wtime()
@@ -228,6 +230,7 @@ program apic
 
      GL_time = GL_time + dt
 
+     call check_particle_mover(pc, GL_time)
      call particles_to_density_and_events(tree, pc, .false.)
      t0 = omp_get_wtime()
      wtime_todensity = wtime_todensity + (t0 - t1)
@@ -436,5 +439,7 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+  
+
 
 end program apic
