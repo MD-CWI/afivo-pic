@@ -68,7 +68,7 @@ contains
     call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
          "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
-        "Whether photoionization is used")
+        "The probability for a single photoemission event")
     call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
         "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%rmin", pi_photon_rmin, &
@@ -111,7 +111,7 @@ contains
          [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
          "The inverse min/max absorption length, will be scaled by pO2")
 
-    if (photoi_enabled .or. photoe_enabled) then
+    if (photoi_enabled) then
        frac_O2 = GAS_get_fraction("O2")
        if (frac_O2 <= epsilon(1.0_dp)) then
           error stop "There is no oxygen, you should disable photoionzation"
