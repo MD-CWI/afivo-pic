@@ -64,9 +64,8 @@ contains
 
     call CFG_add_get(cfg, "photon%model", model, &
          "The model that is used for photon interactions")
-
     call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
-         "Whether photoionization is used")
+         "Whether photoemission is used")
     call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
         "The probability for a single photoemission event")
     call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
@@ -84,6 +83,9 @@ contains
         call Zheleznyak_initialize(cfg)
         photoionization => photoi_Zheleznyak
         photoemission => photoe_Zheleznyak
+      case("CO2")
+        call CO2_initialize(cfg)
+        photoemission => photoe_CO2
       case default
         error stop "Unrecognized photon model"
     end select
@@ -110,6 +112,17 @@ contains
     call CFG_add(cfg, "photon%absorp_inv_lengths", &
          [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
          "The inverse min/max absorption length, will be scaled by pO2")
+    call CFG_get_size(cfg, "photon%efficiency_table", t_size)
+    call CFG_get_size(cfg, "photon%efield_table", t_size_2)
+    if (t_size_2 /= t_size) then
+      print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
+      stop
+    end if
+
+    allocate(pi_photo_eff_table1(t_size))
+    allocate(pi_photo_eff_table2(t_size))
+    call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
+    call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
 
     if (photoi_enabled) then
        frac_O2 = GAS_get_fraction("O2")
@@ -117,26 +130,29 @@ contains
           error stop "There is no oxygen, you should disable photoionzation"
        end if
 
-       call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
-       pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
-       pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
-
        pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
             (GAS_pressure + (40.0D0 * UC_torr_to_bar))
 
-       call CFG_get_size(cfg, "photon%efficiency_table", t_size)
-       call CFG_get_size(cfg, "photon%efield_table", t_size_2)
-       if (t_size_2 /= t_size) then
-          print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
-          stop
-       end if
-
-       allocate(pi_photo_eff_table1(t_size))
-       allocate(pi_photo_eff_table2(t_size))
-       call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
-       call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
+       call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
+       pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
+       pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
     end if
+
   end subroutine Zheleznyak_initialize
+
+  ! ==== Now the modules for CO2 model
+  subroutine CO2_initialize(cfg)
+    use m_gas
+    use m_config
+    type(CFG_t), intent(inout) :: cfg
+
+    if (photoi_enabled) then
+      error stop "There is no photoionzation in CO2"
+    end if
+    pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
+        (GAS_pressure + (40.0D0 * UC_torr_to_bar))
+
+  end subroutine CO2_initialize
 
   ! Perform photon generation and ionization according to the Zheleznyak model
   subroutine photoi_Zheleznyak(tree, pc, n_photons)
@@ -198,7 +214,6 @@ contains
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
-
           do m = 1, n_uv
             x_start = pc%event_list(n)%part%x
             x_stop  = get_x_stop(x_start, prng%rngs(tid))
@@ -217,6 +232,44 @@ contains
     !$omp end parallel
     call prng%update_seed(GL_rng)
   end subroutine photoe_Zheleznyak
+
+  ! Perform photoemission based on the Zheleznyak model for CO2
+  subroutine photoe_CO2(tree, pc)
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+    logical                       :: on_surface
+    integer                       :: n, m, n_uv, tid
+    real(dp)                      :: x_start(3), x_stop(3)
+    type(prng_t)                  :: prng
+
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
+    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid)
+    tid = omp_get_thread_num() + 1
+    !$omp do
+    do n = 1, pc%n_events
+       if (pc%event_list(n)%ctype == CS_ionize_t) then
+         n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+          do m = 1, n_uv
+            x_start = pc%event_list(n)%part%x
+            x_stop  = get_x_stop_unlimited(x_start, prng%rngs(tid))
+            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
+            if (on_surface) then
+              if ((prng%rngs(tid)%unif_01() < photoe_probability)) then
+                !$omp critical
+                call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+                !$omp end critical
+              end if
+            end if
+          end do
+      end if
+    end do
+    !$omp end do
+    !$omp end parallel
+    call prng%update_seed(GL_rng)
+  end subroutine photoe_CO2
+
 
   ! Calculate the mean number of generate photons according to Zheleznyak model
   real(dp) function get_mean_n_photons(part)
@@ -239,6 +292,19 @@ contains
     fly_len = -log(1.0_dp - rng%unif_01()) / get_photoi_lambda(en_frac)
     x_stop  = x_start + rng%sphere(fly_len)
   end function
+
+  ! Calculate the coordinates of photon absorption with unlimited fly_len
+  function get_x_stop_unlimited(x_start, rng) result(x_stop)
+    type(rng_t), intent(inout)  :: rng
+    real(dp), intent(in)        :: x_start(3)
+    real(dp)                    :: x_stop(3)
+    real(dp)                    :: en_frac, fly_len
+
+    en_frac = rng%unif_01()
+    fly_len = sqrt(domain_len(1)**2 + domain_len(2)**2)
+    x_stop  = x_start + rng%sphere(fly_len)
+  end function
+
 
   ! Returns the photo-efficiency (for ionization) coefficient corresponding to an electric
   ! field of strength fld, according to Zheleznyak model
