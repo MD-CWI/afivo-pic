@@ -32,6 +32,9 @@ real(dp)              :: pi_photon_rmax(NDIM) = 1e10_dp
 ! the proportional factor for photoionization
 real(dp)              :: pi_eff = 0.075_dp
 
+! the proportional factor for photoemission from CO2
+real(dp)              :: pe_from_CO2 = 0.25_dp
+
 procedure(photoi), pointer :: photoionization => null()
 procedure(photoe), pointer :: photoemission => null()
 
@@ -68,6 +71,8 @@ contains
          "Whether photoemission is used")
     call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
         "The probability for a single photoemission event")
+    call CFG_add_get(cfg, "photon%em_from_CO2", pe_from_CO2, &
+        "The probability for a photoemission from CO2 corresponding to a ionization event")
     call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
         "Whether photoionization is used")
     call CFG_add_get(cfg, "photon%rmin", pi_photon_rmin, &
@@ -149,8 +154,6 @@ contains
     if (photoi_enabled) then
       error stop "There is no photoionzation in CO2"
     end if
-    pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
-        (GAS_pressure + (40.0D0 * UC_torr_to_bar))
 
   end subroutine CO2_initialize
 
@@ -250,7 +253,7 @@ contains
     !$omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
-         n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+         n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
           do m = 1, n_uv
             x_start = pc%event_list(n)%part%x
             x_stop  = get_x_stop_unlimited(x_start, prng%rngs(tid))
@@ -279,6 +282,13 @@ contains
     fld         = norm2(part%a / UC_elec_q_over_m)
     get_mean_n_photons = get_photoi_eff(fld) * pi_quench_fac * &
          part%w / particle_min_weight
+  end function
+
+  ! Calculate the mean number of generate photons according to Zheleznyak model
+  real(dp) function get_mean_n_photons_CO2(part)
+    type(PC_part_t), intent(in)  :: part
+
+    get_mean_n_photons_CO2 = pe_from_CO2 * part%w / particle_min_weight
   end function
 
   ! Calculate the coordinates of photon absorption according to Zheleznyak model
