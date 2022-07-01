@@ -36,12 +36,12 @@ contains
     part%t_left = 0.0_dp
 
     do n = 1, 1000
-       pos(1:2) = [0.25_dp, 0.5_dp] * domain_len
+       pos(1:2) = [0.3_dp, 0.8_dp] * domain_len
        pos(3)   = 0.0_dp
        part%w   = 1.0_dp
 
        rand_seed = GL_rng%two_normals()
-       part%x(1:2) = pos(1:2) + [rand_seed(1) * 1e-3_dp, rand_seed(2) * 1e-3_dp]
+       part%x(1:2) = pos(1:2) + [rand_seed(1) * 1e-4_dp, rand_seed(2) * 1e-4_dp]
        ! part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
 
        if (outside_check(part) <= 0) then
