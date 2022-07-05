@@ -138,7 +138,7 @@ contains
     pc%outside_check => outside_check
 
     where (pc%colls(:)%type == CS_ionize_t .or. &
-         pc%colls(:)%type == CS_attach_t)
+         pc%colls(:)%type == CS_attach_t .or. pc%colls(:)%type == CS_emission_t)
        pc%coll_is_event(:) = .true.
     end where
 

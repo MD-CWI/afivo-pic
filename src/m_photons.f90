@@ -252,7 +252,7 @@ contains
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_ionize_t) then
+       if (pc%event_list(n)%ctype == CS_emission_t) then
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
           do m = 1, n_uv
             x_start = pc%event_list(n)%part%x
@@ -288,7 +288,8 @@ contains
   real(dp) function get_mean_n_photons_CO2(part)
     type(PC_part_t), intent(in)  :: part
 
-    get_mean_n_photons_CO2 = pe_from_CO2 * part%w / particle_min_weight
+    ! get_mean_n_photons_CO2 = pe_from_CO2 * part%w / particle_min_weight
+    get_mean_n_photons_CO2 = part%w / particle_min_weight
   end function
 
   ! Calculate the coordinates of photon absorption according to Zheleznyak model
