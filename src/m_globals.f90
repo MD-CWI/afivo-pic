@@ -118,7 +118,7 @@ module m_globals
   real(dp) :: GL_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.9_dp]
   real(dp) :: GL_init_seed_sigma    = 1.0e-3_dp
   integer  :: GL_init_num_particles = 10000
-  
+
   ! The length of the (square) domain
   ! TODO: cannot directly use domain_len in m_domain
   real(dp), protected, public :: GL_domain_len(NDIM) = 4e-3_dp
@@ -148,7 +148,7 @@ contains
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "residual", .false., ix=i_residual)
     call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
-    call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
+    call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")

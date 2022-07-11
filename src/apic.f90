@@ -417,6 +417,7 @@ contains
     call af_particles_to_grid(tree, i_energy, n_part, get_id, &
          get_r_energy, 1, fill_gc=.false., iv_tmp=i_tmp_dens)
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
+    call clear_cc_inside_dielectric(tree, i_energy)
 
     ! Fill ghost cells before writing output
     call af_gc_tree(tree, [i_electron, i_pos_ion])
@@ -436,5 +437,24 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+
+  subroutine clear_cc_inside_dielectric(tree, iv)
+    type(af_t), intent(inout) :: tree
+    integer, intent(in)        :: iv !< Variable to clear
+    integer                    :: lvl, i, id
+
+    !$omp parallel private(lvl, i, id)
+    do lvl = 1, tree%highest_lvl
+       !$omp do
+       do i = 1, size(tree%lvls(lvl)%ids)
+          id = tree%lvls(lvl)%ids(i)
+            if (tree%boxes(id)%cc(1, 1, i_eps) > 1) then
+              call af_box_clear_cc(tree%boxes(id), iv)
+            end if
+       end do
+       !$omp end do
+    end do
+    !$omp end parallel
+  end subroutine clear_cc_inside_dielectric
 
 end program apic
