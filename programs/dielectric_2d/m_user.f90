@@ -8,6 +8,12 @@ module m_user
   implicit none
   private
 
+  real(dp) :: seed_pos(2) = [0.5_dp, 0.5_dp]
+  real(dp) :: seed_sigma = 1e-4_dp
+  integer :: seed_num_particles = 10000
+  real(dp) :: seed_particle_weight = 1e4
+  logical  :: user_init_pc = .true.
+
   ! Public methods
   public :: user_initialize
 
@@ -16,36 +22,53 @@ contains
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
-    user_initial_particles => init_particles
-    ! user_initial_ion_density => init_ion_density
-    user_set_surface_charge => init_surface_charge
+    call CFG_add_get(cfg, "pc%seed_pos", seed_pos, &
+         "relative position of initial seed")
+    call CFG_add_get(cfg, "pc%seed_sigma", seed_sigma, &
+         "characteristic size of the initial seed")
+    call CFG_add_get(cfg, "pc%seed_num_particles", seed_num_particles, &
+         "number of particles in the seed")
+    call CFG_add_get(cfg, "pc%seed_particle_weight", seed_particle_weight, &
+         "weight of the particles in the seed")
+    call CFG_add_get(cfg, "pc%user_init", user_init_pc, &
+         "use user_initial_particles or not")
+    if (user_init_pc) then
+      user_initial_particles => init_particles
+    end if
+    ! user_set_surface_charge => init_surface_charge
     user_set_dielectric_eps => set_epsilon
     !user_potential_bc => my_potential
   end subroutine user_initialize
 
-  subroutine init_particles(pc)
+  subroutine init_particles(pctest)
     use m_particle_core
-    type(PC_t), intent(inout) :: pc
+    type(PC_t), intent(inout) :: pctest
     integer                   :: n
-    real(dp)                  :: pos(3)
-    real(dp)                  :: rand_seed(2)
+    real(dp)                  :: tmp_vec(2)
     type(PC_part_t)           :: part
 
     part%v      = 0.0_dp
     part%a      = 0.0_dp
     part%t_left = 0.0_dp
 
-    do n = 1, 1000
-       pos(1:2) = [0.3_dp, 0.8_dp] * domain_len
-       pos(3)   = 0.0_dp
-       part%w   = 1.0_dp
+    do n = 1, seed_num_particles
+       if (GL_cylindrical) then
+          tmp_vec = GL_rng%two_normals() * seed_sigma
+          part%x(1) = norm2(tmp_vec)
+          tmp_vec = GL_rng%two_normals() * seed_sigma
+          part%x(2) = tmp_vec(1)
+          part%x(1:2) = part%x(1:2) + seed_pos * domain_len
+          part%x(3) = 0.0_dp
+       else
+          part%x(1:2) = GL_rng%two_normals() * seed_sigma
+          part%x(1:2) = part%x(1:2) + seed_pos * domain_len
+          part%x(3) = 0.0_dp
+       end if
 
-       rand_seed = GL_rng%two_normals()
-       part%x(1:2) = pos(1:2) + [rand_seed(1) * 1e-4_dp, rand_seed(2) * 1e-4_dp]
-       ! part%x(1:2) = pos(1:2) + GL_rng%two_normals() * 1e-5_dp
+       part%w = seed_particle_weight
 
        if (outside_check(part) <= 0) then
-          call pc%add_part(part)
+          call pctest%add_part(part)
        end if
     end do
   end subroutine init_particles
@@ -60,27 +83,6 @@ contains
     z_dist = r(2) - rel_z_pos * domain_len(2)
     init_surface_charge = surface_density * exp(-z_dist**2/decay_length**2)
   end function init_surface_charge
-
-  subroutine init_ion_density(box)
-    use m_geometry
-    type(box_t), intent(inout) :: box
-    integer                    :: i, j, nc
-    real(dp)                   :: density, rr(2)
-
-    nc = box%n_cell
-
-    do j = 0, nc+1
-       do i = 0, nc+1
-          rr = af_r_cc(box, [i, j])
-          density = 2e18_dp * GM_density_line(rr, &
-               [0.26_dp, 0.95_dp] * domain_len, &
-               [0.26_dp, 0.9_dp] * domain_len, &
-               NDIM, 5e-5_dp, "smoothstep")
-          box%cc(i, j, i_pos_ion) = box%cc(i, j, i_pos_ion) + &
-               density
-       end do
-    end do
-  end subroutine init_ion_density
 
   subroutine set_epsilon(box)
     type(box_t), intent(inout) :: box
