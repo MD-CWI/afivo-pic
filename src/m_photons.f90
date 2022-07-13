@@ -242,8 +242,8 @@ contains
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
     logical                       :: on_surface
-    integer                       :: n, m, n_uv, tid
-    real(dp)                      :: x_start(3), x_stop(3)
+    integer                       :: n, m, n_uv, tid, cIx
+    real(dp)                      :: x_start(3), x_stop(3), phe_probability
     type(prng_t)                  :: prng
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
@@ -253,13 +253,15 @@ contains
     !$omp do
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_emission_t) then
+         cIx = pc%event_list(n)%cix
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
           do m = 1, n_uv
             x_start = pc%event_list(n)%part%x
             x_stop  = get_x_stop_unlimited(x_start, prng%rngs(tid))
             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
             if (on_surface) then
-              if ((prng%rngs(tid)%unif_01() < photoe_probability)) then
+              phe_probability = pc%colls(cIx)%gamma_phe
+              if ((prng%rngs(tid)%unif_01() < phe_probability)) then
                 !$omp critical
                 call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
                 !$omp end critical
