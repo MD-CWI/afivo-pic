@@ -68,7 +68,7 @@ COMMENT: transcribed by J. Stephens from S.F. Biagi's Fortran code MAGBOLTZ v 11
 
 EMISSION
 CO2 -> hv (293.3– 438.4 nm)
- 1.731400e+1
+ 1.0e-7
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + E + CO2, Ionization
 PARAM.:  E = 17.314 eV, complete set
@@ -159,7 +159,7 @@ COLUMNS: Energy (eV) | Cross section (m2)
 
 EMISSION
 CO2 -> hv (218.9– 226.8 nm)
- 1.807700e+1
+ 1.0e-6
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + E + CO2, Ionization
 PARAM.:  E = 18.077 eV, complete set
@@ -239,7 +239,7 @@ COLUMNS: Energy (eV) | Cross section (m2)
 
 EMISSION
 CO2 -> hv (195- 250 nm)
- 2.60e+01
+ 5.0e-6
 COMMENT: Emission from CO+
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
@@ -306,7 +306,7 @@ COLUMNS: Energy (eV) | Cross section (m2)
 
 EMISSION
 CO2 -> hv (126- 195 nm)
- 29.35133886
+ 5.0e-5
 COMMENT: Emission from CO
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
@@ -338,7 +338,7 @@ COLUMNS: Energy (eV) | Cross section (m2)
 
 EMISSION
 CO2 -> hv (133.5 nm)
- 43.40395751
+ 7.0e-4
 COMMENT: Emission from C II
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
@@ -369,7 +369,7 @@ COLUMNS: Energy (eV) | Cross section (m2)
 
 EMISSION
 CO2 -> hv (127.8 nm)
- 43.40395751
+ 7.0e-4
 COMMENT: Emission from C I
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
@@ -404,7 +404,7 @@ COLUMNS: Energy (eV) | Cross section (m2)
 
 EMISSION
 CO2 -> hv (130.4 nm)
- 43.40395751
+ 7.0e-4
 COMMENT: Emission from O I
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
