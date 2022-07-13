@@ -12,6 +12,7 @@ module m_user
   real(dp) :: seed_sigma = 1e-4_dp
   integer :: seed_num_particles = 10000
   real(dp) :: seed_particle_weight = 1e4
+  real(dp) :: dielectric_eps = 3.0_dp
   logical  :: user_init_pc = .true.
 
   ! Public methods
@@ -35,6 +36,9 @@ contains
     if (user_init_pc) then
       user_initial_particles => init_particles
     end if
+
+    call CFG_add_get(cfg, "dielectric_eps", dielectric_eps, &
+         "relative permittivity of the dielectric")
     ! user_set_surface_charge => init_surface_charge
     user_set_dielectric_eps => set_epsilon
     !user_potential_bc => my_potential
@@ -94,7 +98,7 @@ contains
           r = af_r_cc(box, [i, j])
 
           if (r(1)/domain_len(1) < 0.25_dp) then
-             box%cc(i, j, i_eps) = 2.0_dp
+             box%cc(i, j, i_eps) = dielectric_eps
           else
              box%cc(i, j, i_eps) = 1.0_dp
           end if
