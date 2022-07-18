@@ -285,10 +285,12 @@ program apic
         end if
 
         if (GL_write_to_dat) then
-          if (GL_write_to_dat_interval(1) .le. GL_time .and. GL_time .le. GL_write_to_dat_interval(2)) then
-            call af_write_tree(tree, trim(GL_output_dir) // "/" // trim(fname), write_sim_data)
+           if (GL_write_to_dat_interval(1) <= GL_time .and. &
+              GL_time <= GL_write_to_dat_interval(2)) then
+            call af_write_tree(tree, trim(fname), write_sim_data)
           end if
-        end if
+       end if
+
         t1 = omp_get_wtime()
         wtime_io = wtime_io + (t1 - t0)
      end if
