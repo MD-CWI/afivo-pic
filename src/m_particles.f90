@@ -200,12 +200,14 @@ contains
     integer                   :: i, j, i_buffer, n_part_prev, N_vb
     real(dp)                  :: v_new, w_min, w_max, desired_weight
     real(dp)                  :: w_new, remainder
+    real(dp)                  :: inv_particle_min_weight, w_relative
     integer, parameter        :: buffer_size = 1024
     type(PC_part_t)           :: pbuffer(buffer_size)
     type(prng_t)              :: prng
 
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
          ! pc%get_mean_energy() / UC_elec_volt
+    inv_particle_min_weight = 1/particle_min_weight
 
     ! Set tags that contain information about the cell index and velocity
     call set_particle_tags(tree, pc, N_vb)
@@ -251,6 +253,8 @@ contains
        ! Went one index too far, so subtract one
        cell_i1 = cell_i1 - 1
 
+       ! Now pc%particles(cell_i0:cell_i1) are in the same grid cell
+
        desired_weight = get_desired_weight(pc%particles(cell_i0))
        w_min = desired_weight / 1.5_dp
        w_max = desired_weight * 1.5_dp
@@ -258,10 +262,10 @@ contains
        ! Merge particles
        i = cell_i0
        do while (i < cell_i1)
-          if (pc%particles(i)%w > 0 .and. pc%particles(i)%w < w_min) then
+          if (pc%particles(i)%w >= 0 .and. pc%particles(i)%w < w_min) then
              ! Look for candidate to merge with
              do j = i + 1, cell_i1
-                if (pc%particles(j)%w > 0 .and. pc%particles(j)%w < w_min) exit
+                if (pc%particles(j)%w >= 0 .and. pc%particles(j)%w < w_min) exit
              end do
 
              if (j == cell_i1 + 1) exit ! No candidate found
@@ -289,11 +293,11 @@ contains
 
        ! Split particles
        do i = cell_i0, cell_i1
-          if (pc%particles(i)%w > 0 .and. pc%particles(i)%w > w_max) then
+          w_relative = pc%particles(i)%w * inv_particle_min_weight
+          if (w_relative >= 2 .and. pc%particles(i)%w > w_max) then
              ! Determine new weights that are multiples of particle_min_weight,
              ! there is a correction below for odd multiples
-             w_new = floor(0.5_dp * pc%particles(i)%w/particle_min_weight) * &
-                  particle_min_weight
+             w_new = floor(0.5_dp * w_relative) * particle_min_weight
              remainder = pc%particles(i)%w - 2 * w_new
              pc%particles(i)%w = w_new
 
