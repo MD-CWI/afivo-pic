@@ -91,6 +91,7 @@ contains
       case("CO2")
         call CO2_initialize(cfg)
         photoemission => photoe_CO2
+        photoionization => photoi_Zheleznyak
       case default
         error stop "Unrecognized photon model"
     end select
@@ -150,10 +151,18 @@ contains
     use m_gas
     use m_config
     type(CFG_t), intent(inout) :: cfg
+    real(dp)                   :: temp_vec(2)
 
-    if (photoi_enabled) then
-      error stop "There is no photoionzation in CO2"
-    end if
+    ! if (photoi_enabled) then
+    !   error stop "There is no photoionzation in CO2"
+    ! end if
+    pi_quench_fac = 1.0D0
+    call CFG_add(cfg, "photon%absorp_inv_lengths", &
+         [34D0 / UC_torr_to_bar, 220D0 / UC_torr_to_bar], &
+         "The inverse min/max absorption length, will be scaled by pO2")
+    call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
+    pi_min_inv_abs_len = temp_vec(1) * GAS_pressure
+    pi_max_inv_abs_len = temp_vec(2) * GAS_pressure
 
   end subroutine CO2_initialize
 
