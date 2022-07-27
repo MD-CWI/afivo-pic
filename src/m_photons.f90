@@ -91,7 +91,7 @@ contains
       case("CO2")
         call CO2_initialize(cfg)
         photoemission => photoe_CO2
-        photoionization => photoi_Zheleznyak
+        photoionization => photoi_CO2
       case default
         error stop "Unrecognized photon model"
     end select
@@ -208,6 +208,48 @@ contains
     call prng%update_seed(GL_rng)
   end subroutine photoi_Zheleznyak
 
+  ! Perform photon generation and ionization according to the Zheleznyak model
+  subroutine photoi_CO2(tree, pc, n_photons)
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+    integer, intent(out)          :: n_photons
+    type(prng_t)                  :: prng
+
+    integer  :: n, m, n_uv, tid
+    integer  :: n_part_before
+    real(dp) :: x_start(3), x_stop(3)
+
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
+    n_part_before = pc%n_part
+
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
+    tid = omp_get_thread_num() + 1
+    !$omp do
+    do n = 1, pc%n_events
+       if (pc%event_list(n)%ctype == CS_photonH_t) then
+          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
+
+          do m = 1, n_uv
+             x_start = pc%event_list(n)%part%x
+             x_stop  = get_x_stop(x_start, prng%rngs(tid))
+             x_stop(1:NDIM) = get_coordinates_x(x_stop)
+
+             if (is_in_gas(tree, x_stop) .and. .not. &
+                  ignore_photon(x_stop)) then
+               call single_photoionization_event(tree, pc, x_stop)
+             end if
+          end do
+       end if
+    end do
+    !$omp end do
+    !$omp end parallel
+
+    n_photons = pc%n_part - n_part_before
+    call prng%update_seed(GL_rng)
+  end subroutine photoi_CO2
+
   ! Perform photoemission based on the Zheleznyak model for air
   subroutine photoe_Zheleznyak(tree, pc)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
@@ -261,7 +303,7 @@ contains
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_emission_t) then
+       if (pc%event_list(n)%ctype == CS_photonL_t) then
          cIx = pc%event_list(n)%cix
          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
           do m = 1, n_uv
