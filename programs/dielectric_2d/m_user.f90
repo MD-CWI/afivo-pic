@@ -13,6 +13,7 @@ module m_user
   integer :: seed_num_particles = 10000
   real(dp) :: seed_particle_weight = 1e4
   real(dp) :: dielectric_eps = 3.0_dp
+  character(len=20) :: dielectric_type = "left"
   logical  :: user_init_pc = .true.
 
   ! Public methods
@@ -37,6 +38,8 @@ contains
       user_initial_particles => init_particles
     end if
 
+    call CFG_add_get(cfg, "dielectric_type", dielectric_type, &
+         "What kind of dielectric to use")
     call CFG_add_get(cfg, "dielectric_eps", dielectric_eps, &
          "relative permittivity of the dielectric")
     ! user_set_surface_charge => init_surface_charge
@@ -93,7 +96,9 @@ contains
     real(dp)                   :: r(2)
     integer                    :: i, j
 
-    do j = 0, box%n_cell+1
+    select case (dielectric_type)
+    case ("left")
+      do j = 0, box%n_cell+1
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
@@ -103,7 +108,22 @@ contains
              box%cc(i, j, i_eps) = 1.0_dp
           end if
        end do
-    end do
+      end do
+    case ("left_right")
+      do j = 0, box%n_cell+1
+       do i = 0, box%n_cell+1
+          r = af_r_cc(box, [i, j])
+
+          if (r(1)/domain_len(1) < 0.25_dp .or. r(1)/domain_len(1) > 0.75_dp) then
+             box%cc(i, j, i_eps) = dielectric_eps
+          else
+             box%cc(i, j, i_eps) = 1.0_dp
+          end if
+       end do
+      end do
+    case default
+      error stop "Unknown dielectric_type"
+    end select
   end subroutine set_epsilon
 
   subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
