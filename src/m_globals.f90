@@ -93,6 +93,12 @@ module m_globals
   ! Output directory
   character(len=GL_slen), protected :: GL_output_dir = "output"
 
+  ! Whether to write Silo output
+  logical, protected :: GL_write_silo = .true.
+
+  ! Whether to write VTK unstructured output
+  logical, protected :: GL_write_vtk = .false.
+
   ! Time between writing output
   real(dp), protected :: GL_dt_output = 1.0e-10_dp
 
@@ -118,7 +124,7 @@ module m_globals
   real(dp) :: GL_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.9_dp]
   real(dp) :: GL_init_seed_sigma    = 1.0e-3_dp
   integer  :: GL_init_num_particles = 10000
-  
+
   ! The length of the (square) domain
   ! TODO: cannot directly use domain_len in m_domain
   real(dp), protected, public :: GL_domain_len(NDIM) = 4e-3_dp
@@ -158,6 +164,10 @@ contains
          "The name of the simulation")
     call CFG_add_get(cfg, "output_dir", GL_output_dir, &
          "Directory where the output should be written")
+    call CFG_add_get(cfg, "write_silo", GL_write_silo, &
+         "Whether to write Silo output")
+    call CFG_add_get(cfg, "write_vtk", GL_write_vtk, &
+         "Whether to write VTK unstructured output")
     call CFG_add_get(cfg, "dt_output", GL_dt_output, &
          "The timestep for writing output (s)")
     call CFG_add_get(cfg, "print_status_sec", GL_print_status_sec, &

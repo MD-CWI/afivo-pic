@@ -268,9 +268,17 @@ program apic
 
         write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // &
              trim(GL_simulation_name) // "_", output_cnt
-        call af_write_silo(tree, fname, output_cnt, GL_time, &
-             add_curve_names = ["EEDF"], &
-             add_curve_dat = write_EEDF_as_curve(pc))
+
+        if (GL_write_silo) then
+           call af_write_silo(tree, fname, output_cnt, GL_time, &
+                add_curve_names = ["EEDF"], &
+                add_curve_dat = write_EEDF_as_curve(pc))
+        end if
+
+        if (GL_write_vtk) then
+           call af_write_vtk(tree, fname, output_cnt, GL_time)
+        end if
+
         call print_info()
         call CS_write_ledger(pc%coll_ledger, &
         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
