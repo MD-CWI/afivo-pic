@@ -78,11 +78,14 @@ module m_globals
   procedure(af_subr_bc), public, protected, pointer :: &
        bc_species => null()
 
-  ! Whether a the output is also written to a .dat file
-  logical, protected :: GL_write_to_dat = .false.
+  ! Whether the mesh is written to a binary file
+  logical, protected :: GL_write_mesh_binary = .false.
 
-  ! Interval for writing to .dat file
-  real(dp), protected :: GL_write_to_dat_interval(2) = 1e100_dp
+  ! Whether the particles are written to a binary file
+  logical, protected :: GL_write_particles_binary = .false.
+
+  ! Per how many regular outputs binary output is written
+  integer, protected :: GL_binary_per_outputs = 1
 
   ! Random number generator
   type(rng_t) :: GL_rng
@@ -180,10 +183,12 @@ contains
          "Fraction of O2, used for photoionization")
     call CFG_add_get(cfg, "use_dielectric", GL_use_dielectric, &
          "Whether a dielectric is used")
-    call CFG_add_get(cfg, "write_to_dat", GL_write_to_dat, &
-          "Wheter the output is also written to a .dat file")
-    call CFG_add_get(cfg, "write_to_dat_interval", GL_write_to_dat_interval, &
-          "The time interval that is written to a .dat file")
+    call CFG_add_get(cfg, "write_mesh_binary", GL_write_mesh_binary, &
+          "Wheter the mesh is written to a binary file")
+    call CFG_add_get(cfg, "write_particles_binary", GL_write_particles_binary, &
+          "Wheter the particles are written to a binary file")
+    call CFG_add_get(cfg, "binary_per_outputs", GL_binary_per_outputs, &
+          "Per how many regular outputs binary output is written")
     call CFG_add_get(cfg, "use_electrode", GL_use_electrode, &
          "Whether to include an electrode")
 

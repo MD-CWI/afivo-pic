@@ -29,7 +29,7 @@ program apic
   integer                :: n_part, n_prev_merge, n_samples
   integer                :: lvl, i, id
   integer, allocatable   :: ref_links(:, :)
-  character(len=GL_slen) :: fname
+  character(len=GL_slen) :: fname, logname
   logical                :: write_out
   type(ref_info_t)       :: ref_info
   real(dp)               :: n_elec, n_elec_prev, max_elec_dens
@@ -280,24 +280,28 @@ program apic
         end if
 
         call print_info()
-        call CS_write_ledger(pc%coll_ledger, &
-        trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_ledger.txt", &
-        GL_time)
+        call CS_write_ledger(pc%coll_ledger, trim(GL_output_dir) // "/" &
+             // trim(GL_simulation_name) // "_cs_ledger.txt", GL_time)
 
         ! output the log file
-        write(fname, "(A,I6.6)") trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_log.txt"
+        logname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_log.txt"
+
         if (associated(user_write_log)) then
           call user_write_log(tree, fname, output_cnt)
         else
           call output_log(tree, fname, output_cnt, wc_time)
         end if
 
-        if (GL_write_to_dat) then
-           if (GL_write_to_dat_interval(1) <= GL_time .and. &
-              GL_time <= GL_write_to_dat_interval(2)) then
-            call af_write_tree(tree, trim(fname), write_sim_data)
-          end if
-       end if
+        ! Write mesh variables to binary file
+        if (modulo(output_cnt, GL_binary_per_outputs) == 0) then
+           if (GL_write_mesh_binary) then
+              call af_write_tree(tree, trim(fname), write_sim_data)
+           end if
+
+           if (GL_write_particles_binary) then
+              call pc%write_particles_binary(trim(fname) // "_particles.dat")
+           end if
+        end if
 
         t1 = omp_get_wtime()
         wtime_io = wtime_io + (t1 - t0)
