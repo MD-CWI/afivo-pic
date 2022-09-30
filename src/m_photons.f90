@@ -17,6 +17,8 @@ private
 
 logical, public         :: photoi_enabled
 logical, public         :: photoe_enabled
+logical                 :: pi_eff_fixed = .true.
+logical                 :: eff_based_photoi = .true.
 real(dp)                :: photoe_probability = 1.0e-2_dp
 character(CFG_name_len) :: model
 
@@ -79,6 +81,10 @@ contains
          "Ignore photoionization below this coordinate")
     call CFG_add_get(cfg, "photon%rmax", pi_photon_rmax, &
         "Ignore photoionization above this coordinate")
+    call CFG_add_get(cfg, "photon%ion_eff_fixed", pi_eff_fixed, &
+        "the proportional factor for photoionization is fixed or not")
+    call CFG_add_get(cfg, "photon%eff_based_photoi", eff_based_photoi, &
+        "the photoionization method is based on coefficient or not")
     call CFG_add_get(cfg, "photon%ion_eff", pi_eff, &
         "the proportional factor for photoionization")
 
@@ -91,7 +97,11 @@ contains
       case("CO2")
         call CO2_initialize(cfg)
         photoemission => photoe_CO2
-        photoionization => photoi_CO2
+        if (eff_based_photoi) then
+          photoionization => photoi_CO2_exp
+        else
+          photoionization => photoi_CO2_cs
+        end if
       case default
         error stop "Unrecognized photon model"
     end select
@@ -151,15 +161,34 @@ contains
     use m_gas
     use m_config
     type(CFG_t), intent(inout) :: cfg
+    integer                    :: t_size, t_size_2
     real(dp)                   :: temp_vec(2)
 
-    ! if (photoi_enabled) then
-    !   error stop "There is no photoionzation in CO2"
-    ! end if
+    ! Photoionization parameters for CO2
+    call CFG_add(cfg, "photon%efield_table", &
+        [5D6, 6.5D6, 8.4D6, 13.4D6, 25D6], &
+        "Tabulated values of the electric field (for the photo-efficiency)")
+    call CFG_add(cfg, "photon%efficiency_table", &
+        [0.0D0, 0.6D-4, 1.2D-4, 2.8D-4, 4.8D-4], &
+        "The tabulated values of the the photo-efficiency")
+    call CFG_add(cfg, "photon%frequencies", [2.925D12, 3.059D12], &
+        "The lower/upper bound for the frequency of the photons, not currently used")
+    call CFG_get_size(cfg, "photon%efficiency_table", t_size)
+    call CFG_get_size(cfg, "photon%efield_table", t_size_2)
+    if (t_size_2 /= t_size) then
+      print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
+      stop
+    end if
+
+    allocate(pi_photo_eff_table1(t_size))
+    allocate(pi_photo_eff_table2(t_size))
+    call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
+    call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
+
     pi_quench_fac = 1.0D0
     call CFG_add(cfg, "photon%absorp_inv_lengths", &
          [34D0 / UC_torr_to_bar, 220D0 / UC_torr_to_bar], &
-         "The inverse min/max absorption length, will be scaled by pO2")
+         "The inverse min/max absorption length")
     call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
     pi_min_inv_abs_len = temp_vec(1) * GAS_pressure
     pi_max_inv_abs_len = temp_vec(2) * GAS_pressure
@@ -209,7 +238,49 @@ contains
   end subroutine photoi_Zheleznyak
 
   ! Perform photon generation and ionization according to the Zheleznyak model
-  subroutine photoi_CO2(tree, pc, n_photons)
+  subroutine photoi_CO2_exp(tree, pc, n_photons)
+    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
+    type(af_t), intent(inout)     :: tree
+    type(PC_t), intent(inout)     :: pc
+    integer, intent(out)          :: n_photons
+    type(prng_t)                  :: prng
+
+    integer  :: n, m, n_uv, tid
+    integer  :: n_part_before
+    real(dp) :: x_start(3), x_stop(3)
+
+    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+
+    n_part_before = pc%n_part
+
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
+    tid = omp_get_thread_num() + 1
+    !$omp do
+    do n = 1, pc%n_events
+       if (pc%event_list(n)%ctype == CS_ionize_t) then
+          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+
+          do m = 1, n_uv
+             x_start = pc%event_list(n)%part%x
+             x_stop  = get_x_stop(x_start, prng%rngs(tid))
+             x_stop(1:NDIM) = get_coordinates_x(x_stop)
+
+             if (is_in_gas(tree, x_stop) .and. .not. &
+                  ignore_photon(x_stop)) then
+               call single_photoionization_event(tree, pc, x_stop)
+             end if
+          end do
+       end if
+    end do
+    !$omp end do
+    !$omp end parallel
+
+    n_photons = pc%n_part - n_part_before
+    call prng%update_seed(GL_rng)
+  end subroutine photoi_CO2_exp
+
+  ! Perform photon generation and ionization according to the Zheleznyak model
+  subroutine photoi_CO2_cs(tree, pc, n_photons)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
     type(af_t), intent(inout)     :: tree
     type(PC_t), intent(inout)     :: pc
@@ -248,7 +319,7 @@ contains
 
     n_photons = pc%n_part - n_part_before
     call prng%update_seed(GL_rng)
-  end subroutine photoi_CO2
+  end subroutine photoi_CO2_cs
 
   ! Perform photoemission based on the Zheleznyak model for air
   subroutine photoe_Zheleznyak(tree, pc)
@@ -375,9 +446,13 @@ contains
   real(dp) function get_photoi_eff(fld)
     use m_lookup_table
     real(dp), intent(in) :: fld
-    get_photoi_eff = pi_eff
-    ! call LT_lin_interp_list(pi_photo_eff_table1, &
-         ! pi_photo_eff_table2, fld, get_photoi_eff)
+
+    if (pi_eff_fixed) then
+        get_photoi_eff = pi_eff
+    else
+        call LT_lin_interp_list(pi_photo_eff_table1, &
+             pi_photo_eff_table2, fld, get_photoi_eff)
+    end if
   end function get_photoi_eff
 
   ! Returns the inverse mean free path for a photon according to Zheleznyak model

@@ -44,7 +44,6 @@ contains
          "relative permittivity of the dielectric")
     ! user_set_surface_charge => init_surface_charge
     user_set_dielectric_eps => set_epsilon
-    !user_potential_bc => my_potential
   end subroutine user_initialize
 
   subroutine init_particles(pctest)
@@ -102,7 +101,7 @@ contains
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
-          if (r(1)/domain_len(1) < 0.25_dp) then
+          if (r(1)/domain_len(1) < 0.375_dp) then
              box%cc(i, j, i_eps) = dielectric_eps
           else
              box%cc(i, j, i_eps) = 1.0_dp
@@ -114,7 +113,7 @@ contains
        do i = 0, box%n_cell+1
           r = af_r_cc(box, [i, j])
 
-          if (r(1)/domain_len(1) < 0.25_dp .or. r(1)/domain_len(1) > 0.75_dp) then
+          if (r(1)/domain_len(1) < 0.375_dp .or. r(1)/domain_len(1) > 0.625_dp) then
              box%cc(i, j, i_eps) = dielectric_eps
           else
              box%cc(i, j, i_eps) = 1.0_dp
@@ -125,28 +124,5 @@ contains
       error stop "Unknown dielectric_type"
     end select
   end subroutine set_epsilon
-
-  subroutine my_potential(box, nb, iv, coords, bc_val, bc_type)
-    type(box_t), intent(in) :: box
-    integer, intent(in)     :: nb
-    integer, intent(in)     :: iv
-    real(dp), intent(in)    :: coords(NDIM, box%n_cell**(NDIM-1))
-    real(dp), intent(out)   :: bc_val(box%n_cell**(NDIM-1))
-    integer, intent(out)    :: bc_type
-
-    select case (nb)
-    case (af_neighb_lowy)
-        bc_type = af_bc_dirichlet
-        bc_val = 0.0_dp
-      case (af_neighb_highy)
-        bc_type = af_bc_dirichlet
-        bc_val = 12e3_dp
-      case default
-        bc_type = af_bc_neumann
-        bc_val = 0.0_dp
-    end select
-
-  end subroutine my_potential
-
 
 end module m_user
