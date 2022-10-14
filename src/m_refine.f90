@@ -150,9 +150,9 @@ contains
        ! Refine around electrode
        if (iand(box%tag, mg_lsf_box) > 0 .and. &
             max_dx > refine_electrode_dx) then
-          if (box%cc(IJK, i_lsf) < 0) then
+         !  if (box%cc(IJK, i_lsf) < 0) then
              cell_flags(IJK) = af_do_ref
-          end if
+         !  end if
        end if
     end do; CLOSE_DO
 
