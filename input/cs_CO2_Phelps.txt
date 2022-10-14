@@ -1,0 +1,452 @@
+LXCat, www.lxcat.net
+Generated on 13 Oct 2022. All rights reserved.
+
+RECOMMENDED REFERENCE FORMAT
+- Phelps database, www.lxcat.net, retrieved on October 13, 2022.
+Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
+Please check below in the headers of databases.
+
+CROSS SECTION DATA FORMAT
+In downloaded files, each collision process is defined by a block consisting of
+1st line
+Keyword in capitals indicating the type of the collision. Possible collision types are elastic, effective, excitation,
+ionization, or attachment (capital letters required, key words are case sensitive), where "elastic" is used to denote
+the elastic momentum transfer cross section and where "effective" denotes the total momentum transfer cross section (sum
+of elastic momentum transfer and total inelastic cross sections).  The latter is useful for solving the Boltzmann
+equation in the 2-term approximation.
+2nd line
+Name of the target particle species. This name is a character string, freely chosen by the user, e.g. "Ar". Optionally
+for excitation processes, the name of the corresponding excited state can be specified on the same line, separated from
+the first name either by arrow "->" (dash + greater than) or by double-head arrow "<->" (less than + dash +
+greater than), e.g. "Ar -> Ar*" and "Ar <-> Ar*", respectively. In the later case BOLSIG+ will automatically
+define the inverse superelastic process, constructing the superelastic cross-section by detailed balancing, and
+considering the indicated excited state as the target. In this case, the ratio of statistical weights must be input in
+the 3rd line (see below).
+3rd line
+For elastic and effective collisions, the ratio of the electron mass to the target particle mass. For excitation or
+ionization collisions, the electron energy loss (nominally the threshold energy) in eV. For attachment, the 3rd line is
+missing. In case of an excitation process where an excited state has been indicated on the 2nd line using double-head
+arrow "<->", the 3rd line must specify also ratio of the statistical weights of the final state to the initial state
+as the second parameter in 3rd line this is needed by BOLSIG+ to calculate the de-excitation cross-section. The
+statistical weight ratio, if given, will also be used by the automatic superelastics option in BOLSIG+. If this ratio is
+not provided then BOLSIG+ will assume it unity.
+from 4th line (optionally)
+User comments and reference information, maximum 100 lines. The only constraint on format is that these comment lines
+must not start with a number.
+Finally
+Table of the cross section as a function of energy. The table starts and ends by a line of dashes "------" (at least 5),
+and has otherwise two numbers per line: the energy in eV and the cross section in m2.
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE:         Phelps database
+PERMLINK:         www.lxcat.net/Phelps
+DESCRIPTION:      A compilation of atomic and molecular data, assembled and evaluated by A.V. Phelps and collaborators.
+                  Please refer to these data using the sources cited for each gas. 
+                  
+                  We make no claims for these cross sections beyond those stated in the papers where they are published
+                  or cited.  In most cases these cross sections were assembled in the 1970's and 1980's. In only a few
+                  cases have they been modified or tested since that time. I do not plan any updates.  Additions have
+                  been made when cross sections have been assembled for other purposes. Since the JILA information
+                  center was closed by NIST, there is no one there to help you.  Opinions expressed are those of AV
+                  Phelps and do not imply JILA, CU, or NIST approval.
+CONTACT:          A.V. Phelps, Fellow Adjoint of JILA
+                  University of Colorado
+                  Boulder, CO 80309-0440
+                  e-mail: avp@@jila.colorado.edu
+HOW TO REFERENCE: http://jilawww.colorado.edu/~avp/
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+************************************************************************************************************************
+
+COMMENT: PURE CO2- DEC 1978-AV Phelps compilation.
+
+********************************************************** CO2 **********************************************************
+
+ATTACHMENT
+CO2 -> CO + O^-
+SPECIES: e / CO2
+PROCESS: E + CO2 -> CO + O-, Attachment
+PARAM.:  E = 0 eV, complete set
+COMMENT: Dissociative attachment, threshold 3.85eV.
+UPDATED: 2010-10-20 16:45:35
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 3.850000e+0	0.000000e+0
+ 4.300000e+0	1.400000e-23
+ 4.500000e+0	1.400000e-23
+ 5.100000e+0	0.000000e+0
+ 6.600000e+0	0.000000e+0
+ 7.200000e+0	7.000000e-24
+ 8.200000e+0	4.500000e-23
+ 8.400000e+0	4.200000e-23
+ 8.900000e+0	1.000000e-23
+ 9.700000e+0	0.000000e+0
+-----------------------------
+
+EFFECTIVE
+CO2
+ 1.240000e-5
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2, Effective
+PARAM.:  m/M = 0.0000124, complete set
+UPDATED: 2011-06-06 18:19:56
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 0.000000e+0	6.000000e-18
+ 1.000000e-3	5.400000e-18
+ 2.000000e-3	3.800000e-18
+ 3.000000e-3	3.070000e-18
+ 5.000000e-3	2.370000e-18
+ 7.000000e-3	2.000000e-18
+ 8.500000e-3	1.820000e-18
+ 1.000000e-2	1.700000e-18
+ 1.500000e-2	1.380000e-18
+ 2.000000e-2	1.200000e-18
+ 3.000000e-2	9.700000e-19
+ 4.000000e-2	8.500000e-19
+ 5.000000e-2	7.600000e-19
+ 7.000000e-2	6.300000e-19
+ 1.000000e-1	5.000000e-19
+ 1.200000e-1	4.400000e-19
+ 1.500000e-1	3.900000e-19
+ 1.700000e-1	3.400000e-19
+ 2.000000e-1	2.900000e-19
+ 2.500000e-1	2.400000e-19
+ 3.000000e-1	1.800000e-19
+ 3.500000e-1	1.500000e-19
+ 4.000000e-1	1.300000e-19
+ 5.000000e-1	1.000000e-19
+ 7.000000e-1	7.100000e-20
+ 1.000000e+0	5.200000e-20
+ 1.200000e+0	4.800000e-20
+ 1.300000e+0	4.700000e-20
+ 1.500000e+0	4.650000e-20
+ 1.700000e+0	4.650000e-20
+ 1.900000e+0	4.850000e-20
+ 2.100000e+0	5.050000e-20
+ 2.200000e+0	5.200000e-20
+ 2.500000e+0	6.400000e-20
+ 2.800000e+0	7.600000e-20
+ 3.000000e+0	9.000000e-20
+ 3.300000e+0	1.150000e-19
+ 3.600000e+0	1.400000e-19
+ 4.000000e+0	1.520000e-19
+ 4.500000e+0	1.480000e-19
+ 5.000000e+0	1.270000e-19
+ 6.000000e+0	1.000000e-19
+ 7.000000e+0	1.000000e-19
+ 8.000000e+0	1.080000e-19
+ 1.000000e+1	1.210000e-19
+ 1.200000e+1	1.310000e-19
+ 1.500000e+1	1.440000e-19
+ 1.700000e+1	1.500000e-19
+ 2.000000e+1	1.580000e-19
+ 2.500000e+1	1.600000e-19
+ 3.000000e+1	1.580000e-19
+ 5.000000e+1	1.260000e-19
+ 7.500000e+1	9.500000e-20
+ 1.000000e+2	8.000000e-20
+ 1.500000e+2	6.000000e-20
+ 2.000000e+2	4.000000e-20
+ 3.000000e+2	3.700000e-20
+ 5.000000e+2	2.500000e-20
+ 7.000000e+2	2.000000e-20
+ 1.000000e+3	1.600000e-20
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.083eV)
+ 8.300000e-2
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.083eV), Excitation
+PARAM.:  E = 0.083 eV, complete set
+COMMENT: VIBRATIONAL Excitation - ASYMMETRIC STRETCH - BULOS amp PHELPS. ENERGY LOSS =0.083eV.
+UPDATED: 2010-06-23 14:11:38
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 8.300000e-2	0.000000e+0
+ 8.440000e-2	8.500000e-21
+ 8.620000e-2	1.160000e-20
+ 9.320000e-2	1.850000e-20
+ 1.035000e-1	2.300000e-20
+ 1.208000e-1	2.600000e-20
+ 1.382000e-1	2.680000e-20
+ 1.726000e-1	2.540000e-20
+ 2.070000e-1	2.200000e-20
+ 2.750000e-1	1.720000e-20
+ 3.450000e-1	1.430000e-20
+ 5.000000e-1	1.080000e-20
+ 7.000000e-1	8.000000e-21
+ 9.000000e-1	6.600000e-21
+ 1.100000e+0	5.700000e-21
+ 1.400000e+0	4.500000e-21
+ 1.600000e+0	4.200000e-21
+ 1.800000e+0	4.400000e-21
+ 2.300000e+0	7.000000e-21
+ 2.600000e+0	9.300000e-21
+ 3.000000e+0	1.340000e-20
+ 3.200000e+0	1.580000e-20
+ 3.400000e+0	1.750000e-20
+ 3.600000e+0	1.800000e-20
+ 3.800000e+0	1.790000e-20
+ 4.000000e+0	1.700000e-20
+ 4.200000e+0	1.520000e-20
+ 4.600000e+0	1.050000e-20
+ 5.100000e+0	5.700000e-21
+ 5.500000e+0	5.100000e-21
+ 6.000000e+0	5.000000e-21
+ 7.000000e+0	4.800000e-21
+ 8.000000e+0	4.500000e-21
+ 1.000000e+1	2.000000e-21
+ 2.000000e+1	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.167eV)
+ 1.670000e-1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.167eV), Excitation
+PARAM.:  E = 0.167 eV, complete set
+COMMENT: VIBRATIONAL Excitation - BULOS amp PHELPS. ENERGY LOSS =0.167eV.
+UPDATED: 2010-06-23 14:11:50
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 1.670000e-1	0.000000e+0
+ 1.720000e-1	3.000000e-21
+ 1.800000e-1	3.300000e-21
+ 2.000000e-1	3.500000e-21
+ 2.500000e-1	3.250000e-21
+ 5.000000e-1	1.170000e-21
+ 1.000000e+0	5.000000e-22
+ 1.500000e+0	4.000000e-22
+ 1.900000e+0	6.000000e-22
+ 2.000000e+0	8.000000e-22
+ 2.250000e+0	2.000000e-21
+ 2.500000e+0	4.000000e-21
+ 3.000000e+0	1.280000e-20
+ 3.200000e+0	1.570000e-20
+ 3.400000e+0	1.770000e-20
+ 3.550000e+0	1.780000e-20
+ 3.700000e+0	1.750000e-20
+ 3.900000e+0	1.600000e-20
+ 4.100000e+0	1.280000e-20
+ 4.500000e+0	8.800000e-21
+ 4.900000e+0	3.900000e-21
+ 5.200000e+0	3.300000e-21
+ 6.000000e+0	2.700000e-21
+ 8.000000e+0	2.500000e-21
+ 1.000000e+1	2.100000e-21
+ 2.000000e+1	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.252eV)
+ 2.520000e-1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.252eV), Excitation
+PARAM.:  E = 0.252 eV, complete set
+COMMENT: VIBRATIONAL Excitation - BULOS amp PHELPS. ENERGY LOSS =0.252 eV.
+UPDATED: 2010-06-23 14:12:51
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 2.500000e+0	0.000000e+0
+ 3.000000e+0	3.200000e-21
+ 3.560000e+0	5.400000e-21
+ 4.100000e+0	3.400000e-21
+ 4.500000e+0	1.600000e-21
+ 5.060000e+0	4.400000e-22
+ 6.000000e+0	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.291eV)
+ 2.910000e-1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.291eV), Excitation
+PARAM.:  E = 0.291 eV, complete set
+COMMENT: VIBRATIONAL Excitation - BULOS amp PHELPS. ENERGY LOSS =0.291eV.
+UPDATED: 2010-06-23 14:12:01
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 2.910000e-1	0.000000e+0
+ 3.000000e-1	9.500000e-21
+ 3.100000e-1	1.700000e-20
+ 3.200000e-1	1.850000e-20
+ 3.300000e-1	2.000000e-20
+ 3.500000e-1	2.150000e-20
+ 3.800000e-1	2.200000e-20
+ 4.000000e-1	2.150000e-20
+ 4.500000e-1	2.000000e-20
+ 5.000000e-1	1.850000e-20
+ 6.000000e-1	1.550000e-20
+ 8.000000e-1	1.230000e-20
+ 1.000000e+0	1.000000e-20
+ 1.500000e+0	7.600000e-21
+ 2.000000e+0	6.400000e-21
+ 3.000000e+0	4.900000e-21
+ 4.500000e+0	4.400000e-21
+ 6.000000e+0	4.100000e-21
+ 8.000000e+0	4.800000e-21
+ 1.000000e+1	2.600000e-21
+ 2.500000e+1	1.350000e-21
+ 3.000000e+1	1.000000e-21
+ 1.000000e+2	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.339eV)
+ 3.390000e-1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.339eV), Excitation
+PARAM.:  E = 0.339 eV, complete set
+COMMENT: Vibrational Excitation. ENERGY LOSS = 0.339eV.
+UPDATED: 2010-06-23 14:11:02
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 1.500000e+0	0.000000e+0
+ 1.950000e+0	7.000000e-22
+ 2.500000e+0	2.000000e-21
+ 3.000000e+0	4.100000e-21
+ 3.560000e+0	6.600000e-21
+ 4.100000e+0	3.400000e-21
+ 4.500000e+0	1.550000e-21
+ 5.060000e+0	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.422eV)
+ 4.220000e-1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.422eV), Excitation
+PARAM.:  E = 0.422 eV, complete set
+COMMENT: VIBRATIONAL EXCITATION. ENERGY LOSS =0.422eV.
+UPDATED: 2010-06-23 14:13:43
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 2.500000e+0	0.000000e+0
+ 3.000000e+0	1.050000e-21
+ 3.560000e+0	2.250000e-21
+ 4.100000e+0	1.000000e-21
+ 4.500000e+0	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(0.505eV)
+ 5.050000e-1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(0.505eV), Excitation
+PARAM.:  E = 0.505 eV, complete set
+COMMENT: ENERGY LOSS = 0.505eV.
+UPDATED: 2010-06-23 14:14:44
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 2.500000e+0	0.000000e+0
+ 3.000000e+0	1.560000e-21
+ 3.560000e+0	3.300000e-21
+ 4.100000e+0	1.560000e-21
+ 4.500000e+0	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2(2.5eV)
+ 2.500000e+0
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2(2.5eV), Excitation
+PARAM.:  E = 2.5 eV, complete set
+COMMENT: Vibrational Excitation . ENERGY LOSS = 2.5eV.
+UPDATED: 2010-06-23 14:48:00
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 2.500000e+0	0.000000e+0
+ 3.000000e+0	1.800000e-21
+ 3.600000e+0	2.500000e-21
+ 4.100000e+0	1.800000e-21
+ 4.500000e+0	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2
+ 3.850000e+0
+SPECIES: e / CO2
+PROCESS: E + CO2, Excitation
+PARAM.:  E = 3.85 eV, complete set
+COMMENT: Uploaded 12 Oct 2019. This process had been omitted in the original upload. Bulos and
+COMMENT: Phelps, PRA, 1976. The inclusion of this processs in the Phelps database leads to better (
+COMMENT: = excellent) agreement with measured mobility data in the 20 Td region.
+UPDATED: 2019-10-12 19:12:17
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 0.000000e+0	0.000000e+0
+ 3.850000e+0	0.000000e+0
+ 4.300000e+0	1.400000e-23
+ 4.500000e+0	1.400000e-23
+ 5.100000e+0	0.000000e+0
+ 6.600000e+0	0.000000e+0
+ 7.200000e+0	7.000000e-24
+ 8.200000e+0	4.500000e-23
+ 8.400000e+0	4.200000e-23
+ 8.900000e+0	1.000000e-23
+ 9.700000e+0	0.000000e+0
+ 2.000000e+2	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2*(7.0eV)
+ 7.000000e+0
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2*(7.0eV), Excitation
+PARAM.:  E = 7 eV, complete set
+COMMENT: Electronic Excitation. ENERGY LOSS =7eV.
+UPDATED: 2010-06-23 14:47:23
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 7.000000e+0	0.000000e+0
+ 8.000000e+0	6.000000e-21
+ 8.500000e+0	6.000000e-21
+ 1.100000e+1	0.000000e+0
+-----------------------------
+
+EXCITATION
+CO2 -> CO2*(10.5eV)
+ 1.050000e+1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2*(10.5eV), Excitation
+PARAM.:  E = 10.5 eV, complete set
+COMMENT: Electronic Excitation.
+UPDATED: 2010-06-23 14:48:49
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 1.050000e+1	0.000000e+0
+ 1.200000e+1	6.900000e-21
+ 1.270000e+1	7.300000e-21
+ 1.350000e+1	7.800000e-21
+ 1.500000e+1	8.800000e-21
+ 1.700000e+1	1.040000e-20
+ 2.000000e+1	1.240000e-20
+ 4.000000e+1	3.600000e-20
+ 1.000000e+2	6.300000e-20
+-----------------------------
+
+IONIZATION
+CO2 -> CO2^+
+ 1.330000e+1
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + E + CO2+, Ionization
+PARAM.:  E = 13.3 eV, complete set
+COMMENT: total ionization.
+UPDATED: 2010-03-13 08:34:31
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 1.330000e+1	0.000000e+0
+ 1.450000e+1	6.000000e-22
+ 1.500000e+1	1.040000e-21
+ 1.600000e+1	1.880000e-21
+ 1.800000e+1	3.590000e-21
+ 2.000000e+1	5.320000e-21
+ 3.000000e+1	1.630000e-20
+ 4.000000e+1	2.280000e-20
+ 5.000000e+1	2.790000e-20
+ 7.000000e+1	3.430000e-20
+ 1.000000e+2	3.790000e-20
+-----------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

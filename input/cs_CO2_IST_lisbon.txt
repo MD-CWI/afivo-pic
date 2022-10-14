@@ -1,8 +1,8 @@
 LXCat, www.lxcat.net
-Generated on 07 Jan 2021. All rights reserved.
+Generated on 12 Oct 2022. All rights reserved.
 
 RECOMMENDED REFERENCE FORMAT
-- IST-Lisbon database, www.lxcat.net, retrieved on January 7, 2021.
+- IST-Lisbon database, www.lxcat.net, retrieved on October 12, 2022.
 Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
 Please check below in the headers of databases.
 
@@ -43,13 +43,13 @@ PERMLINK:         www.lxcat.net/IST-Lisbon
 DESCRIPTION:      IST-Lisbon database contains up-to-date electron-neutral scattering cross sections (together with the
                   measured swarm parameters used to validate these data), resulting from the research effort of the
                   Group N-Plasmas Reactive: Modelling and Engineering (N-PRiME) with IPFN/IST (Instituto de Plasmas e
-                  Fusao Nuclear / Instituto Superior Tecnico), Lisbon, Portugal. The data, compiled from the literature,
-                  correspond to contributions from different authors (see detailed references in the database). For each
-                  gas the database presents a COMPLETE SET of cross sections, validated against measured swarm
-                  parameters by solving the two-term homogeneous electron Boltzmann equation. In most cases, predictions
-                  are in agreement with measurements within 1-20%, for reduced electric fields E/N ~ 1e-4 - 500 Td. To
-                  improve predictions at low E/N, some sets need to be completed with rotational cross sections, also
-                  available in the database.
+                  Fusao Nuclear / Instituto Superior Tecnico), Lisbon, Portugal.  The data, compiled from the
+                  literature, correspond to contributions from different authors (see detailed references in the
+                  database). For each gas the database presents a COMPLETE SET of cross sections, validated against
+                  measured swarm parameters by solving the two-term homogeneous electron Boltzmann equation. In most
+                  cases, predictions are in agreement with measurements within 1-20%, for reduced electric fields E/N ~
+                  1e-4 - 500 Td. To improve predictions at low E/N, some sets need to be completed with rotational cross
+                  sections, also available in the database.
 CONTACT:          LL Alves and V Guerra
                   e-mail: llalves@@tecnico.ulisboa.pt
 HOW TO REFERENCE: L.L. Alves, ''The IST-Lisbon database on LXCat'' J. Phys. Conf. Series 2014, 565, 1
@@ -80,7 +80,7 @@ CO2 -> CO(X) + O(-,X)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> CO(X) + O(-,X), Attachment
 PARAM.:  complete set
-COMMENT: [e + CO2(X,v=000) -> CO(X) + O(-,X), Attachment]  Lowke, Phelps and Irwin 1973 J. Appl.
+COMMENT: [e + CO2(X,v=000) -> CO(X) + O(-,X), Attachment] Lowke, Phelps and Irwin 1973 J. Appl.
 COMMENT: Phys. 44 4664.
 UPDATED: 2017-05-09 06:30:38
 COLUMNS: Energy (eV) | Cross section (m2)
@@ -98,14 +98,533 @@ COLUMNS: Energy (eV) | Cross section (m2)
  1.000000e+3	0.000000e+0
 -----------------------------
 
+EFFECTIVE
+CO2
+ 1.246770e-5
+SPECIES: e / CO2
+PROCESS: E + CO2 -> E + CO2, Effective
+PARAM.:  m/M = 0.0000124677, complete set
+COMMENT: [e + CO2(X) -> e + CO2(X), Effective] Lowke, Phelps and Irwin 1973 J. Appl. Phys. 44
+COMMENT: 4664 (increased below 0.1eV adjusted above 100 eV).
+UPDATED: 2017-11-14 03:28:30
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 0.000000e+0	6.000000e-18
+ 1.000000e-3	5.508000e-18
+ 1.950000e-3	3.957600e-18
+ 2.900000e-3	3.205860e-18
+ 3.850000e-3	2.827950e-18
+ 4.800000e-3	2.488800e-18
+ 5.750000e-3	2.275880e-18
+ 6.700000e-3	2.096610e-18
+ 7.650000e-3	1.960440e-18
+ 8.600000e-3	1.848240e-18
+ 9.550000e-3	1.770720e-18
+ 1.050000e-2	1.701360e-18
+ 1.145000e-2	1.639340e-18
+ 1.240000e-2	1.577330e-18
+ 1.335000e-2	1.515310e-18
+ 1.430000e-2	1.453300e-18
+ 1.525000e-2	1.398420e-18
+ 1.620000e-2	1.363540e-18
+ 1.715000e-2	1.328650e-18
+ 1.810000e-2	1.293770e-18
+ 1.905000e-2	1.258880e-18
+ 2.000000e-2	1.224000e-18
+ 2.095000e-2	1.201710e-18
+ 2.190000e-2	1.179430e-18
+ 2.285000e-2	1.157140e-18
+ 2.380000e-2	1.134850e-18
+ 2.475000e-2	1.112560e-18
+ 2.570000e-2	1.090280e-18
+ 2.665000e-2	1.067990e-18
+ 2.760000e-2	1.045700e-18
+ 2.855000e-2	1.023420e-18
+ 2.950000e-2	1.001130e-18
+ 3.045000e-2	9.838920e-19
+ 3.140000e-2	9.722640e-19
+ 3.235000e-2	9.606360e-19
+ 3.330000e-2	9.490080e-19
+ 3.425000e-2	9.373800e-19
+ 3.520000e-2	9.257520e-19
+ 3.615000e-2	9.141240e-19
+ 3.710000e-2	9.024960e-19
+ 3.805000e-2	8.908680e-19
+ 3.900000e-2	8.792400e-19
+ 3.995000e-2	8.676120e-19
+ 4.090000e-2	8.587380e-19
+ 4.185000e-2	8.500170e-19
+ 4.280000e-2	8.412960e-19
+ 4.375000e-2	8.325750e-19
+ 4.472000e-2	8.236700e-19
+ 4.571000e-2	8.145820e-19
+ 4.672000e-2	8.053100e-19
+ 4.775000e-2	7.958550e-19
+ 4.881000e-2	7.861240e-19
+ 4.989000e-2	7.762100e-19
+ 5.099000e-2	7.686360e-19
+ 5.212000e-2	7.611440e-19
+ 5.327000e-2	7.535200e-19
+ 5.445000e-2	7.456960e-19
+ 5.565000e-2	7.377410e-19
+ 5.689000e-2	7.295190e-19
+ 5.814000e-2	7.212320e-19
+ 5.943000e-2	7.126790e-19
+ 6.074000e-2	7.039940e-19
+ 6.209000e-2	6.950430e-19
+ 6.346000e-2	6.859600e-19
+ 6.486000e-2	6.766780e-19
+ 6.630000e-2	6.671310e-19
+ 6.776000e-2	6.574510e-19
+ 6.926000e-2	6.475060e-19
+ 7.079000e-2	6.391090e-19
+ 7.236000e-2	6.321680e-19
+ 7.396000e-2	6.250970e-19
+ 7.560000e-2	6.178480e-19
+ 7.727000e-2	6.104670e-19
+ 7.898000e-2	6.029090e-19
+ 8.072000e-2	5.952180e-19
+ 8.251000e-2	5.873060e-19
+ 8.433000e-2	5.792610e-19
+ 8.620000e-2	5.709960e-19
+ 8.810000e-2	5.625980e-19
+ 9.005000e-2	5.539790e-19
+ 9.204000e-2	5.451830e-19
+ 9.408000e-2	5.361660e-19
+ 9.616000e-2	5.269730e-19
+ 9.829000e-2	5.175580e-19
+ 1.004600e-1	5.085920e-19
+ 1.026800e-1	5.017990e-19
+ 1.049500e-1	4.948530e-19
+ 1.072800e-1	4.877230e-19
+ 1.096500e-1	4.804710e-19
+ 1.120700e-1	4.730660e-19
+ 1.145500e-1	4.654770e-19
+ 1.170800e-1	4.577350e-19
+ 1.196700e-1	4.498100e-19
+ 1.223200e-1	4.448560e-19
+ 1.250300e-1	4.402490e-19
+ 1.277900e-1	4.355570e-19
+ 1.306200e-1	4.307460e-19
+ 1.335100e-1	4.258330e-19
+ 1.364600e-1	4.208180e-19
+ 1.394800e-1	4.156840e-19
+ 1.425600e-1	4.104480e-19
+ 1.457100e-1	4.050930e-19
+ 1.489400e-1	3.996020e-19
+ 1.522300e-1	3.921130e-19
+ 1.556000e-1	3.835200e-19
+ 1.590400e-1	3.747480e-19
+ 1.625500e-1	3.657980e-19
+ 1.661500e-1	3.566170e-19
+ 1.698200e-1	3.472590e-19
+ 1.735800e-1	3.407140e-19
+ 1.774200e-1	3.341860e-19
+ 1.813400e-1	3.275220e-19
+ 1.853500e-1	3.207050e-19
+ 1.894500e-1	3.137350e-19
+ 1.936400e-1	3.066120e-19
+ 1.979200e-1	2.993360e-19
+ 2.023000e-1	2.934540e-19
+ 2.067800e-1	2.888840e-19
+ 2.113500e-1	2.842230e-19
+ 2.160200e-1	2.794600e-19
+ 2.208000e-1	2.745840e-19
+ 2.256800e-1	2.696060e-19
+ 2.306700e-1	2.645170e-19
+ 2.357800e-1	2.593040e-19
+ 2.409900e-1	2.539900e-19
+ 2.463200e-1	2.485540e-19
+ 2.517700e-1	2.426340e-19
+ 2.573400e-1	2.358160e-19
+ 2.630300e-1	2.288510e-19
+ 2.688400e-1	2.217400e-19
+ 2.747900e-1	2.144570e-19
+ 2.808700e-1	2.070150e-19
+ 2.870800e-1	1.994140e-19
+ 2.934300e-1	1.916420e-19
+ 2.999200e-1	1.836980e-19
+ 3.065500e-1	1.795910e-19
+ 3.133300e-1	1.754420e-19
+ 3.202600e-1	1.712010e-19
+ 3.273400e-1	1.668680e-19
+ 3.345800e-1	1.624370e-19
+ 3.419800e-1	1.579080e-19
+ 3.495400e-1	1.532820e-19
+ 3.572700e-1	1.500340e-19
+ 3.651700e-1	1.468110e-19
+ 3.732500e-1	1.435140e-19
+ 3.815000e-1	1.401480e-19
+ 3.899400e-1	1.367040e-19
+ 3.985700e-1	1.331830e-19
+ 4.073800e-1	1.303420e-19
+ 4.163900e-1	1.275850e-19
+ 4.256000e-1	1.247660e-19
+ 4.350100e-1	1.218870e-19
+ 4.446300e-1	1.189430e-19
+ 4.544600e-1	1.159350e-19
+ 4.645200e-1	1.128570e-19
+ 4.747900e-1	1.097140e-19
+ 4.852900e-1	1.065010e-19
+ 4.960200e-1	1.032180e-19
+ 5.069900e-1	1.009660e-19
+ 5.182000e-1	9.930820e-20
+ 5.296600e-1	9.761330e-20
+ 5.413800e-1	9.587990e-20
+ 5.533500e-1	9.410950e-20
+ 5.655900e-1	9.229920e-20
+ 5.781000e-1	9.044900e-20
+ 5.908800e-1	8.855880e-20
+ 6.039500e-1	8.662580e-20
+ 6.173100e-1	8.464980e-20
+ 6.309600e-1	8.263100e-20
+ 6.449100e-1	8.056780e-20
+ 6.591700e-1	7.845870e-20
+ 6.737500e-1	7.630230e-20
+ 6.886500e-1	7.409860e-20
+ 7.038800e-1	7.216940e-20
+ 7.194500e-1	7.116360e-20
+ 7.353600e-1	7.013570e-20
+ 7.516200e-1	6.908530e-20
+ 7.682500e-1	6.801100e-20
+ 7.852400e-1	6.691350e-20
+ 8.026000e-1	6.579200e-20
+ 8.203500e-1	6.464540e-20
+ 8.384900e-1	6.347360e-20
+ 8.570400e-1	6.227520e-20
+ 8.759900e-1	6.105110e-20
+ 8.953600e-1	5.979970e-20
+ 9.151700e-1	5.852010e-20
+ 9.354100e-1	5.721250e-20
+ 9.560900e-1	5.587660e-20
+ 9.772400e-1	5.451030e-20
+ 9.988500e-1	5.311430e-20
+ 1.020940e+0	5.308290e-20
+ 1.043520e+0	5.261800e-20
+ 1.066600e+0	5.214300e-20
+ 1.090180e+0	5.165760e-20
+ 1.114290e+0	5.116160e-20
+ 1.138940e+0	5.066430e-20
+ 1.164130e+0	5.015730e-20
+ 1.189870e+0	4.963920e-20
+ 1.216190e+0	4.927160e-20
+ 1.243080e+0	4.900800e-20
+ 1.270570e+0	4.873880e-20
+ 1.298670e+0	4.846380e-20
+ 1.327390e+0	4.838710e-20
+ 1.356750e+0	4.831690e-20
+ 1.386760e+0	4.824520e-20
+ 1.417420e+0	4.817200e-20
+ 1.448770e+0	4.809440e-20
+ 1.480810e+0	4.801510e-20
+ 1.513560e+0	4.796800e-20
+ 1.547030e+0	4.796580e-20
+ 1.581250e+0	4.796320e-20
+ 1.616220e+0	4.796060e-20
+ 1.651960e+0	4.797300e-20
+ 1.688500e+0	4.798600e-20
+ 1.725840e+0	4.825610e-20
+ 1.764010e+0	4.864460e-20
+ 1.803020e+0	4.904180e-20
+ 1.842890e+0	4.944620e-20
+ 1.883650e+0	4.985800e-20
+ 1.925310e+0	5.027690e-20
+ 1.967890e+0	5.069980e-20
+ 2.011410e+0	5.113210e-20
+ 2.055890e+0	5.158220e-20
+ 2.101360e+0	5.205030e-20
+ 2.147830e+0	5.278670e-20
+ 2.195330e+0	5.355230e-20
+ 2.243880e+0	5.542650e-20
+ 2.293510e+0	5.745920e-20
+ 2.344230e+0	5.953670e-20
+ 2.396070e+0	6.166020e-20
+ 2.449060e+0	6.379480e-20
+ 2.503230e+0	6.595280e-20
+ 2.558590e+0	6.815400e-20
+ 2.615170e+0	7.040250e-20
+ 2.673010e+0	7.270080e-20
+ 2.732120e+0	7.506900e-20
+ 2.792540e+0	7.754580e-20
+ 2.854300e+0	8.170650e-20
+ 2.917430e+0	8.618820e-20
+ 2.981950e+0	9.081730e-20
+ 3.047890e+0	9.618730e-20
+ 3.115300e+0	1.019220e-19
+ 3.184200e+0	1.078060e-19
+ 3.254620e+0	1.138200e-19
+ 3.326600e+0	1.199740e-19
+ 3.400170e+0	1.263040e-19
+ 3.475360e+0	1.327750e-19
+ 3.552220e+0	1.394160e-19
+ 3.630780e+0	1.444840e-19
+ 3.711080e+0	1.470730e-19
+ 3.793150e+0	1.497330e-19
+ 3.877040e+0	1.524740e-19
+ 3.962780e+0	1.552200e-19
+ 4.050420e+0	1.560500e-19
+ 4.140000e+0	1.554500e-19
+ 4.231560e+0	1.548450e-19
+ 4.325140e+0	1.542260e-19
+ 4.420790e+0	1.535860e-19
+ 4.518560e+0	1.521190e-19
+ 4.618490e+0	1.478580e-19
+ 4.720630e+0	1.435020e-19
+ 4.825030e+0	1.390470e-19
+ 4.931740e+0	1.344620e-19
+ 5.040810e+0	1.304250e-19
+ 5.152290e+0	1.273070e-19
+ 5.266230e+0	1.241160e-19
+ 5.382700e+0	1.208540e-19
+ 5.501740e+0	1.175160e-19
+ 5.623410e+0	1.141030e-19
+ 5.747780e+0	1.106140e-19
+ 5.874890e+0	1.070480e-19
+ 6.004820e+0	1.036250e-19
+ 6.137620e+0	1.036240e-19
+ 6.273360e+0	1.036220e-19
+ 6.412100e+0	1.036210e-19
+ 6.553900e+0	1.036200e-19
+ 6.698850e+0	1.036180e-19
+ 6.846990e+0	1.036170e-19
+ 6.998420e+0	1.036230e-19
+ 7.153190e+0	1.048600e-19
+ 7.311390e+0	1.061380e-19
+ 7.473090e+0	1.074440e-19
+ 7.638360e+0	1.087790e-19
+ 7.807280e+0	1.101430e-19
+ 7.979950e+0	1.115560e-19
+ 8.156430e+0	1.127980e-19
+ 8.336810e+0	1.140360e-19
+ 8.521190e+0	1.153130e-19
+ 8.709640e+0	1.166260e-19
+ 8.902250e+0	1.179680e-19
+ 9.099130e+0	1.193390e-19
+ 9.300370e+0	1.207400e-19
+ 9.506050e+0	1.221730e-19
+ 9.716280e+0	1.236370e-19
+ 9.931160e+0	1.251320e-19
+ 1.015079e+1	1.264030e-19
+ 1.037528e+1	1.275970e-19
+ 1.060474e+1	1.287790e-19
+ 1.083927e+1	1.299780e-19
+ 1.107899e+1	1.311870e-19
+ 1.132400e+1	1.324160e-19
+ 1.157444e+1	1.336720e-19
+ 1.183042e+1	1.349550e-19
+ 1.209205e+1	1.362320e-19
+ 1.235947e+1	1.374350e-19
+ 1.263281e+1	1.386650e-19
+ 1.291219e+1	1.399220e-19
+ 1.319775e+1	1.412070e-19
+ 1.348963e+1	1.425200e-19
+ 1.378796e+1	1.438600e-19
+ 1.409289e+1	1.452220e-19
+ 1.440456e+1	1.466150e-19
+ 1.472313e+1	1.480370e-19
+ 1.504874e+1	1.494190e-19
+ 1.538155e+1	1.504420e-19
+ 1.572172e+1	1.514880e-19
+ 1.606941e+1	1.525570e-19
+ 1.642480e+1	1.536490e-19
+ 1.678804e+1	1.547650e-19
+ 1.715932e+1	1.558500e-19
+ 1.753881e+1	1.568850e-19
+ 1.792669e+1	1.579420e-19
+ 1.832314e+1	1.590230e-19
+ 1.872837e+1	1.601240e-19
+ 1.914256e+1	1.612540e-19
+ 1.956591e+1	1.624110e-19
+ 1.999862e+1	1.635810e-19
+ 2.044090e+1	1.637340e-19
+ 2.089296e+1	1.638880e-19
+ 2.135502e+1	1.640430e-19
+ 2.182730e+1	1.642000e-19
+ 2.231002e+1	1.643600e-19
+ 2.280342e+1	1.645250e-19
+ 2.330773e+1	1.646920e-19
+ 2.382319e+1	1.648640e-19
+ 2.435006e+1	1.650290e-19
+ 2.488857e+1	1.651950e-19
+ 2.543900e+1	1.650060e-19
+ 2.600160e+1	1.647210e-19
+ 2.657664e+1	1.644300e-19
+ 2.716439e+1	1.641330e-19
+ 2.776515e+1	1.638290e-19
+ 2.837919e+1	1.635190e-19
+ 2.900681e+1	1.632010e-19
+ 2.964831e+1	1.628770e-19
+ 3.030400e+1	1.617910e-19
+ 3.097419e+1	1.614500e-19
+ 3.165920e+1	1.611020e-19
+ 3.235937e+1	1.607460e-19
+ 3.307501e+1	1.603830e-19
+ 3.380648e+1	1.600120e-19
+ 3.455413e+1	1.596320e-19
+ 3.531832e+1	1.591900e-19
+ 3.609940e+1	1.586940e-19
+ 3.689776e+1	1.581760e-19
+ 3.771377e+1	1.576480e-19
+ 3.854784e+1	1.571070e-19
+ 3.940034e+1	1.565550e-19
+ 4.027170e+1	1.557830e-19
+ 4.116233e+1	1.547620e-19
+ 4.207266e+1	1.536630e-19
+ 4.300312e+1	1.525400e-19
+ 4.395416e+1	1.513910e-19
+ 4.492623e+1	1.502020e-19
+ 4.591980e+1	1.489440e-19
+ 4.693534e+1	1.476360e-19
+ 4.797334e+1	1.462990e-19
+ 4.903430e+1	1.449410e-19
+ 5.011872e+1	1.436760e-19
+ 5.122713e+1	1.435010e-19
+ 5.236004e+1	1.433250e-19
+ 5.351802e+1	1.431430e-19
+ 5.470160e+1	1.429580e-19
+ 5.591135e+1	1.427860e-19
+ 5.714786e+1	1.426170e-19
+ 5.841172e+1	1.424450e-19
+ 5.970353e+1	1.422170e-19
+ 6.102391e+1	1.417600e-19
+ 6.237348e+1	1.411450e-19
+ 6.375291e+1	1.405150e-19
+ 6.516284e+1	1.398450e-19
+ 6.660395e+1	1.391170e-19
+ 6.807694e+1	1.383560e-19
+ 6.958250e+1	1.375780e-19
+ 7.112135e+1	1.367840e-19
+ 7.269424e+1	1.359710e-19
+ 7.430191e+1	1.351830e-19
+ 7.594514e+1	1.347650e-19
+ 7.762471e+1	1.347370e-19
+ 7.934143e+1	1.347070e-19
+ 8.109611e+1	1.345510e-19
+ 8.288959e+1	1.343290e-19
+ 8.472274e+1	1.340940e-19
+ 8.659643e+1	1.338270e-19
+ 8.851156e+1	1.335450e-19
+ 9.046904e+1	1.332420e-19
+ 9.246982e+1	1.329140e-19
+ 9.451484e+1	1.325720e-19
+ 9.660509e+1	1.322220e-19
+ 9.874156e+1	1.318660e-19
+ 1.009253e+2	1.313610e-19
+ 1.031573e+2	1.306460e-19
+ 1.054387e+2	1.299160e-19
+ 1.077705e+2	1.291690e-19
+ 1.101539e+2	1.283970e-19
+ 1.125901e+2	1.275740e-19
+ 1.150800e+2	1.267270e-19
+ 1.176251e+2	1.258610e-19
+ 1.202264e+2	1.249740e-19
+ 1.228853e+2	1.240300e-19
+ 1.256030e+2	1.230640e-19
+ 1.283808e+2	1.220770e-19
+ 1.312200e+2	1.210690e-19
+ 1.341220e+2	1.200390e-19
+ 1.370882e+2	1.189850e-19
+ 1.401200e+2	1.178750e-19
+ 1.432188e+2	1.166790e-19
+ 1.463861e+2	1.154280e-19
+ 1.496236e+2	1.142390e-19
+ 1.529326e+2	1.132380e-19
+ 1.563148e+2	1.123590e-19
+ 1.597717e+2	1.114690e-19
+ 1.633052e+2	1.105760e-19
+ 1.669168e+2	1.096730e-19
+ 1.706082e+2	1.087510e-19
+ 1.743813e+2	1.078080e-19
+ 1.782379e+2	1.068420e-19
+ 1.821797e+2	1.058380e-19
+ 1.862087e+2	1.047910e-19
+ 1.903268e+2	1.037210e-19
+ 1.945360e+2	1.026270e-19
+ 1.988383e+2	1.015090e-19
+ 2.032357e+2	1.005080e-19
+ 2.077304e+2	9.952870e-20
+ 2.123245e+2	9.853150e-20
+ 2.170201e+2	9.751220e-20
+ 2.218196e+2	9.647040e-20
+ 2.267253e+2	9.536040e-20
+ 2.317395e+2	9.418230e-20
+ 2.368645e+2	9.296730e-20
+ 2.421029e+2	9.172550e-20
+ 2.474572e+2	9.046990e-20
+ 2.529298e+2	8.925250e-20
+ 2.585235e+2	8.810550e-20
+ 2.642409e+2	8.693300e-20
+ 2.700847e+2	8.573270e-20
+ 2.760578e+2	8.448010e-20
+ 2.821630e+2	8.305720e-20
+ 2.884031e+2	8.160280e-20
+ 2.947813e+2	8.011620e-20
+ 3.013006e+2	7.873910e-20
+ 3.079640e+2	7.767210e-20
+ 3.147748e+2	7.662210e-20
+ 3.217362e+2	7.554880e-20
+ 3.288516e+2	7.445180e-20
+ 3.361244e+2	7.333050e-20
+ 3.435580e+2	7.218440e-20
+ 3.511559e+2	7.106140e-20
+ 3.589219e+2	6.997620e-20
+ 3.668597e+2	6.889520e-20
+ 3.749730e+2	6.779040e-20
+ 3.832657e+2	6.666110e-20
+ 3.917419e+2	6.550690e-20
+ 4.004055e+2	6.430830e-20
+ 4.092607e+2	6.302860e-20
+ 4.183117e+2	6.170550e-20
+ 4.275629e+2	6.035320e-20
+ 4.370187e+2	5.897100e-20
+ 4.466836e+2	5.755840e-20
+ 4.565623e+2	5.650940e-20
+ 4.666594e+2	5.561560e-20
+ 4.769798e+2	5.471240e-20
+ 4.875285e+2	5.378930e-20
+ 4.983105e+2	5.285850e-20
+ 5.093309e+2	5.201410e-20
+ 5.205950e+2	5.118870e-20
+ 5.321083e+2	5.034500e-20
+ 5.438761e+2	4.948260e-20
+ 5.559043e+2	4.862560e-20
+ 5.681984e+2	4.777290e-20
+ 5.807644e+2	4.690230e-20
+ 5.936083e+2	4.601610e-20
+ 6.067363e+2	4.512980e-20
+ 6.201546e+2	4.425380e-20
+ 6.338697e+2	4.335850e-20
+ 6.478881e+2	4.244660e-20
+ 6.622165e+2	4.153230e-20
+ 6.768618e+2	4.060550e-20
+ 6.918310e+2	3.965820e-20
+ 7.071312e+2	3.886370e-20
+ 7.227698e+2	3.822400e-20
+ 7.387543e+2	3.758010e-20
+ 7.550922e+2	3.690820e-20
+ 7.717915e+2	3.620580e-20
+ 7.888601e+2	3.548410e-20
+ 8.063062e+2	3.474640e-20
+ 8.241381e+2	3.399250e-20
+ 8.423644e+2	3.322700e-20
+ 8.609937e+2	3.252210e-20
+ 8.800351e+2	3.186930e-20
+ 8.994976e+2	3.119220e-20
+ 9.193905e+2	3.048140e-20
+ 9.397233e+2	2.974060e-20
+ 9.605058e+2	2.896870e-20
+ 9.817479e+2	2.815550e-20
+ 1.000000e+3	2.755600e-20
+-----------------------------
+
 EXCITATION
 CO2 <-> CO2(v=010)
  8.300000e-2  2.000000e+0
 SPECIES: e / CO2
 PROCESS: E + CO2 <-> E + CO2(v=010), Excitation
 PARAM.:  E = 0.083 eV, g1/g0 = 2, complete set
-COMMENT: [e + CO2(X,v=000) <-> e + CO2(X,v=010), Vibrational]  Lowke, Phelps and Irwin 1973
-COMMENT: J. Appl. Phys. 44 4664.
+COMMENT: [e + CO2(X,v=000) <-> e + CO2(X,v=010), Vibrational] Lowke, Phelps and Irwin 1973 J.
+COMMENT: Appl. Phys. 44 4664.
 UPDATED: 2017-05-09 05:43:34
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
@@ -153,7 +672,7 @@ CO2 -> CO2(v=020)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(v=020), Excitation
 PARAM.:  E = 0.167 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=020), Vibrational]  Lowke, Phelps and Irwin 1973 J.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=020), Vibrational] Lowke, Phelps and Irwin 1973 J.
 COMMENT: Appl. Phys. 44 4664 Celiberto et al 2014 Open Plasma Phys. J. 7 33 Celiberto et al 2016
 COMMENT: Plasma Sources Sci. Technol. 25 033004 (for deconvolution from (100)).
 UPDATED: 2017-05-09 05:39:17
@@ -194,7 +713,7 @@ CO2 -> CO2(v=100)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(v=100), Excitation
 PARAM.:  E = 0.167 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=100), Vibrational]  Lowke, Phelps and Irwin 1973 J.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=100), Vibrational] Lowke, Phelps and Irwin 1973 J.
 COMMENT: Appl. Phys. 44 4664 Celiberto et al 2014 Open Plasma Phys. J. 7 33 Celiberto et al 2016
 COMMENT: Plasma Sources Sci. Technol. 25 033004 (for deconvolution from (020)).
 UPDATED: 2017-05-09 05:41:27
@@ -234,8 +753,8 @@ CO2 -> CO2(v=030+110)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(v=030+110), Excitation
 PARAM.:  E = 0.252 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=030+110), Vibrational]  Lowke, Phelps and Irwin 1973
-COMMENT: J. Appl. Phys. 44 4664.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=030+110), Vibrational] Lowke, Phelps and Irwin 1973 J.
+COMMENT: Appl. Phys. 44 4664.
 UPDATED: 2017-05-09 05:48:06
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
@@ -256,7 +775,7 @@ CO2 -> CO2(v=001)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(v=001), Excitation
 PARAM.:  E = 0.291 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=001), Vibrational]  Lowke, Phelps and Irwin 1973 J.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=001), Vibrational] Lowke, Phelps and Irwin 1973 J.
 COMMENT: Appl. Phys. 44 4664.
 UPDATED: 2017-05-09 05:56:46
 COLUMNS: Energy (eV) | Cross section (m2)
@@ -293,7 +812,7 @@ CO2 -> CO2(v=040+120+011)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(v=040+120+011), Excitation
 PARAM.:  E = 0.339 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=040+120+011), Vibrational]  Lowke, Phelps and Irwin
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=040+120+011), Vibrational] Lowke, Phelps and Irwin
 COMMENT: 1973 J. Appl. Phys. 44 4664 Fridman 2012 Plasma Chemistry, Cambridge University Press
 COMMENT: Celiberto et al 2014 Open Plasma Phys. J. 7 33 Celiberto et al 2016 Plasma Sources Sci.
 COMMENT: Technol. 25 033004 (for deconvolution).
@@ -318,7 +837,7 @@ CO2 -> CO2(X,v=200)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(X,v=200), Excitation
 PARAM.:  E = 0.339 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=200), Vibrational]  Lowke, Phelps and Irwin 1973 J.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=200), Vibrational] Lowke, Phelps and Irwin 1973 J.
 COMMENT: Appl. Phys. 44 4664 Fridman 2012 Plasma Chemistry, Cambridge University Press Celiberto
 COMMENT: et al 2014 Open Plasma Phys. J. 7 33 Celiberto et al 2016 Plasma Sources Sci. Technol. 25
 COMMENT: 033004 (for deconvolution).
@@ -343,7 +862,7 @@ CO2 -> CO2(X,v=050+210+130+021+101)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(X,v=050+210+130+021+101), Excitation
 PARAM.:  E = 0.422 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=050+210+130+021+101), Vibrational]  Lowke, Phelps and
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=050+210+130+021+101), Vibrational] Lowke, Phelps and
 COMMENT: Irwin 1973 J. Appl. Phys. 44 4664 Celiberto et al 2014 Open Plasma Phys. J. 7 33
 COMMENT: Celiberto et al 2016 Plasma Sources Sci. Technol. 25 033004 (for deconvolution).
 UPDATED: 2017-05-09 06:05:00
@@ -364,7 +883,7 @@ CO2 -> CO2(X,v=300)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(X,v=300), Excitation
 PARAM.:  E = 0.5 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=300), Vibrational]  Lowke, Phelps and Irwin 1973 J.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=300), Vibrational] Lowke, Phelps and Irwin 1973 J.
 COMMENT: Appl. Phys. 44 4664 Fridman 2012 Plasma Chemistry, Cambridge University Press Celiberto
 COMMENT: et al 2014 Open Plasma Phys. J. 7 33 Celiberto et al 2016 Plasma Sources Sci. Technol. 25
 COMMENT: 033004 (for deconvolution).
@@ -778,7 +1297,7 @@ CO2 -> CO2(X,v=060+220+140)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(X,v=060+220+140), Excitation
 PARAM.:  E = 0.505 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=060+220+140), Vibrational]  Lowke, Phelps and Irwin
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=060+220+140), Vibrational] Lowke, Phelps and Irwin
 COMMENT: 1973 J. Appl. Phys. 44 4664 Fridman 2012 Plasma Chemistry, Cambridge University Press
 COMMENT: Celiberto et al 2014 Open Plasma Phys. J. 7 33 Celiberto et al 2016 Plasma Sources Sci.
 COMMENT: Technol. 25 033004 (for deconvolution).
@@ -853,8 +1372,8 @@ CO2 -> CO2(X,v=0n0+n00)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(X,v=0n0+n00), Excitation
 PARAM.:  E = 2.5 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=0n0+n00), Vibrational]  Lowke, Phelps and Irwin 1973
-COMMENT: J. Appl. Phys. 44 4664 Fridman 2012 Plasma Chemistry, Cambridge University Press (for
+COMMENT: [e + CO2(X,v=000) -> e + CO2(X,v=0n0+n00), Vibrational] Lowke, Phelps and Irwin 1973 J.
+COMMENT: Appl. Phys. 44 4664 Fridman 2012 Plasma Chemistry, Cambridge University Press (for
 COMMENT: deconvolution).
 UPDATED: 2017-05-09 06:26:06
 COLUMNS: Energy (eV) | Cross section (m2)
@@ -873,7 +1392,7 @@ CO2 -> CO2(e1)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(e1), Excitation
 PARAM.:  E = 7 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(e1), Excitation]  Lowke, Phelps and Irwin 1973 J. Appl.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(e1), Excitation] Lowke, Phelps and Irwin 1973 J. Appl.
 COMMENT: Phys. 44 4664.
 UPDATED: 2017-05-09 05:06:01
 COLUMNS: Energy (eV) | Cross section (m2)
@@ -891,7 +1410,7 @@ CO2 -> CO2(e2)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + CO2(e2), Excitation
 PARAM.:  E = 10.5 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(e2), Excitation]  Lowke, Phelps and Irwin 1973 J. Appl.
+COMMENT: [e + CO2(X,v=000) -> e + CO2(e2), Excitation] Lowke, Phelps and Irwin 1973 J. Appl.
 COMMENT: Phys. 44 4664 Itikawa 2002 J. Phys. Chem. Ref. Data 31 749 (cross section extended up to
 COMMENT: 1000 eV).
 UPDATED: 2017-05-09 05:11:41
@@ -923,9 +1442,9 @@ CO2 -> CO2(+,X)
 SPECIES: e / CO2
 PROCESS: E + CO2 -> E + E + CO2(+,X), Ionization
 PARAM.:  E = 13.8 eV, complete set
-COMMENT: [e + CO2(X,v=000) -> e + CO2(+,X), Ionization]  Itikawa 2002 J. Phys. Chem. Ref. Data
-COMMENT: 31 749.
-UPDATED: 2018-08-31 03:41:32
+COMMENT: [e + CO2(X,v=000) -> e + e + CO2(+,X), Ionization] Itikawa 2002 J. Phys. Chem. Ref.
+COMMENT: Data 31 749.
+UPDATED: 2022-07-21 05:50:10
 COLUMNS: Energy (eV) | Cross section (m2)
 -----------------------------
  1.380000e+1	0.000000e+0
