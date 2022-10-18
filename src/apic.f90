@@ -417,7 +417,10 @@ contains
     call af_particles_to_grid(tree, i_energy, n_part, get_id, &
          get_r_energy, 1, fill_gc=.false., iv_tmp=i_tmp_dens)
     call af_tree_apply(tree, i_energy, i_electron, '/', 1e-10_dp)
-    call clear_cc_inside_dielectric(tree, i_energy)
+
+    if (GL_use_dielectric) then
+       call clear_cc_inside_dielectric(tree, i_energy)
+    end if
 
     ! Fill ghost cells before writing output
     call af_gc_tree(tree, [i_electron, i_pos_ion])
