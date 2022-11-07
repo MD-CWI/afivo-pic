@@ -11,3 +11,13 @@ The first time, run these commands to download `afivo`, `particle_core` etc.:
 Then compile the examples in `programs` by typing `make` in the example folders. Afterwards, the examples can be run with:
 
     ./apic my_config_file.cfg
+
+# Updating the code
+
+First get the latest version:
+
+    git pull
+    git submodule update
+
+And then type `make' in the respective program to compile again.
+
