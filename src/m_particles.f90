@@ -239,7 +239,7 @@ contains
 
     !$omp parallel private(thread_id, cell_tag, cell_i0, cell_i1, &
     !$omp i, j, i_buffer, v_new, w_min, w_max, desired_weight, &
-    !$omp pbuffer, w_new, remainder)
+    !$omp pbuffer, w_new, w_relative, remainder)
     i_buffer = 0
     thread_id = omp_get_thread_num()
 
