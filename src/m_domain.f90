@@ -10,6 +10,9 @@ module m_domain
   ! The length of the (square) domain
   real(dp), protected, public :: domain_len(NDIM) = 4e-3_dp
 
+  ! The volume of the domain
+  real(dp), protected, public :: domain_volume = -1.0_dp
+
   ! The coarse grid size (in number of cells)
   integer, protected, public :: coarse_grid_size(NDIM) = -1
 
@@ -24,6 +27,7 @@ contains
   subroutine domain_init(cfg)
     use m_config
     type(CFG_t), intent(inout) :: cfg
+    real(dp), parameter        :: pi = acos(-1.0_dp)
 
     call CFG_add_get(cfg, "domain_len", domain_len, &
          "The length of the domain (m)")
@@ -37,6 +41,11 @@ contains
        coarse_grid_size = nint(domain_len/minval(domain_len)) * box_size
     end if
 
+    if (GL_cylindrical) then
+       domain_volume = pi * domain_len(1)**2 * domain_len(2)
+    else
+       domain_volume = product(domain_len)
+    end if
   end subroutine domain_init
 
   integer function outside_check(my_part)

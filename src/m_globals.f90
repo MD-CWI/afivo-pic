@@ -123,6 +123,9 @@ module m_globals
   ! Fraction of O2
   real(dp), protected :: GL_gas_frac_O2 = 0.2_dp
 
+  ! Background ionization rate (m^-3 s^-1)
+  real(dp), protected :: GL_background_ionization_rate = 0.0_dp
+
   ! Position of initial electron seed
   real(dp) :: GL_init_seed_pos(3)   = [0.5_dp, 0.5_dp, 0.9_dp]
   real(dp) :: GL_init_seed_sigma    = 1.0e-3_dp
@@ -191,6 +194,10 @@ contains
           "Per how many regular outputs binary output is written")
     call CFG_add_get(cfg, "use_electrode", GL_use_electrode, &
          "Whether to include an electrode")
+    call CFG_add_get(cfg, "background_ionization_rate", &
+         GL_background_ionization_rate, &
+         "Background production rate (m^-3 s^-1) of electrons and positive ions")
+
 
     call CFG_add_get(cfg, "memory_afivo_GB", GL_memory_afivo_GB, &
          "How many gigabytes of memory to use for afivo")

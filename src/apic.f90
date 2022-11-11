@@ -193,8 +193,13 @@ program apic
 
      if (associated(user_generate_particles)) then
         call user_generate_particles(pc, GL_time, GL_time - time_last_generate)
-        time_last_generate = GL_time
      end if
+
+     if (GL_background_ionization_rate > 0) then
+        call particles_background_ionization(tree, pc, GL_time - time_last_generate)
+     end if
+
+     time_last_generate = GL_time
 
      if (pc%get_num_sim_part() == 0) then
         print *, "No particles, end of simulation"

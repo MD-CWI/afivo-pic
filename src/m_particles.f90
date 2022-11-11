@@ -1,3 +1,4 @@
+#include "../afivo/src/cpp_macros.h"
 module m_particles
   use m_particle_core
   use m_af_all
@@ -375,7 +376,7 @@ contains
   subroutine particles_to_density_and_events(tree, pc, init_cond)
     use m_cross_sec
     use m_particle_core
-    use m_domain, only: outside_check
+    use m_domain
     type(af_t), intent(inout)        :: tree
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
@@ -487,6 +488,58 @@ contains
     end subroutine get_event_rw
 
   end subroutine particles_to_density_and_events
+
+  !> Add background ionization due to a continues volumetric source
+  subroutine particles_background_ionization(tree, pc, time_elapsed)
+    use m_particle_core
+    use m_domain
+    type(af_t), intent(inout) :: tree
+    type(PC_t), intent(inout) :: pc
+    real(dp), intent(in)      :: time_elapsed
+    integer                   :: n, n_new, n_part_before, n_ionizations
+    real(dp)                  :: num_electrons, x(NDIM)
+    type(PC_part_t)           :: new_part
+
+    if (GL_background_ionization_rate > 0) then
+       num_electrons = GL_background_ionization_rate * domain_volume * &
+            time_elapsed / particle_min_weight
+
+       ! Draw Poisson random number
+       n_ionizations = GL_rng%poisson(num_electrons)
+
+       new_part%a = 0
+       new_part%v = 0
+       new_part%x = 0
+       new_part%w = particle_min_weight
+       n_part_before = pc%n_part
+
+       do n = 1, n_ionizations
+          ! Get location (TODO: cylindrical sampling)
+
+          if (NDIM == 2 .and. GL_cylindrical) then
+             ! r, z
+             x(1:2) = [sqrt(GL_rng%unif_01()), GL_rng%unif_01()]
+          else
+             x = [DTIMES(GL_rng%unif_01())]
+          end if
+
+          new_part%x(1:NDIM) = x * domain_len
+          new_part%id = af_get_id_at(tree, new_part%x(1:NDIM))
+
+          if (outside_check(new_part) == 0) then
+             call pc%add_part(new_part)
+          end if
+       end do
+
+       ! Add positive ions in the end
+       n_new = pc%n_part - n_part_before
+       if (n_new > 0) then
+          call af_particles_to_grid(tree, i_pos_ion, n_new, &
+               get_id, get_rw, interpolation_order_to_density, &
+               iv_tmp=i_tmp_dens, offset_particles=n_part_before)
+       end if
+    end if
+  end subroutine particles_background_ionization
 
   subroutine particle_to_surface_charge(tree, my_part, i_surf)
     ! Input: a particle that is found in the dielectric (after timestep, and is
