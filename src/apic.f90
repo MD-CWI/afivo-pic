@@ -364,11 +364,13 @@ contains
   end subroutine init_tree
 
   subroutine print_status()
-    write(*, "(F7.2,A,I0,A,E9.2,A,E9.2,A,E9.2,A,E9.2,A,E9.2)") &
+    write(*, "(F7.2,A,I0,9(A,E9.2))") &
          100 * GL_time / GL_end_time, "% it: ", it, &
          " t:", GL_time, " dt:", GL_dt, " wc:", wc_time, &
          " ncell:", real(af_num_cells_used(tree), dp), &
-         " npart:", real(pc%get_num_sim_part(), dp)
+         " npart:", real(pc%get_num_sim_part(), dp), &
+         " dt_cfl:", dt_cfl, " dt_growth:", dt_growth, " dt_drt:", dt_drt, &
+         " min_dx:", af_min_dr(tree)
   end subroutine print_status
 
   subroutine write_sim_data(my_unit)
