@@ -206,6 +206,12 @@ contains
     type(PC_part_t)           :: pbuffer(buffer_size)
     type(prng_t)              :: prng
 
+    t_sort = 0
+    t_rest = 0
+
+    ! Don't attempt to adapt weights without particles
+    if (pc%n_part == 0) return
+
     ! print *, "before: ", pc%get_num_sim_part(), pc%get_num_real_part(), &
          ! pc%get_mean_energy() / UC_elec_volt
     inv_particle_min_weight = 1/particle_min_weight
@@ -224,15 +230,20 @@ contains
     ix_thread(0) = 1
     ix_thread(n_threads) = pc%n_part + 1
     do n = 1, n_threads-1
-       ix_thread(n) = nint(pc%n_part * real(n, dp)/n_threads)
+       ix_thread(n) = max(ix_thread(n-1), nint(pc%n_part * real(n, dp)/n_threads))
     end do
 
     ! Correct so that the boundaries between threads occur at tag boundaries
     do n = 1, n_threads-1
-       do while (pc%particles(ix_thread(n))%tag/N_vb == &
-            pc%particles(ix_thread(n)-1)%tag/N_vb .and. &
-            ix_thread(n) > ix_thread(n-1))
-          ix_thread(n) = ix_thread(n) - 1
+       ! Check if the thread has particles assigned to it
+       do while (ix_thread(n) > ix_thread(n-1))
+          if (pc%particles(ix_thread(n))%tag/N_vb == &
+               pc%particles(ix_thread(n)-1)%tag/N_vb) then
+             ! Adjust boundary
+             ix_thread(n) = ix_thread(n) - 1
+          else
+             exit
+          end if
        end do
     end do
 
@@ -631,10 +642,15 @@ contains
        bins(i) = en_step * (i-1)
     end do
 
-    call pc%histogram(calc_elec_energy, is_alive, [0.0_dp], bins, bin_values)
-    ! Convert histogram to density and save as curve-object
-    curve_dat(1, 1, :) = bins
-    curve_dat(1, 2, :) = bin_values/(n_part * en_step) + 1e-9 ! Add regularization parameter to prevent errors when converting to semilogy plots
+    if (n_part > 0) then
+       call pc%histogram(calc_elec_energy, is_alive, [0.0_dp], bins, bin_values)
+       ! Convert histogram to density and save as curve-object
+       curve_dat(1, 1, :) = bins
+       curve_dat(1, 2, :) = bin_values/(n_part * en_step) + 1e-9 ! Add regularization parameter to prevent errors when converting to semilogy plots
+    else
+       curve_dat(1, 1, :) = bins
+       curve_dat(1, 2, :) = 0.0_dp
+    end if
   end function write_EEDF_as_curve
 
   function calc_elec_energy(part) result(energy)

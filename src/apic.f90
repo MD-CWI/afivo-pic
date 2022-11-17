@@ -175,7 +175,10 @@ program apic
   call af_print_info(tree)
 
   ! Start from small time step
-  GL_dt   = GL_dt_min
+  GL_dt     = GL_dt_min
+  dt_cfl    = GL_dt_max
+  dt_growth = GL_dt_max
+  dt_drt    = GL_dt_max
 
   ! Initial wall clock time
   call system_clock(t_start, count_rate)
@@ -201,7 +204,7 @@ program apic
 
      time_last_generate = GL_time
 
-     if (pc%get_num_sim_part() == 0) then
+     if (pc%get_num_sim_part() == 0 .and. GL_background_ionization_rate <= 0) then
         print *, "No particles, end of simulation"
         exit
      end if
@@ -263,7 +266,8 @@ program apic
      n_elec      = pc%get_num_real_part()
      dt_cfl      = PM_get_max_dt(pc, GL_rng, n_samples, cfl_particles)
      dt_drt      = dielectric_relaxation_time(max_elec_dens)
-     dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/n_elec_prev), 20.0e-2_dp)
+     dt_growth   = get_new_dt(GL_dt, abs(1-n_elec/max(1.0_dp, n_elec_prev)), &
+          20.0e-2_dp)
      GL_dt       = min(dt_cfl, dt_growth, dt_drt)
      n_elec_prev = n_elec
 
@@ -413,7 +417,7 @@ contains
     write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
-    write(*, "(A20,E12.4)") "mean weight", n_elec/n_part
+    write(*, "(A20,E12.4)") "mean weight", n_elec/max(n_part, 1.0_dp)
 
     wtime_run = omp_get_wtime() - wtime_start
     write(*, "(8A10)") "advance", "to_grid", "weights", "sort", &

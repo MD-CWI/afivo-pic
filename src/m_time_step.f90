@@ -139,7 +139,7 @@ contains
        min_dr = af_min_dr(tree)
        dt_max = cfl_num * min_dr / max(vel_est, 1e-10_dp)
     else
-       dt_max = huge(1.0_dp)
+       dt_max = GL_dt_max
     end if
 
   end function PM_get_max_dt
