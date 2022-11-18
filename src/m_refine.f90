@@ -199,7 +199,7 @@ contains
     character(len=GL_slen)     :: td_file = "input/transport_data.txt"
     logical                    :: td_old_style = .true.
     integer                    :: table_size       = 500
-    real(dp)                   :: max_electric_fld = 3e7_dp
+    real(dp)                   :: max_electric_fld
     real(dp), allocatable      :: x_data(:), y_data(:)
     character(len=GL_slen)     :: data_name
 
@@ -207,11 +207,6 @@ contains
          "Input file with transport data")
     call CFG_add_get(cfg, "lookup_table_size", table_size, &
          "The transport data table size in the fluid model")
-    call CFG_add_get(cfg, "lookup_table_max_efield", max_electric_fld, &
-         "The maximum electric field in the fluid model coefficients")
-
-    ! Create a lookup table for the model coefficients
-    td_tbl = LT_create(0.0_dp, max_electric_fld, table_size, 1)
 
     call CFG_add_get(cfg, "td_old_style", td_old_style, &
             "Whether to use old or new style transport data")
@@ -232,6 +227,10 @@ contains
        x_data = x_data * gas_number_dens / 1e21_dp
        y_data = y_data * gas_number_dens
     end if
+
+    max_electric_fld = x_data(size(x_data))
+    td_tbl = LT_create(0.0_dp, max_electric_fld, table_size, 1, &
+         extrapolate_above=.true.)
 
     call LT_set_col(td_tbl, i_td_alpha, x_data, y_data)
 
