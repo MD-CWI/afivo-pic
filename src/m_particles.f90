@@ -140,8 +140,7 @@ contains
 
     where (pc%colls(:)%type == CS_ionize_t .or. &
          pc%colls(:)%type == CS_attach_t .or. &
-         pc%colls(:)%type == CS_photonL_t .or. &
-         pc%colls(:)%type == CS_photonH_t)
+         pc%colls(:)%type == CS_photoemission_t)
        pc%coll_is_event(:) = .true.
     end where
 
@@ -453,17 +452,17 @@ contains
             iv_tmp=i_tmp_dens)
     end if
 
-    if (photoi_enabled) then
+    if (photoionization_enabled) then
        ! Photo-electrons are added to the end of the particle list
        n_part_before = pc%n_part
-       call photoionization(tree, pc, n_photons)
+       call photons_photoionization(tree, pc, n_photons)
        call af_particles_to_grid(tree, i_pos_ion, n_photons, &
             get_id, get_rw, interpolation_order_to_density, &
             iv_tmp=i_tmp_dens, offset_particles=n_part_before)
     end if
 
-    if (photoe_enabled) then
-       call photoemission(tree, pc)
+    if (photoemission_enabled) then
+       call photons_photoemission(tree, pc)
     end if
 
     pc%n_events = 0

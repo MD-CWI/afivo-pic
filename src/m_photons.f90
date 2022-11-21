@@ -1,64 +1,62 @@
 #include "../afivo/src/cpp_macros.h"
+!> This module contains the functionality for photon interaction (ionization and
+!> electron emission from dielectric surface)
+!>
+!> Authors: Xiaoran Li, Jannis Teunissen
+!>
+!> Note: a prefix pfi_ is used for variables and functions that compute
+!> photoionization proportional to ionization.
 module m_photons
-! This module contains the functionality for
-! photon interaction (ionization and electron emission from dielectric surface)
-use m_globals
-use m_af_all
-use m_particle_core
-use m_cross_sec
-use m_units_constants
+  use m_globals
+  use m_af_all
+  use m_particle_core
+  use m_cross_sec
+  use m_units_constants
+  use m_domain
 
-use m_time_step
-use m_domain
+  implicit none
+  private
 
-implicit none
+  !> Whether photoionization is enabled
+  logical, public, protected :: photoionization_enabled = .false.
+  !> Whether photon-induced secondary emission from surfaces is enabled
+  logical, public, protected :: photoemission_enabled   = .false.
 
-private
+  !> Whether to include photoionization from collisions
+  logical :: photoemission_from_collisions   = .false.
+  !> Whether to include photoemission from collisions
+  logical :: photoionization_from_collisions = .false.
 
-logical, public         :: photoi_enabled
-logical, public         :: photoe_enabled
-logical                 :: pi_eff_fixed = .true.
-logical                 :: eff_based_photoi = .true.
-real(dp)                :: photoe_probability = 1.0e-2_dp
-character(CFG_name_len) :: model
+  !> Whether photoionization from (or proportional to) ionization is enabled, as
+  !> is for example used in in Zheleznyak's model
+  logical  :: pfi_enabled                            = .false.
+  !> Relative photoemission probability (compared to photoionization), if both
+  !> are assumed proportional to ionization
+  real(dp) :: pfi_relative_photoemission_probability = 1.0e-2_dp
+  !> Quenching factor for photoionization from ionization
+  real(dp) :: pfi_quench_factor                      = 1.0_dp
+  !> Minimal inverse absorption length for photoionization from ionization
+  real(dp) :: pfi_min_inv_abs_len
+  !> Maximal inverse absorption length for photoionization from ionization
+  real(dp) :: pfi_max_inv_abs_len
 
-real(dp)              :: pi_quench_fac
-real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
-real(dp), allocatable :: pi_photo_eff_table1(:), pi_photo_eff_table2(:)
+  !> Tabulated field strengths for photoionization from ionization
+  real(dp), allocatable :: pfi_photo_eff_table1(:)
+  !> Tabulated photoionization efficiencies for photoionization from ionization
+  real(dp), allocatable :: pfi_photo_eff_table2(:)
 
-!> Ignore photoionization below this coordinate
-real(dp)              :: pi_photon_rmin(NDIM) = -1e10_dp
-!> Ignore photoionization above this coordinate
-real(dp)              :: pi_photon_rmax(NDIM) = 1e10_dp
+  !> Ignore photoionization below this coordinate
+  real(dp) :: photoionization_rmin(NDIM) = -1e10_dp
+  !> Ignore photoionization above this coordinate
+  real(dp) :: photoionization_rmax(NDIM) = 1e10_dp
 
-! the proportional factor for photoionization
-real(dp)              :: pi_eff = 0.075_dp
+  !> Pressure of the gas that is absorbing photons
+  real(dp) :: photons_absorbing_gas_pressure = 0.0_dp
 
-! the proportional factor for photoemission from CO2
-real(dp)              :: pe_from_CO2 = 0.25_dp
-
-procedure(photoi), pointer :: photoionization => null()
-procedure(photoe), pointer :: photoemission => null()
-
-! Public methods
-public  :: photons_initialize
-public  :: photoionization
-public  :: photoemission
-
-abstract interface
-  subroutine photoi(tree, pc, n_photons)
-    import
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    integer, intent(out)          :: n_photons
-  end subroutine photoi
-
-  subroutine photoe(tree, pc)
-    import
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-  end subroutine photoe
-end interface
+  ! Public methods
+  public  :: photons_initialize
+  public  :: photons_photoionization
+  public  :: photons_photoemission
 
 contains
 
@@ -66,166 +64,145 @@ contains
     use m_gas
     use m_config
     type(CFG_t), intent(inout) :: cfg
+    real(dp)                   :: frac_gas, absorp_inv_lengths(2)
+    real(dp)                   :: temp_vec(2), dummy_vec(0)
+    integer                    :: t_size, t_size_2
+    character(CFG_name_len)    :: model
 
     call CFG_add_get(cfg, "photon%model", model, &
-         "The model that is used for photon interactions")
-    call CFG_add_get(cfg, "photon%em_enabled", photoe_enabled, &
+         "The model that is used for photoionization")
+    call CFG_add_get(cfg, "photon%photoemission_enabled", &
+         photoemission_enabled, &
          "Whether photoemission is used")
-    call CFG_add_get(cfg, "photon%em_probability", photoe_probability, &
-        "The probability for a single photoemission event")
-    call CFG_add_get(cfg, "photon%em_from_CO2", pe_from_CO2, &
-        "The probability for a photoemission from CO2 corresponding to a ionization event")
-    call CFG_add_get(cfg, "photon%ion_enabled", photoi_enabled, &
-        "Whether photoionization is used")
-    call CFG_add_get(cfg, "photon%rmin", pi_photon_rmin, &
+    call CFG_add_get(cfg, "photon%relative_photoemission_probability", &
+         pfi_relative_photoemission_probability, &
+         "The relative probability of photoemission compared to photoionization "&
+         "(when both are proportional to ionization)")
+    call CFG_add_get(cfg, "photon%rmin", photoionization_rmin, &
          "Ignore photoionization below this coordinate")
-    call CFG_add_get(cfg, "photon%rmax", pi_photon_rmax, &
-        "Ignore photoionization above this coordinate")
-    call CFG_add_get(cfg, "photon%ion_eff_fixed", pi_eff_fixed, &
-        "the proportional factor for photoionization is fixed or not")
-    call CFG_add_get(cfg, "photon%eff_based_photoi", eff_based_photoi, &
-        "the photoionization method is based on coefficient or not")
-    call CFG_add_get(cfg, "photon%ion_eff", pi_eff, &
-        "the proportional factor for photoionization")
+    call CFG_add_get(cfg, "photon%rmax", photoionization_rmax, &
+         "Ignore photoionization above this coordinate")
+
+    call CFG_add_get(cfg, "photon%photoionization_from_collisions", &
+         photoionization_from_collisions, &
+         "Whether to include photoionization from collisions")
+    call CFG_add_get(cfg, "photon%photoemission_from_collisions", &
+         photoemission_from_collisions, &
+         "Whether to include photoemission from collisions")
+
+    pfi_photo_eff_table1 = dummy_vec
+    pfi_photo_eff_table2 = dummy_vec
+    absorp_inv_lengths = [0.0_dp, 0.0_dp]
 
     ! Initialize parameters and pointers according to the selected model
     select case (model)
-      case("Zheleznyak")
-        call Zheleznyak_initialize(cfg)
-        photoionization => photoi_Zheleznyak
-        photoemission => photoe_Zheleznyak
-      case("CO2")
-        call CO2_initialize(cfg)
-        photoemission => photoe_CO2
-        if (eff_based_photoi) then
-          photoionization => photoi_CO2_exp
-        else
-          photoionization => photoi_CO2_cs
-        end if
-      case default
-        error stop "Unrecognized photon model"
+    case("Zheleznyak")
+       ! Zheleznyak photoionization model for air. See "Photoionization of
+       ! nitrogen and oxygen mixtures by radiation from a gas discharge" by
+       ! Zheleznyak et al., 1982
+       pfi_enabled = .true.
+       pfi_photo_eff_table1 = [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7]
+       pfi_photo_eff_table2 = [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0]
+       absorp_inv_lengths = [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar]
+
+       frac_gas = GAS_get_fraction("O2")
+       if (frac_gas <= epsilon(1.0_dp)) &
+            error stop "Zheleznyak model requires oxygen"
+       photons_absorbing_gas_pressure = frac_gas * GAS_pressure
+       pfi_quench_factor = (40.0D0 * UC_torr_to_bar) / &
+            (GAS_pressure + (40.0D0 * UC_torr_to_bar))
+
+       pfi_enabled = .true.
+    case("CO2-experimental")
+       ! CO2 photoionization model, see "Photoionization produced by
+       ! low-current discharges in O2, air, N2 and > CO2", Pancheshnyi, 2015
+       pfi_enabled = .true.
+       pfi_photo_eff_table1 = [5D6, 6.5D6, 8.4D6, 13.4D6, 25D6]
+       pfi_photo_eff_table2 = [0.0D0, 0.6D-4, 1.2D-4, 2.8D-4, 4.8D-4]
+       absorp_inv_lengths = [34D0 / UC_torr_to_bar, 220D0 / UC_torr_to_bar]
+
+       frac_gas = GAS_get_fraction("CO2")
+       if (frac_gas <= epsilon(1.0_dp)) &
+            error stop "CO2-experimental model requires CO2"
+       photons_absorbing_gas_pressure = frac_gas * GAS_pressure
+       pfi_quench_factor = 1.0_dp ! TODO: check if this is correct
+    case ("none")
+       photoionization_enabled = .false.
+       photoemission_enabled = .false.
+    case default
+       error stop "Unrecognized photon%model"
     end select
+
+    call CFG_add(cfg, "photon%efield_table", pfi_photo_eff_table1, &
+         "Tabulated electric fields (for the photo-efficiency)", &
+         .true.)
+    call CFG_add(cfg, "photon%efficiency_table", pfi_photo_eff_table2, &
+         "Tabulated photoionization efficiencies (one value means constant)", &
+         .true.)
+    call CFG_add(cfg, "photon%absorp_inv_lengths", absorp_inv_lengths, &
+         "The inverse min/max absorption length, will be scaled by gas density")
+
+    ! Check if arrays have the same size
+    call CFG_get_size(cfg, "photon%efficiency_table", t_size)
+    call CFG_get_size(cfg, "photon%efield_table", t_size_2)
+    if (t_size_2 /= t_size) &
+         error stop "size(photon%efield_table) /= size(photon%efficiency_table)"
+
+    deallocate(pfi_photo_eff_table1, pfi_photo_eff_table2)
+    allocate(pfi_photo_eff_table1(t_size))
+    allocate(pfi_photo_eff_table2(t_size))
+    call CFG_get(cfg, "photon%efield_table", pfi_photo_eff_table1)
+    call CFG_get(cfg, "photon%efficiency_table", pfi_photo_eff_table2)
+
+    call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
+    pfi_min_inv_abs_len = temp_vec(1) * photons_absorbing_gas_pressure
+    pfi_max_inv_abs_len = temp_vec(2) * photons_absorbing_gas_pressure
 
   end subroutine photons_initialize
 
-  ! ==== Now the modules for Zheleznyak air model
-  subroutine Zheleznyak_initialize(cfg)
-    use m_gas
-    use m_config
-    type(CFG_t), intent(inout) :: cfg
-    integer                    :: t_size, t_size_2
-    real(dp)                   :: frac_O2, temp_vec(2)
-
-    ! Photoionization parameters for AIR
-    call CFG_add(cfg, "photon%efield_table", &
-        [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
-        "Tabulated values of the electric field (for the photo-efficiency)")
-    call CFG_add(cfg, "photon%efficiency_table", &
-        [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0], &
-        "The tabulated values of the the photo-efficiency")
-    call CFG_add(cfg, "photon%frequencies", [2.925D12, 3.059D12], &
-        "The lower/upper bound for the frequency of the photons, not currently used")
-    call CFG_add(cfg, "photon%absorp_inv_lengths", &
-         [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
-         "The inverse min/max absorption length, will be scaled by pO2")
-    call CFG_get_size(cfg, "photon%efficiency_table", t_size)
-    call CFG_get_size(cfg, "photon%efield_table", t_size_2)
-    if (t_size_2 /= t_size) then
-      print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
-      stop
-    end if
-
-    allocate(pi_photo_eff_table1(t_size))
-    allocate(pi_photo_eff_table2(t_size))
-    call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
-    call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
-
-    if (photoi_enabled) then
-       frac_O2 = GAS_get_fraction("O2")
-       if (frac_O2 <= epsilon(1.0_dp)) then
-          error stop "There is no oxygen, you should disable photoionzation"
-       end if
-
-       pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
-            (GAS_pressure + (40.0D0 * UC_torr_to_bar))
-
-       call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
-       pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
-       pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
-    end if
-
-  end subroutine Zheleznyak_initialize
-
-  ! ==== Now the modules for CO2 model
-  subroutine CO2_initialize(cfg)
-    use m_gas
-    use m_config
-    type(CFG_t), intent(inout) :: cfg
-    integer                    :: t_size, t_size_2
-    real(dp)                   :: temp_vec(2)
-
-    ! Photoionization parameters for CO2
-    call CFG_add(cfg, "photon%efield_table", &
-        [5D6, 6.5D6, 8.4D6, 13.4D6, 25D6], &
-        "Tabulated values of the electric field (for the photo-efficiency)")
-    call CFG_add(cfg, "photon%efficiency_table", &
-        [0.0D0, 0.6D-4, 1.2D-4, 2.8D-4, 4.8D-4], &
-        "The tabulated values of the the photo-efficiency")
-    call CFG_add(cfg, "photon%frequencies", [2.925D12, 3.059D12], &
-        "The lower/upper bound for the frequency of the photons, not currently used")
-    call CFG_get_size(cfg, "photon%efficiency_table", t_size)
-    call CFG_get_size(cfg, "photon%efield_table", t_size_2)
-    if (t_size_2 /= t_size) then
-      print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
-      stop
-    end if
-
-    allocate(pi_photo_eff_table1(t_size))
-    allocate(pi_photo_eff_table2(t_size))
-    call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
-    call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
-
-    pi_quench_fac = 1.0D0
-    call CFG_add(cfg, "photon%absorp_inv_lengths", &
-         [34D0 / UC_torr_to_bar, 220D0 / UC_torr_to_bar], &
-         "The inverse min/max absorption length")
-    call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
-    pi_min_inv_abs_len = temp_vec(1) * GAS_pressure
-    pi_max_inv_abs_len = temp_vec(2) * GAS_pressure
-
-  end subroutine CO2_initialize
-
-  ! Perform photon generation and ionization according to the Zheleznyak model
-  subroutine photoi_Zheleznyak(tree, pc, n_photons)
+  !> Compute photoionization due to a list of particle events
+  subroutine photons_photoionization(tree, pc, n_photons)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    integer, intent(out)          :: n_photons
-    type(prng_t)                  :: prng
-
-    integer  :: n, m, n_uv, tid
-    integer  :: n_part_before
-    real(dp) :: x_start(3), x_stop(3)
+    type(af_t), intent(inout) :: tree
+    type(PC_t), intent(inout) :: pc
+    integer, intent(out)      :: n_photons
+    type(prng_t)              :: prng
+    integer                   :: n, m, n_uv, tid, cix
+    integer                   :: n_part_before
+    real(dp)                  :: x_start(3), x_stop(3)
+    real(dp)                  :: en_frac, lambda, mean_production
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
     n_part_before = pc%n_part
 
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
+    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid, mean_production, &
+    !$omp& en_frac, cix, lambda)
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_ionize_t) then
-          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+       mean_production = mean_photoionization_production(pc%event_list(n))
+
+       if (mean_production > 0) then
+          n_uv = prng%rngs(tid)%poisson(mean_production)
 
           do m = 1, n_uv
              x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start, prng%rngs(tid))
+
+             if (pc%event_list(n)%ctype == CS_ionize_t) then
+                en_frac = prng%rngs(tid)%unif_01()
+                lambda = pfi_photoionization_lambda(en_frac)
+             else
+                cix = pc%event_list(n)%cix
+                lambda = pc%colls(cix)%c3 * photons_absorbing_gas_pressure
+             end if
+
+             x_stop = get_x_stop(x_start, lambda, prng%rngs(tid))
              x_stop(1:NDIM) = get_coordinates_x(x_stop)
 
              if (is_in_gas(tree, x_stop) .and. .not. &
                   ignore_photon(x_stop)) then
-               call single_photoionization_event(tree, pc, x_stop)
+                call single_photoionization_event(tree, pc, x_stop)
              end if
           end do
        end if
@@ -235,234 +212,143 @@ contains
 
     n_photons = pc%n_part - n_part_before
     call prng%update_seed(GL_rng)
-  end subroutine photoi_Zheleznyak
+  end subroutine photons_photoionization
 
-  ! Perform photon generation and ionization according to the Zheleznyak model
-  subroutine photoi_CO2_exp(tree, pc, n_photons)
+  !> Compute photoemission due to a list of particle events
+  subroutine photons_photoemission(tree, pc)
     use omp_lib, only: omp_get_max_threads, omp_get_thread_num
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    integer, intent(out)          :: n_photons
-    type(prng_t)                  :: prng
-
-    integer  :: n, m, n_uv, tid
-    integer  :: n_part_before
-    real(dp) :: x_start(3), x_stop(3)
+    type(af_t), intent(inout) :: tree
+    type(PC_t), intent(inout) :: pc
+    logical                   :: on_surface
+    integer                   :: n, m, n_uv, tid, cix
+    real(dp)                  :: x_start(3), x_stop(3)
+    real(dp)                  :: en_frac, lambda, mean_production
+    type(prng_t)              :: prng
 
     call prng%init_parallel(omp_get_max_threads(), GL_rng)
 
-    n_part_before = pc%n_part
-
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
+    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid, &
+    !$omp& mean_production, en_frac, cix)
     tid = omp_get_thread_num() + 1
     !$omp do
     do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_ionize_t) then
-          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
+       mean_production = mean_photoemission_production(pc%event_list(n))
+
+       if (mean_production > 0) then
+          n_uv = prng%rngs(tid)%poisson(mean_production)
 
           do m = 1, n_uv
              x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start, prng%rngs(tid))
+
+             if (pc%event_list(n)%ctype == CS_ionize_t) then
+                en_frac = prng%rngs(tid)%unif_01()
+                lambda = pfi_photoionization_lambda(en_frac)
+             else
+                cix = pc%event_list(n)%cix
+                lambda = pc%colls(cix)%c3 * photons_absorbing_gas_pressure
+             end if
+
+             x_stop = get_x_stop(x_start, lambda, prng%rngs(tid))
              x_stop(1:NDIM) = get_coordinates_x(x_stop)
 
-             if (is_in_gas(tree, x_stop) .and. .not. &
-                  ignore_photon(x_stop)) then
-               call single_photoionization_event(tree, pc, x_stop)
-             end if
-          end do
-       end if
-    end do
-    !$omp end do
-    !$omp end parallel
+             call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
 
-    n_photons = pc%n_part - n_part_before
-    call prng%update_seed(GL_rng)
-  end subroutine photoi_CO2_exp
-
-  ! Perform photon generation and ionization according to the Zheleznyak model
-  subroutine photoi_CO2_cs(tree, pc, n_photons)
-    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    integer, intent(out)          :: n_photons
-    type(prng_t)                  :: prng
-
-    integer  :: n, m, n_uv, tid
-    integer  :: n_part_before
-    real(dp) :: x_start(3), x_stop(3)
-
-    call prng%init_parallel(omp_get_max_threads(), GL_rng)
-
-    n_part_before = pc%n_part
-
-    !$omp parallel private(n, n_uv, x_start, x_stop, m, tid)
-    tid = omp_get_thread_num() + 1
-    !$omp do
-    do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_photonH_t) then
-          n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
-
-          do m = 1, n_uv
-             x_start = pc%event_list(n)%part%x
-             x_stop  = get_x_stop(x_start, prng%rngs(tid))
-             x_stop(1:NDIM) = get_coordinates_x(x_stop)
-
-             if (is_in_gas(tree, x_stop) .and. .not. &
-                  ignore_photon(x_stop)) then
-               call single_photoionization_event(tree, pc, x_stop)
-             end if
-          end do
-       end if
-    end do
-    !$omp end do
-    !$omp end parallel
-
-    n_photons = pc%n_part - n_part_before
-    call prng%update_seed(GL_rng)
-  end subroutine photoi_CO2_cs
-
-  ! Perform photoemission based on the Zheleznyak model for air
-  subroutine photoe_Zheleznyak(tree, pc)
-    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    logical                       :: on_surface
-    integer                       :: n, m, n_uv, tid
-    real(dp)                      :: x_start(3), x_stop(3)
-    type(prng_t)                  :: prng
-
-    call prng%init_parallel(omp_get_max_threads(), GL_rng)
-
-    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid)
-    tid = omp_get_thread_num() + 1
-    !$omp do
-    do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_ionize_t) then
-         n_uv = prng%rngs(tid)%poisson(get_mean_n_photons(pc%event_list(n)%part))
-          do m = 1, n_uv
-            x_start = pc%event_list(n)%part%x
-            x_stop  = get_x_stop(x_start, prng%rngs(tid))
-            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
-            if (on_surface) then
-              if ((prng%rngs(tid)%unif_01() < photoe_probability)) then
+             if (on_surface) then
                 !$omp critical
-                call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
+                call single_photoemission_event(tree, pc, particle_min_weight, &
+                     x_start, x_stop)
                 !$omp end critical
-              end if
-            end if
+             end if
           end do
-      end if
+       end if
     end do
     !$omp end do
     !$omp end parallel
     call prng%update_seed(GL_rng)
-  end subroutine photoe_Zheleznyak
+  end subroutine photons_photoemission
 
-  ! Perform photoemission based on the Zheleznyak model for CO2
-  subroutine photoe_CO2(tree, pc)
-    use omp_lib, only: omp_get_max_threads, omp_get_thread_num
-    type(af_t), intent(inout)     :: tree
-    type(PC_t), intent(inout)     :: pc
-    logical                       :: on_surface
-    integer                       :: n, m, n_uv, tid, cIx
-    real(dp)                      :: x_start(3), x_stop(3), phe_probability
-    type(prng_t)                  :: prng
+  !> Calculate the mean number of photo-ionizations for an event
+  real(dp) function mean_photoionization_production(event)
+    use m_lookup_table
+    type(PC_event_t), intent(in) :: event
 
-    call prng%init_parallel(omp_get_max_threads(), GL_rng)
+    mean_photoionization_production = 0.0_dp
 
-    !$omp parallel private(n, n_uv, x_start, x_stop, on_surface, m, tid)
-    tid = omp_get_thread_num() + 1
-    !$omp do
-    do n = 1, pc%n_events
-       if (pc%event_list(n)%ctype == CS_photonL_t) then
-         cIx = pc%event_list(n)%cix
-         n_uv = prng%rngs(tid)%poisson(get_mean_n_photons_CO2(pc%event_list(n)%part))
-          do m = 1, n_uv
-            x_start = pc%event_list(n)%part%x
-            x_stop  = get_x_stop_unlimited(x_start, prng%rngs(tid))
-            call photon_diel_absorbtion(tree, x_start, x_stop, on_surface)
-            if (on_surface) then
-              phe_probability = pc%colls(cIx)%gamma_phe
-              if ((prng%rngs(tid)%unif_01() < phe_probability)) then
-                !$omp critical
-                call single_photoemission_event(tree, pc, particle_min_weight, x_start, x_stop)
-                !$omp end critical
-              end if
-            end if
-          end do
-      end if
-    end do
-    !$omp end do
-    !$omp end parallel
-    call prng%update_seed(GL_rng)
-  end subroutine photoe_CO2
+    if (pfi_enabled .and. event%ctype == CS_ionize_t) then
+       mean_photoionization_production = pfi_photoionization_efficiency(event) * &
+            pfi_quench_factor * event%part%w / particle_min_weight
+    else if (photoionization_from_collisions .and. &
+         event%ctype == CS_photoemission_t) then
+       ! The coefficient c2 should hold the photoionization probability
+       mean_photoionization_production = pc%colls(event%cix)%c2 * &
+            event%part%w / particle_min_weight
+    end if
 
+  end function mean_photoionization_production
 
-  ! Calculate the mean number of generate photons according to Zheleznyak model
-  real(dp) function get_mean_n_photons(part)
-    type(PC_part_t), intent(in)  :: part
+  !> Calculate the mean number of generated photo-emissions for an event
+  real(dp) function mean_photoemission_production(event)
+    use m_lookup_table
+    type(PC_event_t), intent(in) :: event
+
+    mean_photoemission_production = 0.0_dp
+
+    if (pfi_enabled .and. event%ctype == CS_ionize_t) then
+       ! Same number of photons as for photoionization, but we multiply with
+       ! pfi_relative_photoemission_probability
+       mean_photoemission_production = pfi_photoionization_efficiency(event) * &
+            pfi_quench_factor * event%part%w / particle_min_weight * &
+            pfi_relative_photoemission_probability
+    else if (photoemission_from_collisions .and. &
+         event%ctype == CS_photoemission_t) then
+       ! The coefficient c1 should hold the photoemission probability
+       mean_photoemission_production = pc%colls(event%cix)%c1 * &
+            event%part%w / particle_min_weight
+    end if
+
+  end function mean_photoemission_production
+
+  !> Determine photoionization efficiency coefficient (per ionization) for the
+  !> particles' electric field strength
+  real(dp) function pfi_photoionization_efficiency(event)
+    use m_lookup_table
+    type(PC_event_t), intent(in) :: event
     real(dp)                     :: fld
 
-    fld         = norm2(part%a / UC_elec_q_over_m)
-    get_mean_n_photons = get_photoi_eff(fld) * pi_quench_fac * &
-         part%w / particle_min_weight
-  end function
-
-  ! Calculate the mean number of generate photons according to Zheleznyak model
-  real(dp) function get_mean_n_photons_CO2(part)
-    type(PC_part_t), intent(in)  :: part
-
-    ! get_mean_n_photons_CO2 = pe_from_CO2 * part%w / particle_min_weight
-    get_mean_n_photons_CO2 = part%w / particle_min_weight
-  end function
+    if (size(pfi_photo_eff_table2) == 1) then
+       ! If the efficiency table contains a single element, use it as a constant
+       pfi_photoionization_efficiency = pfi_photo_eff_table2(1)
+    else
+       fld = norm2(event%part%a / UC_elec_q_over_m)
+       call LT_lin_interp_list(pfi_photo_eff_table1, &
+            pfi_photo_eff_table2, fld, pfi_photoionization_efficiency)
+    end if
+  end function pfi_photoionization_efficiency
 
   ! Calculate the coordinates of photon absorption according to Zheleznyak model
-  function get_x_stop(x_start, rng) result(x_stop)
-    type(rng_t), intent(inout)  :: rng
-    real(dp), intent(in)        :: x_start(3)
-    real(dp)                    :: x_stop(3)
-    real(dp)                    :: en_frac, fly_len
+  function get_x_stop(x_start, lambda, rng) result(x_stop)
+    real(dp), intent(in)       :: x_start(3) ! Start coordinate
+    real(dp), intent(in)       :: lambda ! Inverse absorption length
+    type(rng_t), intent(inout) :: rng
+    real(dp)                   :: x_stop(3)
+    real(dp)                   :: fly_len
 
-    en_frac = rng%unif_01()
-    fly_len = -log(1.0_dp - rng%unif_01()) / get_photoi_lambda(en_frac)
-    x_stop  = x_start + rng%sphere(fly_len)
-  end function
-
-  ! Calculate the coordinates of photon absorption with unlimited fly_len
-  function get_x_stop_unlimited(x_start, rng) result(x_stop)
-    type(rng_t), intent(inout)  :: rng
-    real(dp), intent(in)        :: x_start(3)
-    real(dp)                    :: x_stop(3)
-    real(dp)                    :: en_frac, fly_len
-
-    en_frac = rng%unif_01()
-    fly_len = sqrt(domain_len(1)**2 + domain_len(2)**2)
-    x_stop  = x_start + rng%sphere(fly_len)
-  end function
-
-
-  ! Returns the photo-efficiency (for ionization) coefficient corresponding to an electric
-  ! field of strength fld, according to Zheleznyak model
-  real(dp) function get_photoi_eff(fld)
-    use m_lookup_table
-    real(dp), intent(in) :: fld
-
-    if (pi_eff_fixed) then
-        get_photoi_eff = pi_eff
+    if (lambda > 0) then
+       fly_len = -log(1.0_dp - rng%unif_01()) / lambda
     else
-        call LT_lin_interp_list(pi_photo_eff_table1, &
-             pi_photo_eff_table2, fld, get_photoi_eff)
+       ! No absorption, let the photon fly out of the domain
+       fly_len = norm2(domain_len)
     end if
-  end function get_photoi_eff
+
+    x_stop  = x_start + rng%sphere(fly_len)
+  end function get_x_stop
 
   ! Returns the inverse mean free path for a photon according to Zheleznyak model
-  real(dp) function get_photoi_lambda(en_frac)
+  real(dp) function pfi_photoionization_lambda(en_frac)
     real(dp), intent(in) :: en_frac
-    get_photoi_lambda = pi_min_inv_abs_len * &
-         (pi_max_inv_abs_len/pi_min_inv_abs_len)**en_frac
-  end function get_photoi_lambda
-
-  ! ==== General modules
+    pfi_photoionization_lambda = pfi_min_inv_abs_len * &
+         (pfi_max_inv_abs_len/pfi_min_inv_abs_len)**en_frac
+  end function pfi_photoionization_lambda
 
   ! Generate photo-emitted electrons on the surface of a dielectric
   subroutine single_photoemission_event(tree, pc, photon_w, x_gas, x_diel)
@@ -523,6 +409,7 @@ contains
     new_part%id = af_get_id_at(tree, x_stop(1:NDIM))
 
     ! It is key that the photons are added at the end of the list
+    ! Note: OMP critical is present in add_part
     call pc%add_part(new_part)
   end subroutine single_photoionization_event
 
@@ -534,25 +421,26 @@ contains
     logical                        :: success
 
     if (GL_use_dielectric) then
-      m_eps = af_interp0(tree, x_stop, [i_eps], success)
-      if (m_eps(1) > 1.0_dp .or. .not. success) then
-        is_in_gas     = .false.
-      else
-        is_in_gas     = .true.
-      end if
+       m_eps = af_interp0(tree, x_stop, [i_eps], success)
+       if (m_eps(1) > 1.0_dp .or. .not. success) then
+          is_in_gas     = .false.
+       else
+          is_in_gas     = .true.
+       end if
     else
-      if (any(x_stop < 0.0_dp .or. x_stop > domain_len)) then
-        is_in_gas     = .false.
-      else
-        is_in_gas     = .true.
-      end if
+       if (any(x_stop < 0.0_dp .or. x_stop > domain_len)) then
+          is_in_gas     = .false.
+       else
+          is_in_gas     = .true.
+       end if
     end if
   end function is_in_gas
 
   ! Check if the photon is in the ignore area
   logical function ignore_photon(x_stop)
     real(dp), intent(in) :: x_stop(NDIM)
-    ignore_photon = any(x_stop < pi_photon_rmin) .or. any(x_stop > pi_photon_rmax)
+    ignore_photon = any(x_stop < photoionization_rmin) .or. &
+         any(x_stop > photoionization_rmax)
   end function ignore_photon
 
   ! Determine if an emitted photon is absorbed by the gas or dielectric surface
@@ -567,11 +455,11 @@ contains
     m_eps = af_interp0(tree, x_stop, [i_eps], success)
     ! Perform bisection and determine on_surface
     if (m_eps(1) > 1.0_dp .or. .not. success) then
-      call bisect_line(tree, x_start, x_stop, i_eps)
-      m_eps = af_interp0(tree, x_stop, [i_eps], success)
-      on_surface = success
+       call bisect_line(tree, x_start, x_stop, i_eps)
+       m_eps = af_interp0(tree, x_stop, [i_eps], success)
+       on_surface = success
     else ! The photon is absorbed by the gas
-      on_surface = .false.
+       on_surface = .false.
     end if
   end subroutine photon_diel_absorbtion
 
@@ -590,13 +478,13 @@ contains
     ! Determine the number of steps to ensure a minimum error smaller than the cell size
     n_steps = -ceiling(log(af_min_dr(tree)/distance) / log(2.0_dp))
     do n = 1, n_steps
-      x_mid = 0.5_dp * (x_start + x_stop)
-      m_eps = af_interp0(tree, x_mid, [i_eps], success)
-      if (m_eps(1) > 1.0_dp .or. .not. success) then
-        x_stop = x_mid ! Move the end to the middle
-      else
-        x_start = x_mid ! Move the start to the middle
-      end if
+       x_mid = 0.5_dp * (x_start + x_stop)
+       m_eps = af_interp0(tree, x_mid, [i_eps], success)
+       if (m_eps(1) > 1.0_dp .or. .not. success) then
+          x_stop = x_mid ! Move the end to the middle
+       else
+          x_start = x_mid ! Move the start to the middle
+       end if
     end do
   end subroutine bisect_line
 
