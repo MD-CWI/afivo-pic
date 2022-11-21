@@ -160,7 +160,7 @@ contains
     call af_add_cc_variable(tree, "rhs", .true., ix=i_rhs)
     call af_add_cc_variable(tree, "residual", .false., ix=i_residual)
     call af_add_cc_variable(tree, "ppc", .true., ix=i_ppc)
-    call af_add_cc_variable(tree, "energy", .false., ix=i_energy)
+    call af_add_cc_variable(tree, "energy", .true., ix=i_energy)
 
     call CFG_add_get(cfg, "cylindrical", GL_cylindrical, &
          "Whether cylindrical coordinates are used (only in 2D)")
