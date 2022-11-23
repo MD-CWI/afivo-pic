@@ -482,7 +482,7 @@ contains
        !$omp do
        do i = 1, size(tree%lvls(lvl)%ids)
           id = tree%lvls(lvl)%ids(i)
-            if (tree%boxes(id)%cc(1, 1, i_eps) > 1) then
+            if (tree%boxes(id)%cc(DTIMES(1), i_eps) > 1) then
               call af_box_clear_cc(tree%boxes(id), iv)
             end if
        end do
