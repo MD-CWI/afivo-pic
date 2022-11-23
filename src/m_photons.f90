@@ -67,7 +67,7 @@ contains
     real(dp)                   :: frac_gas, absorp_inv_lengths(2)
     real(dp)                   :: temp_vec(2), dummy_vec(0)
     integer                    :: t_size, t_size_2
-    character(CFG_name_len)    :: model
+    character(CFG_name_len)    :: model = "none"
 
     call CFG_add_get(cfg, "photon%model", model, &
          "The model that is used for photoionization")

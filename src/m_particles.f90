@@ -393,7 +393,7 @@ contains
     type(PC_t), intent(inout)        :: pc
     logical, intent(in)              :: init_cond
 
-    integer                     :: n, i, n_part, n_photons
+    integer                     :: n, i, j, n_attachments, n_part, n_photons
     integer                     :: n_part_before
     real(dp), allocatable, save :: coords(:, :)
     real(dp), allocatable, save :: weights(:)
@@ -426,7 +426,11 @@ contains
             iv_tmp=i_tmp_dens)
     end if
 
+    ! Ionization events are stored at the beginning of the array, attachment
+    ! events at the end
     i = 0
+    j = size(weights) + 1
+
     do n = 1, pc%n_events
        if (pc%event_list(n)%ctype == CS_ionize_t) then
           i = i + 1
@@ -434,10 +438,10 @@ contains
           weights(i) = pc%event_list(n)%part%w
           id_guess(i) = pc%event_list(n)%part%id
        else if (pc%event_list(n)%ctype == CS_attach_t) then
-          i = i + 1
-          coords(:, i) = get_coordinates(pc%event_list(n)%part)
-          weights(i) = -pc%event_list(n)%part%w
-          id_guess(i) = pc%event_list(n)%part%id
+          j = j - 1
+          coords(:, j) = get_coordinates(pc%event_list(n)%part)
+          weights(j) = pc%event_list(n)%part%w
+          id_guess(j) = pc%event_list(n)%part%id
        else if (pc%event_list(n)%ctype == PC_particle_went_out .and. &
             pc%event_list(n)%cIx == inside_dielectric) then
           ! Now we map the particle to surface charge
@@ -446,10 +450,19 @@ contains
        end if
     end do
 
-    if (i > 0) then ! only for the events that created an ion
+    ! Handle ionization events, stored at the beginning of the arrays
+    if (i > 0) then
        call af_particles_to_grid(tree, i_pos_ion, i, &
             get_event_id, get_event_rw, interpolation_order_to_density, &
             iv_tmp=i_tmp_dens)
+    end if
+
+    ! Handle attachment events, which were stored at the end of the arrays
+    n_attachments = size(weights) + 1 - j
+    if (n_attachments > 0) then
+       call af_particles_to_grid(tree, i_neg_ion, n_attachments, &
+            get_event_id, get_event_rw, interpolation_order_to_density, &
+            iv_tmp=i_tmp_dens, offset_particles=size(weights) - n_attachments)
     end if
 
     if (photoionization_enabled) then
@@ -474,10 +487,12 @@ contains
             i_surf_elec_close, 1.0_dp, clear_cc=.true., clear_surf=.true.)
        call surface_inside_layer_to_surface(tree, diel, i_pos_ion, &
             i_surf_pos_ion, 1.0_dp, clear_cc=.true., clear_surf=.false.)
+       call surface_inside_layer_to_surface(tree, diel, i_neg_ion, &
+            i_surf_neg_ion, 1.0_dp, clear_cc=.true., clear_surf=.false.)
        ! Sum densities together
        call surface_set_weighted_sum(diel, i_surf_sum_dens, &
-            [i_surf_elec, i_surf_elec_close, i_surf_pos_ion], &
-            [-1.0_dp, -1.0_dp, 1.0_dp])
+            [i_surf_elec, i_surf_elec_close, i_surf_pos_ion, i_surf_neg_ion], &
+            [-1.0_dp, -1.0_dp, 1.0_dp, -1.0_dp])
     end if
 
   contains

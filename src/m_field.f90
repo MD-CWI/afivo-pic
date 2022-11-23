@@ -147,6 +147,7 @@ contains
           id = tree%lvls(lvl)%leaves(i)
           tree%boxes(id)%cc(DTIMES(:), i_rhs) = fac * (&
                tree%boxes(id)%cc(DTIMES(:), i_pos_ion) - &
+               tree%boxes(id)%cc(DTIMES(:), i_neg_ion) - &
                tree%boxes(id)%cc(DTIMES(:), i_electron))
           if (GL_use_electrode) then
              where (tree%boxes(id)%cc(DTIMES(:), i_lsf) <= 0)

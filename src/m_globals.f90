@@ -37,6 +37,7 @@ module m_globals
   integer, protected :: n_var_cell = 0  ! Number of variables
   integer, protected :: i_electron = -1 ! Electron density
   integer, protected :: i_pos_ion  = -1 ! Positive ion density
+  integer, protected :: i_neg_ion  = -1 ! Negative ion density
   integer, protected :: i_phi      = -1 ! Electrical potential
   integer, protected :: ifc_E = -1 ! Face-centered electric field
   integer, protected :: i_E = -1     ! norm(E) (face-centered)
@@ -50,11 +51,12 @@ module m_globals
   integer, parameter :: name_len   = 12
 
   ! Index of surface charge on dielectric
-  integer, parameter :: n_surf_vars = 4
+  integer, parameter :: n_surf_vars = 5
   integer, parameter :: i_surf_sum_dens = 1
   integer, parameter :: i_surf_elec_close = 2
   integer, parameter :: i_surf_elec = 3
   integer, parameter :: i_surf_pos_ion = 4
+  integer, parameter :: i_surf_neg_ion = 5
 
   !> How many gigabytes of memory to use for afivo
   real(dp), protected :: GL_memory_afivo_GB = 2.0_dp
@@ -153,6 +155,7 @@ contains
 
     call af_add_cc_variable(tree, "electron", .true., ix=i_electron)
     call af_add_cc_variable(tree, "pos_ion", .true., ix=i_pos_ion)
+    call af_add_cc_variable(tree, "neg_ion", .true., ix=i_neg_ion)
     call af_add_cc_variable(tree, "phi", .false., ix=i_phi)
     call af_add_fc_variable(tree, "E_fc", ix=ifc_E)
 

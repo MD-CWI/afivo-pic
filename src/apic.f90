@@ -110,6 +110,8 @@ program apic
   call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
        prolong=af_prolong_limit)
+  call af_set_cc_methods(tree, i_neg_ion, af_bc_neumann_zero, &
+       prolong=af_prolong_limit)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
 
   if (GL_use_dielectric) then
@@ -129,6 +131,7 @@ program apic
   ! Perform additional refinement
   do i = 1, 100
      call af_tree_clear_cc(tree, i_pos_ion)
+     call af_tree_clear_cc(tree, i_neg_ion)
      call particles_to_density_and_events(tree, pc, .true.)
 
      if (associated(user_initial_ion_density)) &
@@ -161,6 +164,7 @@ program apic
      end do
 
      call af_tree_clear_cc(tree, i_pos_ion)
+     call af_tree_clear_cc(tree, i_neg_ion)
      call particles_to_density_and_events(tree, pc, .true.)
   end if
 
@@ -395,26 +399,28 @@ contains
 
   subroutine print_info()
     use m_units_constants
-    real(dp) :: max_fld, max_elec, max_pion
-    real(dp) :: sum_elec, sum_pos_ion
+    real(dp) :: max_fld, max_elec, max_pion, max_nion
+    real(dp) :: sum_elec, sum_pos_ion, sum_neg_ion
     real(dp) :: mean_en, n_elec, n_part
     real(dp) :: surf_int
 
     call af_tree_max_cc(tree, i_E, max_fld)
     call af_tree_max_cc(tree, i_electron, max_elec)
     call af_tree_max_cc(tree, i_pos_ion, max_pion)
+    call af_tree_max_cc(tree, i_neg_ion, max_nion)
     call af_tree_sum_cc(tree, i_electron, sum_elec)
     call af_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
+    call af_tree_sum_cc(tree, i_neg_ion, sum_neg_ion)
     mean_en = pc%get_mean_energy()
     n_part  = pc%get_num_sim_part()
     n_elec  = pc%get_num_real_part()
 
     write(*, "(A20,E12.4)") "dt", GL_dt
     write(*, "(A20,E12.4)") "max field", max_fld
-    write(*, "(A20,2E12.4)") "max elec/pion", max_elec, max_pion
-    write(*, "(A20,2E12.4)") "sum elec/pion", sum_elec, sum_pos_ion
+    write(*, "(A20,3E12.4)") "max elec/pion/nion", max_elec, max_pion, max_nion
+    write(*, "(A20,3E12.4)") "sum elec/pion/nion", sum_elec, sum_pos_ion, sum_neg_ion
     call surface_get_integral(diel, i_surf_sum_dens, surf_int)
-    write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec + surf_int
+    write(*, "(A20,E12.4)") "Net charge", sum_pos_ion - sum_elec - sum_neg_ion + surf_int
     write(*, "(A20,E12.4)") "mean energy", mean_en / UC_elec_volt
     write(*, "(A20,2E12.4)") "n_part, n_elec", n_part, n_elec
     write(*, "(A20,E12.4)") "mean weight", n_elec/max(n_part, 1.0_dp)
@@ -448,7 +454,7 @@ contains
     end if
 
     ! Fill ghost cells before writing output
-    call af_gc_tree(tree, [i_electron, i_pos_ion])
+    call af_gc_tree(tree, [i_electron, i_pos_ion, i_neg_ion])
 
   end subroutine set_output_variables
 

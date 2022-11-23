@@ -22,7 +22,7 @@ contains
     integer                      :: my_unit
     real(dp)                     :: velocity, dt
     real(dp), save               :: prev_pos(NDIM) = 0
-    real(dp)                     :: sum_elec, sum_pos_ion
+    real(dp)                     :: sum_elec, sum_pos_ion, sum_neg_ion
     real(dp)                     :: max_elec, max_field, max_Er, min_Er
     real(dp)                     :: ne_zminmax(2)
     real(dp)                     :: elecdens_threshold, max_field_tip
@@ -45,6 +45,7 @@ contains
 
     call af_tree_sum_cc(tree, i_electron, sum_elec)
     call af_tree_sum_cc(tree, i_pos_ion, sum_pos_ion)
+    call af_tree_sum_cc(tree, i_neg_ion, sum_neg_ion)
     call af_tree_max_cc(tree, i_electron, max_elec, loc_elec)
     call af_tree_max_cc(tree, i_E, max_field, loc_field)
     call af_tree_max_fc(tree, 1, ifc_E, max_Er, loc_Er)
@@ -106,11 +107,11 @@ contains
     end if
 
 #if NDIM == 1
-    n_reals = 15
+    n_reals = 16
 #elif NDIM == 2
-    n_reals = 22
+    n_reals = 23
 #elif NDIM == 3
-    n_reals = 21
+    n_reals = 22
 #endif
 
     if (associated(user_log_variables)) then
@@ -127,7 +128,7 @@ contains
          position="append")
 #if NDIM == 1
     write(my_unit, fmt) out_cnt, GL_time, dt, velocity, sum_elec, &
-         sum_pos_ion, &
+         sum_pos_ion, sum_neg_ion, &
          max_field, af_r_loc(tree, loc_field), max_elec, &
          af_r_loc(tree, loc_elec), field_voltage, ne_zminmax, &
          max_field_tip, af_r_loc(tree, loc_tip), &
@@ -136,7 +137,7 @@ contains
          var_values(1:n_user_vars)
 #elif NDIM == 2
     write(my_unit, fmt) out_cnt, GL_time, dt, velocity, sum_elec, &
-         sum_pos_ion, &
+         sum_pos_ion, sum_neg_ion, &
          max_field, af_r_loc(tree, loc_field), max_elec, &
          af_r_loc(tree, loc_elec), max_Er, af_r_loc(tree, loc_Er), min_Er, &
          field_voltage, ne_zminmax, max_field_tip, af_r_loc(tree, loc_tip), &
@@ -144,7 +145,7 @@ contains
          var_values(1:n_user_vars)
 #elif NDIM == 3
     write(my_unit, fmt) out_cnt, GL_time, dt, velocity, sum_elec, &
-         sum_pos_ion,&
+         sum_pos_ion, sum_neg_ion, &
          max_field, af_r_loc(tree, loc_field), max_elec, &
          af_r_loc(tree, loc_elec), field_voltage, ne_zminmax, &
          max_field_tip, af_r_loc(tree, loc_tip), &
