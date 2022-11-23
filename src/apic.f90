@@ -300,9 +300,9 @@ program apic
         logname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_log.txt"
 
         if (associated(user_write_log)) then
-          call user_write_log(tree, fname, output_cnt)
+          call user_write_log(tree, logname, output_cnt)
         else
-          call output_log(tree, fname, output_cnt, wc_time)
+          call output_log(tree, logname, output_cnt, wc_time)
         end if
 
         ! Write mesh variables to binary file
