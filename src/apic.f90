@@ -48,6 +48,8 @@ program apic
   real(dp) :: wtime_amr = 0.0_dp
   integer :: output_cnt = 0 ! Number of output files written
 
+  procedure(af_subr_prolong), pointer :: prolongation_method => null()
+
   ! Read command line arguments and configuration files
   call CFG_update_from_arguments(cfg)
 
@@ -107,11 +109,20 @@ program apic
   ! This routine always needs to be called when using multigrid
   call mg_init(tree, mg)
 
-  call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero)
+  if (GL_cylindrical) then
+     ! This ensures there is charge conservation when adapting the mesh in a
+     ! cylindrical geometry. It can lead to negative densities however.
+     prolongation_method => af_prolong_linear_cons
+  else
+     prolongation_method => af_prolong_limit
+  end if
+
+  call af_set_cc_methods(tree, i_electron, af_bc_neumann_zero, &
+       prolong=prolongation_method)
   call af_set_cc_methods(tree, i_pos_ion, af_bc_neumann_zero, &
-       prolong=af_prolong_limit)
+       prolong=prolongation_method)
   call af_set_cc_methods(tree, i_neg_ion, af_bc_neumann_zero, &
-       prolong=af_prolong_limit)
+       prolong=prolongation_method)
   call af_set_cc_methods(tree, i_E, af_bc_neumann_zero)
 
   if (GL_use_dielectric) then
@@ -322,6 +333,7 @@ program apic
 
      if (mod(it, refine_per_steps) == 0) then
         t0 = omp_get_wtime()
+
         if (GL_use_dielectric) then
            ! Make sure there are no refinement jumps across the dielectric
            call surface_get_refinement_links(diel, ref_links)
@@ -332,6 +344,7 @@ program apic
            call af_adjust_refinement(tree, refine_routine, ref_info, &
                 refine_buffer_width)
         end if
+
         t1 = omp_get_wtime()
         wtime_amr = wtime_amr + (t1 - t0)
 
