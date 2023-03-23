@@ -100,6 +100,7 @@ contains
        ! Zheleznyak photoionization model for air. See "Photoionization of
        ! nitrogen and oxygen mixtures by radiation from a gas discharge" by
        ! Zheleznyak et al., 1982
+       photoionization_enabled = .true.
        pfi_enabled = .true.
        pfi_photo_eff_table1 = [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7]
        pfi_photo_eff_table2 = [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0]
@@ -116,6 +117,7 @@ contains
     case("CO2-experimental")
        ! CO2 photoionization model, see "Photoionization produced by
        ! low-current discharges in O2, air, N2 and > CO2", Pancheshnyi, 2015
+       photoionization_enabled = .true.
        pfi_enabled = .true.
        pfi_photo_eff_table1 = [5D6, 6.5D6, 8.4D6, 13.4D6, 25D6]
        pfi_photo_eff_table2 = [0.0D0, 0.6D-4, 1.2D-4, 2.8D-4, 4.8D-4]
