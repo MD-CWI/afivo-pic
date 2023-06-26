@@ -15,8 +15,6 @@ module m_particles
 
   real(dp), parameter :: array_incr_fac = 1.25_dp
 
-  real(dp), protected :: steps_per_period = 30.0_dp
-
 contains
 
   subroutine init_particle(cfg, pc)
@@ -76,8 +74,6 @@ contains
          "The size of the lookup table for the collision rates")
     call CFG_add(cfg, "particle%max_energy_ev", 500.0_dp, &
          "The maximum energy in eV for particles in the simulation")
-    call CFG_add_get(cfg, "boris_steps_per_period", steps_per_period, &
-         "The minimum number of time steps per gyration")
 
     call CFG_get_size(cfg, "gas%components", n_gas_comp)
     call CFG_get_size(cfg, "gas%fractions", n_gas_frac)
