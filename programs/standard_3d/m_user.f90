@@ -19,13 +19,13 @@ contains
   subroutine user_initialize(cfg)
     type(CFG_t), intent(inout) :: cfg
 
-    call CFG_add_get(cfg, "seed_pos", seed_pos, &
+    call CFG_add_get(cfg, "pc%seed_pos", seed_pos, &
          "relative position of initial seed")
-    call CFG_add_get(cfg, "seed_sigma", seed_sigma, &
+    call CFG_add_get(cfg, "pc%seed_sigma", seed_sigma, &
          "characteristic size of the initial seed")
-    call CFG_add_get(cfg, "seed_num_particles", seed_num_particles, &
+    call CFG_add_get(cfg, "pc%seed_num_particles", seed_num_particles, &
          "number of particles in the seed")
-    call CFG_add_get(cfg, "seed_particle_weight", seed_particle_weight, &
+    call CFG_add_get(cfg, "pc%seed_particle_weight", seed_particle_weight, &
          "weight of the particles in the seed")
 
     user_initial_particles => init_particles
