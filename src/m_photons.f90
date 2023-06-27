@@ -119,7 +119,7 @@ contains
        ! low-current discharges in O2, air, N2 and > CO2", Pancheshnyi, 2015
        photoionization_enabled = .true.
        pfi_enabled = .true.
-       pfi_photo_eff_table1 = [5D6, 6.5D6, 8.4D6, 13.4D6, 25D6]
+       pfi_photo_eff_table1 = [200D0, 259D0, 334D0, 534D0, 1000D0]
        pfi_photo_eff_table2 = [0.0D0, 0.6D-4, 1.2D-4, 2.8D-4, 4.8D-4]
        absorp_inv_lengths = [34D0 / UC_torr_to_bar, 220D0 / UC_torr_to_bar]
 
@@ -314,16 +314,17 @@ contains
   !> particles' electric field strength
   real(dp) function pfi_photoionization_efficiency(event)
     use m_lookup_table
+    use m_gas
     type(PC_event_t), intent(in) :: event
-    real(dp)                     :: fld
+    real(dp)                     :: reduced_fld
 
     if (size(pfi_photo_eff_table2) == 1) then
        ! If the efficiency table contains a single element, use it as a constant
        pfi_photoionization_efficiency = pfi_photo_eff_table2(1)
     else
-       fld = norm2(event%part%a / UC_elec_q_over_m)
+      reduced_fld = norm2(event%part%a / UC_elec_q_over_m) / GAS_number_dens / 1e-21
        call LT_lin_interp_list(pfi_photo_eff_table1, &
-            pfi_photo_eff_table2, fld, pfi_photoionization_efficiency)
+            pfi_photo_eff_table2, reduced_fld, pfi_photoionization_efficiency)
     end if
   end function pfi_photoionization_efficiency
 
