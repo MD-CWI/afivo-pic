@@ -53,6 +53,9 @@ module m_photons
   !> Pressure of the gas that is absorbing photons
   real(dp) :: photons_absorbing_gas_pressure = 0.0_dp
 
+  !> Quenching pressure for photoionization (bar)
+  real(dp) :: photon_quenching_pressure = 40e-3_dp
+
   ! Public methods
   public  :: photons_initialize
   public  :: photons_photoionization
@@ -90,6 +93,10 @@ contains
          photoemission_from_collisions, &
          "Whether to include photoemission from collisions")
 
+    call CFG_add_get(cfg, "photon%quenching_pressure", &
+         photon_quenching_pressure, &
+         "Quenching pressure for photoionization")
+
     pfi_photo_eff_table1 = dummy_vec
     pfi_photo_eff_table2 = dummy_vec
     absorp_inv_lengths = [0.0_dp, 0.0_dp]
@@ -110,8 +117,8 @@ contains
        if (frac_gas <= epsilon(1.0_dp)) &
             error stop "Zheleznyak model requires oxygen"
        photons_absorbing_gas_pressure = frac_gas * GAS_pressure
-       pfi_quench_factor = (40.0D0 * UC_torr_to_bar) / &
-            (GAS_pressure + (40.0D0 * UC_torr_to_bar))
+       pfi_quench_factor = photon_quenching_pressure / &
+            (GAS_pressure + photon_quenching_pressure)
 
        pfi_enabled = .true.
     case("CO2-experimental")
@@ -127,7 +134,8 @@ contains
        if (frac_gas <= epsilon(1.0_dp)) &
             error stop "CO2-experimental model requires CO2"
        photons_absorbing_gas_pressure = frac_gas * GAS_pressure
-       pfi_quench_factor = 1.0_dp ! TODO: check if this is correct
+       pfi_quench_factor = photon_quenching_pressure / &
+            (GAS_pressure + photon_quenching_pressure)
     case ("none")
        photoionization_enabled = .false.
        photoemission_enabled = .false.
