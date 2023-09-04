@@ -18,7 +18,7 @@ private
 logical, public         :: photoi_enabled
 logical, public         :: photoe_enabled
 real(dp)                :: photoe_probability = 1.0e-2_dp
-character(CFG_name_len) :: model
+character(CFG_name_len) :: model = "Zheleznyak"
 
 real(dp)              :: pi_quench_fac
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
@@ -85,7 +85,7 @@ contains
         photoionization => photoi_Zheleznyak
         photoemission => photoe_Zheleznyak
       case default
-        error stop "Unrecognized photon model"
+        error stop "Unrecognized photon model (choices: Zheleznyak)"
     end select
 
   end subroutine photons_initialize
