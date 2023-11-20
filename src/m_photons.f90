@@ -30,6 +30,7 @@ module m_photons
   !> Whether photoionization from (or proportional to) ionization is enabled, as
   !> is for example used in in Zheleznyak's model
   logical  :: pfi_enabled                            = .false.
+  logical  :: quenching_enabled                            = .true.
   !> Relative photoemission probability (compared to photoionization), if both
   !> are assumed proportional to ionization
   real(dp) :: pfi_relative_photoemission_probability = 1.0e-2_dp
@@ -77,6 +78,9 @@ contains
     call CFG_add_get(cfg, "photon%photoemission_enabled", &
          photoemission_enabled, &
          "Whether photoemission is used")
+    call CFG_add_get(cfg, "photon%quenching_enabled", &
+         quenching_enabled, &
+         "Whether quenching is used")
     call CFG_add_get(cfg, "photon%relative_photoemission_probability", &
          pfi_relative_photoemission_probability, &
          "The relative probability of photoemission compared to photoionization "&
@@ -134,8 +138,12 @@ contains
        if (frac_gas <= epsilon(1.0_dp)) &
             error stop "CO2-experimental model requires CO2"
        photons_absorbing_gas_pressure = frac_gas * GAS_pressure
-       pfi_quench_factor = photon_quenching_pressure / &
+       if (quenching_enabled) then
+         pfi_quench_factor = photon_quenching_pressure / &
             (GAS_pressure + photon_quenching_pressure)
+       else
+         pfi_quench_factor = 1
+       end if
     case ("none")
        photoionization_enabled = .false.
        photoemission_enabled = .false.
