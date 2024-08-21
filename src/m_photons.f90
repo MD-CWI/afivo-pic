@@ -113,7 +113,8 @@ contains
        ! Zheleznyak et al., 1982
        photoionization_enabled = .true.
        pfi_enabled = .true.
-       pfi_photo_eff_table1 = [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7]
+       !TODO change to TD
+       pfi_photo_eff_table1 = [0.0D0, 100D0, 160D0, 300D0, 600D0, 1500D0]
        pfi_photo_eff_table2 = [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0]
        absorp_inv_lengths = [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar]
 
