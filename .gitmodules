@@ -1,10 +1,9 @@
 [submodule "particle_core"]
 	path = particle_core
-	url = https://gitlab.com/MD-CWI-NL/particle_core.git
+	url = https://github.com/MD-CWI/particle_core.git
 [submodule "afivo"]
 	path = afivo
-	url = https://gitlab.com/MD-CWI-NL/afivo.git
-	branch = photoemission
+	url = https://github.com/MD-CWI/afivo.git
 [submodule "config_fortran"]
 	path = src/config_fortran
 	url = https://github.com/jannisteunissen/config_fortran
