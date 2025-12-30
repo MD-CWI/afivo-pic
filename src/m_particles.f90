@@ -37,6 +37,7 @@ contains
     type(CS_t), allocatable        :: cross_secs(:)
     type(PC_part_t)                :: dummy_part
     real(dp)                       :: boris_dt_factor = 0.1_dp
+    logical                        :: collisions_enabled = .true.
 
     ! Gas parameters
     call CFG_add(cfg, "gas%temperature", 300.0_dp, &
@@ -61,6 +62,9 @@ contains
 
     call CFG_add_get(cfg, "particle%boris_dt_factor", boris_dt_factor, &
          "With B-field: limit time step to boris_dt_factor / cyclotron freq.")
+
+    call CFG_add_get(cfg, "particle%collisions_enabled", collisions_enabled, &
+         "Whether electron-neutral collisions are enabled")
 
     if (GL_cylindrical) then
        ! Adapt weights more frequently to prevent fluctuations near the axis
@@ -92,15 +96,6 @@ contains
     ! Initialize gas and electric field module
     call GAS_initialize(gas_names, gas_fracs, GL_gas_pressure, temperature)
 
-    do nn = 1, n_gas_comp
-       call CS_add_from_file(trim(cs_file), &
-            trim(gas_names(nn)), gas_fracs(nn) * &
-            GAS_number_dens, max_ev, cross_secs)
-    end do
-
-    call CS_write_summary(cross_secs, &
-         trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_summary.txt")
-
     call CFG_get(cfg, "particle%lkptbl_size", tbl_size)
 
     if (magnetic_field_used) then
@@ -129,15 +124,34 @@ contains
     write(*, "(A,I12)")   " Max number of particles: ", max_num_part
 
     call pc%initialize(UC_elec_mass, max_num_part)
-    call pc%use_cross_secs(max_ev, tbl_size, cross_secs)
+    if (collisions_enabled) then
+       do nn = 1, n_gas_comp
+          call CS_add_from_file(trim(cs_file), &
+               trim(gas_names(nn)), gas_fracs(nn) * &
+               GAS_number_dens, max_ev, cross_secs)
+       end do
+
+       call CS_write_summary(cross_secs, &
+            trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_cs_summary.txt")
+
+       call pc%use_cross_secs(max_ev, tbl_size, cross_secs)
+    else
+       pc%n_colls = 0
+       pc%max_rate = 0.0_dp
+       pc%inv_max_rate = huge(1.0_dp)
+       if (.not. allocated(pc%coll_ledger)) allocate(pc%coll_ledger(0))
+       pc%coll_ledger = 0.0_dp
+    end if
 
     pc%accel_function => get_accel
     pc%outside_check => outside_check
 
-    where (pc%colls(:)%type == CS_ionize_t .or. &
-         pc%colls(:)%type == CS_attach_t)
-       pc%coll_is_event(:) = .true.
-    end where
+    if (collisions_enabled) then
+       where (pc%colls(:)%type == CS_ionize_t .or. &
+            pc%colls(:)%type == CS_attach_t)
+          pc%coll_is_event(:) = .true.
+       end where
+    end if
 
   end subroutine init_particle
 
