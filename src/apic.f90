@@ -48,6 +48,12 @@ program apic
   real(dp) :: wtime_amr = 0.0_dp
   integer :: output_cnt = 0 ! Number of output files written
 
+  logical  :: moving_window_enabled = .false.
+  real(dp) :: moving_window_target_rel(NDIM)
+  real(dp) :: moving_window_threshold_rel(NDIM)
+  real(dp) :: moving_window_max_shift_rel(NDIM)
+  integer  :: moving_window_min_particles = 100
+
   ! Read command line arguments and configuration files
   call CFG_update_from_arguments(cfg)
 
@@ -64,6 +70,20 @@ program apic
   call refine_init(cfg, ndim)
   call photons_initialize(cfg)
   call init_cond_initialize(cfg)
+
+  moving_window_target_rel = 0.5_dp
+  moving_window_threshold_rel = 0.15_dp
+  moving_window_max_shift_rel = 0.25_dp
+  call CFG_add_get(cfg, "moving_window%enabled", moving_window_enabled, &
+       "Whether to recenter particles using a moving window")
+  call CFG_add_get(cfg, "moving_window%target_rel", moving_window_target_rel, &
+       "Target centroid position relative to domain (0..1)")
+  call CFG_add_get(cfg, "moving_window%threshold_rel", moving_window_threshold_rel, &
+       "Recenter when centroid deviates by this relative amount")
+  call CFG_add_get(cfg, "moving_window%max_shift_rel", moving_window_max_shift_rel, &
+       "Maximum recentering shift per time step, relative to domain length")
+  call CFG_add_get(cfg, "moving_window%min_particles", moving_window_min_particles, &
+       "Minimum number of particles before recentering is applied")
 
   ! Write configuration to output
   fname = trim(GL_output_dir) // "/" // trim(GL_simulation_name) // "_out.cfg"
@@ -231,6 +251,7 @@ program apic
      t0 = omp_get_wtime()
      call pc%advance_openmp(dt)
      if (.not. magnetic_field_used) call pc%after_mover(dt)
+     if (moving_window_enabled) call moving_window_recenter()
      t1 = omp_get_wtime()
      wtime_advance = wtime_advance + (t1 - t0)
 
@@ -461,5 +482,57 @@ contains
        close(my_unit, status='delete')
     end if
   end subroutine check_path_writable
+
+  subroutine moving_window_recenter()
+    real(dp) :: sums(1+NDIM)
+    real(dp) :: centroid(NDIM)
+    real(dp) :: target(NDIM)
+    real(dp) :: delta(NDIM)
+    real(dp) :: shift(3)
+    real(dp) :: dom(NDIM)
+    integer  :: ll
+
+    if (pc%get_num_sim_part() < moving_window_min_particles) return
+
+    call pc%compute_vector_sum(pptr_centroid, sums)
+    if (sums(1) <= 0.0_dp) return
+
+    centroid = sums(2:) / sums(1)
+
+    dom = domain_len(1:NDIM)
+    target = moving_window_target_rel * dom
+    delta = centroid - target
+
+    where (abs(delta) < moving_window_threshold_rel * dom)
+       delta = 0.0_dp
+    end where
+
+    delta = sign(min(abs(delta), moving_window_max_shift_rel * dom), delta)
+
+    if (maxval(abs(delta)) <= epsilon(1.0_dp)) return
+
+    shift = 0.0_dp
+    shift(1:NDIM) = -delta
+    call pc%translate(shift)
+
+    do ll = 1, pc%n_part
+       if (pc%particles(ll)%w <= PC_dead_weight) cycle
+       if (outside_check(pc%particles(ll)) > 0) call pc%remove_part(ll)
+    end do
+    call pc%clean_up()
+  end subroutine moving_window_recenter
+
+  subroutine pptr_centroid(my_part, my_reals)
+    type(PC_part_t), intent(in) :: my_part
+    real(dp), intent(out)       :: my_reals(:)
+    real(dp)                    :: coord(NDIM)
+
+    my_reals = 0.0_dp
+    if (my_part%w <= 0.0_dp) return
+
+    coord = get_coordinates(my_part)
+    my_reals(1) = my_part%w
+    my_reals(2:) = my_part%w * coord
+  end subroutine pptr_centroid
 
 end program apic

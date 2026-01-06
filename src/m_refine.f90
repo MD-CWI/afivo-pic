@@ -137,7 +137,8 @@ contains
 
        elec_dens = box%cc(IJK, i_electron)
 
-       if (adx > refine_adx .and. elec_dens > refine_elec_dens) then
+       ! if (adx > refine_adx .and. elec_dens > refine_elec_dens) then
+       if (elec_dens > refine_elec_dens) then
           cell_flags(IJK) = af_do_ref
        else if ((adx < 0.125_dp * refine_adx .or. &
             elec_dens < 0.125_dp * refine_elec_dens) .and. &
