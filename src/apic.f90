@@ -62,7 +62,7 @@ program apic
   call field_initialize(cfg, mg)
   call init_particle(cfg, pc)
   call refine_init(cfg, ndim)
-  call photons_initialize(cfg)
+  call photons_initialize(cfg) !, tree)
   call init_cond_initialize(cfg)
 
   ! Write configuration to output

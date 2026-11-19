@@ -11,6 +11,7 @@ module m_geometry
   ! Public methods
   public :: GM_dist_line
   public :: GM_dist_vec_line
+  public :: GM_dist_vec_line1
   public :: GM_density_line
   public :: GM_sigmoid
   public :: GM_gaussian
@@ -37,6 +38,31 @@ contains
        dist_vec = r - (r0 + temp/line_len2 * (r1 - r0))
     end if
   end function GM_dist_vec_line
+
+  !> Compute distance vector between point and its projection onto a line
+  !> between r0 and r1
+  pure subroutine GM_dist_vec_line1(r, r0, r1, n_dim, dist_vec, frac)
+    integer, intent(in)   :: n_dim
+    real(dp), intent(in)  :: r(n_dim), r0(n_dim), r1(n_dim)
+    real(dp), intent(out) :: dist_vec(n_dim)
+    real(dp), intent(out) :: frac !< Fraction [0,1] along line
+    real(dp)              :: line_len2
+
+    line_len2 = sum((r1 - r0)**2)
+    frac = sum((r - r0) * (r1 - r0))
+
+    if (frac <= 0.0_dp) then
+       frac = 0.0_dp
+       dist_vec = r - r0
+    else if (frac >= line_len2) then
+       frac = 1.0_dp
+       dist_vec = r - r1
+    else
+       dist_vec = r - (r0 + frac/line_len2 * (r1 - r0))
+       frac = frac / line_len2
+    end if
+  end subroutine GM_dist_vec_line1
+
 
   function GM_dist_line(r, r0, r1, n_dim) result(dist)
     integer, intent(in)  :: n_dim

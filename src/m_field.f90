@@ -59,6 +59,17 @@ module m_field
   !> Electrode radius (in m, for standard rod electrode)
   real(dp), public, protected :: field_rod_radius = -1.0_dp
 
+  !> ===========================================================================
+  !> Electrode 1: fraction of conical part (if conical)
+  real(dp) :: cone_length_frac = -1.0e100_dp
+  !> Electrode 1: tip radius (if conical)
+  real(dp) :: cone_tip_radius = -1.0e100_dp
+  !> Electrode 1: 'origin' of spherical tip (if conical)
+  real(dp) :: cone_tip_center(NDIM)
+  !> Electrode 1: radius of curvature of spherical tip (if conical)
+  real(dp) :: cone_tip_r_curvature
+  character(GL_slen) :: electrode_type
+
   public :: field_initialize
   public :: field_compute
   public :: field_from_potential
@@ -110,6 +121,49 @@ contains
          "Electrode relative end position (for standard rod electrode)")
     call CFG_add_get(cfg, "field%rod_radius", field_rod_radius, &
          "Electrode radius (in m, for standard rod electrode)")
+    
+    !> ===========================================================================
+    call CFG_add_get(cfg, "field%cone_tip_radius", cone_tip_radius, &
+         "Electrode 1: tip radius (if conical)")
+    call CFG_add_get(cfg, "field%cone_length_frac", cone_length_frac, &
+         "Electrode 1: fraction of conical part (if conical)")
+    electrode_type = "rod"
+    call CFG_add_get(cfg, "field%field_electrode_type", electrode_type, &
+         "Type of electrode (sphere, rod, rod_cone_top, rod_rod, user)")
+    !< [electrode_settings]
+    select case (electrode_type)
+    case ("rod")
+       ! Standard cylindrical rod.
+       ! No additional initialization required.
+    case ("rod_cone_top")
+    if (any(field_rod_r0 < 0.0_dp) .or. &
+        any(field_rod_r1 < 0.0_dp)) then
+        error stop "field rod coordinates not correctly specified"
+    end if
+
+    if (field_rod_radius <= 0.0_dp) then
+       error stop "field_rod_radius must be positive"
+    end if
+
+    if (cone_tip_radius <= 0.0_dp .or. &
+        cone_tip_radius > field_rod_radius) then
+        error stop "Invalid cone_tip_radius"
+    end if
+
+    if (cone_length_frac <= 0.0_dp .or. &
+        cone_length_frac > 1.0_dp) then
+        error stop "Invalid cone_length_frac"
+    end if
+    call get_conical_rod_properties( &
+          field_rod_r0 * domain_len, &
+          field_rod_r1 * domain_len, &
+          field_rod_radius, &
+          cone_tip_radius, &
+          cone_tip_center, &
+          cone_tip_r_curvature)
+   case default
+           error stop "Unknown electrode type"
+   end select
 
     call field_set_voltage(0.0_dp)
 
@@ -314,10 +368,91 @@ contains
 
   real(dp) function field_get_lsf(r)
     real(dp), intent(in) :: r(NDIM)
+    select case (electrode_type)
+    case ("rod")
+       field_get_lsf = GM_dist_line( &
+            r, &
+            field_rod_r0 * domain_len, &
+            field_rod_r1 * domain_len, &
+            NDIM) - field_rod_radius
 
-    field_get_lsf = GM_dist_line(r, field_rod_r0 * domain_len, &
-         field_rod_r1 * domain_len, NDIM) - field_rod_radius
+    case ("rod_cone_top")
+       field_get_lsf = conical_rod_lsf(r)
+
+    case default
+       error stop "Unkown electrode type in field_get_lsf"
+    end select
   end function field_get_lsf
+
+  !> ===========================================================================
+  !> Add routine to include conical electrode as is done in Afivo-streamer
+  !> Compute several parameters for a conical rod
+  subroutine get_conical_rod_properties(r0, r1, &
+       rod_radius, tip_radius, cone_tip_center, cone_tip_r_curvature)
+    real(dp), intent(in)  :: r0(NDIM) !< Beginning of rod
+    real(dp), intent(in)  :: r1(NDIM) !< End of conical part
+    real(dp), intent(in)  :: rod_radius   !< Radius of rod
+    real(dp), intent(in)  :: tip_radius   !< Radius of curvature of tip
+    real(dp), intent(out) :: cone_tip_center(NDIM)
+    real(dp), intent(out) :: cone_tip_r_curvature
+    real(dp)              :: cone_angle, cone_length
+
+    ! Determine (half) the opening angle of the top cone, which goes from
+    ! rod_radius to tip_radius over cone_length
+    cone_length = cone_length_frac * norm2(r1 - r0)
+    cone_angle  = atan((rod_radius - tip_radius) / cone_length)
+
+    ! We have a point on a sphere with coordinates of the form (R*cos(a),
+    ! R*sin(a)) = (tip_radius, y), so we can get R and subtract R sin(a) to
+    ! obtain the center of the sphere
+    cone_tip_r_curvature = tip_radius/cos(cone_angle)
+    cone_tip_center = r1 - sin(cone_angle) * &
+         cone_tip_r_curvature * (r1 - r0)/norm2(r1 - r0)
+  end subroutine get_conical_rod_properties
+
+  !> Helper function to compute lsf for a rod with a conical tip
+  pure function conical_rod_lsf_arg(r, r0, r1, cone_tip_center, &
+       rod_radius, tip_radius, cone_length_frac, r_curvature) result (lsf)
+    use m_geometry
+    real(dp), intent(in) :: r(NDIM)
+    real(dp), intent(in) :: r0(NDIM), r1(NDIM), cone_tip_center(NDIM)
+    real(dp), intent(in) :: rod_radius, tip_radius, cone_length_frac
+    real(dp), intent(in) :: r_curvature
+    real(dp)             :: lsf
+    real(dp)             :: dist_vec(NDIM), frac, radius_at_height, tmp
+
+    ! Project onto line from r0 to r1
+    call GM_dist_vec_line1(r, r0, r1, NDIM, dist_vec, frac)
+
+    if (frac <= 1 - cone_length_frac) then
+       ! Cylindrical part
+       lsf = norm2(dist_vec) - rod_radius
+    else if (frac < 1.0_dp) then
+       ! Conical part
+       tmp = (1 - frac) / cone_length_frac ! between 0 and 1
+       radius_at_height = tip_radius + tmp * (rod_radius - tip_radius)
+       lsf = norm2(dist_vec) - radius_at_height
+    else
+       ! Spherical tip
+       lsf = norm2(r - cone_tip_center) - r_curvature
+    end if
+  end function conical_rod_lsf_arg
+
+  real(dp) function conical_rod_lsf(r)
+    real(dp), intent(in) :: r(NDIM)
+
+    conical_rod_lsf = conical_rod_lsf_arg( &
+         r, &
+         field_rod_r0 * domain_len, &
+         field_rod_r1 * domain_len, &
+         cone_tip_center, &
+         field_rod_radius, &
+         cone_tip_radius, &
+         cone_length_frac, &
+         cone_tip_r_curvature)
+
+  end function conical_rod_lsf
+  !> ===========================================================================
 
   !> Compute electric field from electrical potential
   subroutine field_from_potential(box)

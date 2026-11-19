@@ -18,7 +18,7 @@ private
 logical, public         :: photoi_enabled
 logical, public         :: photoe_enabled
 real(dp)                :: photoe_probability = 1.0e-2_dp
-character(CFG_name_len) :: model = "Zheleznyak"
+character(CFG_name_len) :: model != "Zheleznyak"
 
 real(dp)              :: pi_quench_fac
 real(dp)              :: pi_min_inv_abs_len, pi_max_inv_abs_len
@@ -81,60 +81,118 @@ contains
     ! Initialize parameters and pointers according to the selected model
     select case (model)
       case("Zheleznyak")
-        call Zheleznyak_initialize(cfg)
+        call Zheleznyak_initialize(cfg, model)
+        photoionization => photoi_Zheleznyak
+        photoemission => photoe_Zheleznyak
+      case("CO2")
+        call Zheleznyak_initialize(cfg, model)
         photoionization => photoi_Zheleznyak
         photoemission => photoe_Zheleznyak
       case default
-        error stop "Unrecognized photon model (choices: Zheleznyak)"
+        error stop "Unrecognized photon model (choices: Zheleznyaki, CO2)"
     end select
 
   end subroutine photons_initialize
 
   ! ==== Now the modules for Zheleznyak air model
-  subroutine Zheleznyak_initialize(cfg)
+  subroutine Zheleznyak_initialize(cfg, model)
     use m_gas
     use m_config
     type(CFG_t), intent(inout) :: cfg
     integer                    :: t_size, t_size_2
     real(dp)                   :: frac_O2, temp_vec(2)
+    character(CFG_name_len), intent(in) :: model
+    real(dp)                   :: quenching_pressure
+    logical                    :: enable_quenching
 
-    ! Photoionization parameters for AIR
-    call CFG_add(cfg, "photon%efield_table", &
-        [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
-        "Tabulated values of the electric field (for the photo-efficiency)")
-    call CFG_add(cfg, "photon%efficiency_table", &
-        [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0], &
-        "The tabulated values of the the photo-efficiency")
-    call CFG_add(cfg, "photon%frequencies", [2.925D12, 3.059D12], &
-        "The lower/upper bound for the frequency of the photons, not currently used")
-    call CFG_add(cfg, "photon%absorp_inv_lengths", &
-         [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
-         "The inverse min/max absorption length, will be scaled by pO2")
+    if (model == "Zheleznyak") then
+      ! Photoionization parameters for AIR
+      call CFG_add(cfg, "photon%efield_table", &
+          [0.0D0, 0.25D7, 0.4D7, 0.75D7, 1.5D7, 3.75D7], &
+          "Tabulated values of the electric field (for the photo-efficiency)")
+      call CFG_add(cfg, "photon%efficiency_table", &
+          [0.0D0, 0.05D0, 0.12D0, 0.08D0, 0.06D0, 0.04D0], &
+          "The tabulated values of the the photo-efficiency")
+      call CFG_add(cfg, "photon%frequencies", [2.925D12, 3.059D12], &
+          "The lower/upper bound for the frequency of the photons, not currently used")
+      call CFG_add(cfg, "photon%absorp_inv_lengths", &
+           [3.5D0 / UC_torr_to_bar, 200D0 / UC_torr_to_bar], &
+           "The inverse min/max absorption length, will be scaled by pO2")
 
-    if (photoi_enabled .or. photoe_enabled) then
-       frac_O2 = GAS_get_fraction("O2")
-       if (frac_O2 <= epsilon(1.0_dp)) then
-          error stop "There is no oxygen, you should disable photoionzation"
-       end if
+      if (photoi_enabled .or. photoe_enabled) then
+         frac_O2 = GAS_get_fraction("O2")
+         if (frac_O2 <= epsilon(1.0_dp)) then
+            error stop "There is no oxygen, you should disable photoionzation"
+         end if
 
-       call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
-       pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
-       pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
+         call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
+         pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
+         pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
 
-       pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
-            (GAS_pressure + (40.0D0 * UC_torr_to_bar))
+         pi_quench_fac = (40.0D0 * UC_torr_to_bar) / &
+              (GAS_pressure + (40.0D0 * UC_torr_to_bar))
 
-       call CFG_get_size(cfg, "photon%efficiency_table", t_size)
-       call CFG_get_size(cfg, "photon%efield_table", t_size_2)
-       if (t_size_2 /= t_size) then
-          print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
-          stop
-       end if
+         call CFG_get_size(cfg, "photon%efficiency_table", t_size)
+         call CFG_get_size(cfg, "photon%efield_table", t_size_2)
+         if (t_size_2 /= t_size) then
+            print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
+            stop
+         end if
 
-       allocate(pi_photo_eff_table1(t_size))
-       allocate(pi_photo_eff_table2(t_size))
-       call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
-       call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
+         allocate(pi_photo_eff_table1(t_size))
+         allocate(pi_photo_eff_table2(t_size))
+         call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
+         call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
+      end if
+    else if (model == "CO2") then
+         ! Photoionization parameters for CO2
+         call CFG_add(cfg, "photon%efield_table", &
+             [0.5D7, 0.65D7, 0.84D7, 1.34D7, 2.5D7], &
+             "Tabulated values of the electric field (for the photo-efficiency)")
+         call CFG_add(cfg, "photon%efficiency_table", &
+             [0.0D0, 0.6D-4, 1.2D-4, 2.8D-4, 4.8D-4], &
+             "The tabulated values of the the photo-efficiency")
+         call CFG_add(cfg, "photon%absorp_inv_lengths", &
+             [34.0D0 / UC_torr_to_bar, 220.0D0 / UC_torr_to_bar], &
+             "The inverse min/max absorption length, will be scaled by pO2")
+         call CFG_add(cfg, "photon%enable_quenching", &
+              .false., "Whether quenching is used")
+
+        if (photoi_enabled .or. photoe_enabled) then
+           frac_O2 = GAS_get_fraction("CO2")
+           if (frac_O2 <= epsilon(1.0_dp)) then
+              error stop "There is no CO2, you should disable photoionzation"
+           end if
+           call CFG_get(cfg, "photon%absorp_inv_lengths", temp_vec)
+           pi_min_inv_abs_len = temp_vec(1) * frac_O2 * GAS_pressure
+           pi_max_inv_abs_len = temp_vec(2) * frac_O2 * GAS_pressure
+
+           call CFG_get(cfg, "photon%enable_quenching", enable_quenching)
+           if (enable_quenching) then
+                  call CFG_add(cfg, "photon%quenching_pressure", &
+                               0.03D0, "The quenching pressure [bar]")
+                  call CFG_get(cfg, "photon%quenching_pressure", quenching_pressure)
+                  pi_quench_fac = (quenching_pressure) / &
+                          (GAS_pressure + (quenching_pressure))
+           else
+                  ! If we do not want quenching in CO2   
+                  pi_quench_fac = 1.0_dp 
+           end if
+
+           call CFG_get_size(cfg, "photon%efficiency_table", t_size)
+           call CFG_get_size(cfg, "photon%efield_table", t_size_2)
+           if (t_size_2 /= t_size) then
+              print *, "size(photoi_efield_table) /= size(photoi_efficiency_table)"
+              stop
+           end if
+
+           allocate(pi_photo_eff_table1(t_size))
+           allocate(pi_photo_eff_table2(t_size))
+           call CFG_get(cfg, "photon%efield_table", pi_photo_eff_table1)
+           call CFG_get(cfg, "photon%efficiency_table", pi_photo_eff_table2)
+        end if
+    else
+      error stop "CHOICE A MODEL"
     end if
   end subroutine Zheleznyak_initialize
 
@@ -246,8 +304,8 @@ contains
     use m_lookup_table
     real(dp), intent(in) :: fld
     get_photoi_eff = pi_eff
-    ! call LT_lin_interp_list(pi_photo_eff_table1, &
-         ! pi_photo_eff_table2, fld, get_photoi_eff)
+    call LT_lin_interp_list(pi_photo_eff_table1, &
+         pi_photo_eff_table2, fld, get_photoi_eff)
   end function get_photoi_eff
 
   ! Returns the inverse mean free path for a photon according to Zheleznyak model
